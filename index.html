@@ -116,6 +116,24 @@
   #joy.on{display:block} #joy.on span{display:none}
   #joy.ghost{display:block;left:96px;top:auto;bottom:150px;margin:0 0 -56px -56px;opacity:.55}
   .menu-on #joy,.cine #joy{display:none}
+  #labHud{position:absolute;left:50%;top:44px;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none;text-align:center}
+  #labHud b{font:400 18px/1 var(--display);letter-spacing:.06em;background:#F2C81E;color:#111;padding:5px 12px 4px;transform:skewX(-10deg)}
+  #labHud b em{font-style:normal;opacity:.6;margin-left:6px}
+  #labHud span{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 12px;max-width:min(780px,92vw);font:700 12px var(--ui);letter-spacing:.12em;color:#fff;text-shadow:0 1px 0 #000,0 0 4px #000}
+  #labHud i{font-style:normal;display:inline-flex;align-items:center} #labHud i.on{color:var(--yell)}
+  #labHud small{font:700 11px var(--ui);letter-spacing:.16em;color:#D8DCE2;text-shadow:0 1px 0 #000}
+  .menu-on #labHud,.cine #labHud{display:none}
+  #ui.scr-lab .ui-in{padding-top:6vh;gap:10px;display:grid;grid-template-columns:auto minmax(0,auto);column-gap:36px;align-items:start}
+  #ui.scr-lab .ui-in > .kicker{grid-column:1 / -1;justify-self:start}
+  #ui.scr-lab .ui-in > .mlist{grid-column:2;grid-row:2;min-width:min(420px,100%)}
+  #ui.scr-lab .mi{font-size:clamp(22px,2.6vw,34px)}
+  #ui.scr-lab .ui-in > div:not(.kicker):not(.mlist){max-width:min(460px,40vw)}
+  @media (max-width:759px){#ui.scr-lab .ui-in{display:flex}#ui.scr-lab .ui-in > div:not(.kicker):not(.mlist){max-width:none}}
+  .labcard{background:#E8E8EC;color:#111;padding:12px 16px;border-left:6px solid #B01818;max-width:min(460px,80vw);display:flex;flex-direction:column;gap:5px}
+  .labcard b{font:400 28px/1 var(--display);letter-spacing:.04em}
+  .labcard span{font:700 12px var(--ui);letter-spacing:.18em}
+  .labcard em{font-style:normal} .c-keter{color:#B01818} .c-euclid{color:#C87A10} .c-safe{color:#2A8A3A}
+  .labcard p{margin:0;font-size:14px;line-height:1.35} .labcard .lk{font:700 12px var(--ui);letter-spacing:.12em;color:#3A3E46}
   @media (max-width:560px){#bonkBtn{right:126px;bottom:160px}#hagBtn{right:24px;bottom:268px}} /* phones: keep the left side clear for the move stick */
   #prompt .hg{font-style:normal;color:var(--yell);margin-left:14px}
   #prompt .hg kbd{margin-right:5px}
@@ -821,6 +839,10 @@ const THEMES = {
     name: 'Hidden Vault', stone: [0x5A4A38, 0x524434, 0x63523E, 0x4A3E30], floor: [0x40362A, 0x3A3126, 0x463B2E], trim: 0x8A6A2A, beam: 0x4A3222, ceil: 0x1E1610,
     fog: 0x120D08, hemi: [0xC8A878, 0x2A1E10, 0.7], torch: 0xFFC060, accent: [0xFFD27A, 0, 2.6, 0], pillars: [], spots: [],
   },
+  lab: {
+    name: 'Test Chamber', stone: [0xC9CDD3, 0xC1C5CC, 0xD3D7DD, 0xB8BCC4], floor: [0x8E949C, 0x878D95, 0x959BA3], trim: 0x3A3E46, beam: 0x4A4E56, ceil: 0x2C3038,
+    fog: 0x14181C, hemi: [0xE0ECF8, 0x3A4048, 0.78], torch: 0xCFE8FF, accent: [0xBFE6FF, 0, 4.6, 0], pillars: [], spots: [], lab: true,
+  },
   den: {
     name: 'Gambling Den', stone: [0x3E3A2E, 0x38342A, 0x464034, 0x332F26], floor: [0x2E3A2A, 0x293426, 0x334030], trim: 0x6A4A2A, beam: 0x3A2A1A, ceil: 0x14120C,
     fog: 0x0C0E08, hemi: [0xC8B878, 0x1E2410, 0.65], torch: 0xFFB050, accent: [0x9AFFB0, 0, 2.4, 0], pillars: [], spots: [],
@@ -1061,6 +1083,10 @@ function buildRoom(r) {
   for (const [px, pz] of th.pillars) grp.add(at(meshOf(new THREE.CylinderGeometry(0.55, 0.62, H, 8), M(th.stone[2])), px, H / 2, pz));
   // four torches on the side walls, plus the room's accent light
   [['W', -3.6], ['W', 3.6], ['E', -3.6], ['E', 3.6]].forEach(([dir, along], i) => {
+    if (th.lab) { // the lab gets steady strip lamps instead of fire
+      const [x, z] = wallXZ(dir, along, -0.05), lamp = at(meshOf(new THREE.BoxGeometry(0.9, 0.16, 0.18), M(0xE8F4FF, { emissive: 0xCFE8FF, emissiveIntensity: 1.2 })), x, 3.3, z);
+      lamp.rotation.y = WALL_RY[dir]; grp.add(lamp); const L = torchLights[i], [lx, lz] = wallXZ(dir, along, -0.6); L.color.set(th.torch); L.position.set(lx, 3.2, lz); L.intensity = 1.25; return;
+    }
     const t = new THREE.Group(), [x, z] = wallXZ(dir, along, -0.05);
     const stick = at(meshOf(new THREE.CylinderGeometry(0.05, 0.04, 0.6, 5), M(0x5A3A22)), 0, 0, 0.18); stick.rotation.x = 0.6; t.add(stick);
     const fl = at(meshOf(new THREE.ConeGeometry(0.13, 0.36, 5), new THREE.MeshBasicMaterial({ color: th.torch })), 0, 0.34, 0.34); t.add(fl);
@@ -1143,6 +1169,7 @@ function buildRoom(r) {
   if (r.xTile) buildXBrick(r, xCol);
   buildTraps(r);
   if (r.den) spawnDen(r);
+  if (th.lab) buildLab(grp);
 }
 function setDoors(open, quiet) {
   doors.forEach(d => { d.open = open; d.runeMat.color.set(open ? 0x5FF29A : 0xFF3B30); });
@@ -1940,6 +1967,7 @@ addEventListener('keydown', e => {
   if (k === 'e') interactHeld = true;
   if (k === 'q' && !e.repeat) swapTool();
   if (k === 'v' && !e.repeat) bonk();
+  if (lab.on && !e.repeat && k.length === 1 && k >= '0' && k <= '9') { if (k === '0') labSpawn(); else labTrigger(+k - 1); }
   if (k === 'g' && !e.repeat && net.on && !player.down) emote();
   if (k === 'r' && !e.repeat) swapBrew();
   if (k === 'f' && !e.repeat && inter.cur && inter.cur.type === 'buy') haggle(inter.cur.sl);
@@ -1968,7 +1996,7 @@ function play() { audio(); hideUI(); relock(); }
 function openMenu() {
   if (ui.screen) return;
   wind.on = false; stopFire(); interactHeld = false; keys.clear();
-  showUI('pause');
+  showUI(lab.on ? 'lab' : 'pause');
   if (locked) { invUnlocking = true; document.exitPointerLock(); }
 }
 function updateHint() {
@@ -2003,7 +2031,8 @@ const comboGrid = () => `<div class="combos">${Object.entries(COMBOS).map(([k, C
   ? `<div class="cb"><span class="chain">${C.chain.map(i => `<span style="color:${ING[i].css}">${svg(i)}</span>`).join(C.gun ? '<i>+</i>' : '<i>›</i>')}${C.gun ? `<em title="Water gun">${svg('gun')}</em>` : ''}</span><b>${C.name}</b></div>`
   : `<div class="cb lock"><span class="chain">${C.chain.map(() => '<span class="q"></span>').join('<i>›</i>')}</span><b>???</b></div>`).join('')}</div>`;
 const SCREENS = {
-  title: () => ({ head: LOGO, items: [{ label: 'PLAY', act: startRun }, { label: 'CO-OP', act: () => uiPush('coop') }, { label: 'BREWER', act: () => uiPush('brewer') }, { label: 'COMBOS', act: () => uiPush('combos') }, { label: 'OPTIONS', act: () => uiPush('options') }] }),
+  title: () => ({ head: LOGO, items: [{ label: 'PLAY', act: startRun }, { label: 'CO-OP', act: () => uiPush('coop') }, { label: 'BREWER', act: () => uiPush('brewer') }, { label: 'COMBOS', act: () => uiPush('combos') }, { label: 'OPTIONS', act: () => uiPush('options') }, { label: 'TEST LAB', act: enterLab }] }),
+  lab: () => ({ kicker: 'SITE-19 · TEST CHAMBER 07', body: labBody(), items: labItems() }),
   pause: () => ({ kicker: 'PAUSED', body: run.items.size ? `<div class="owned">${[...run.items].map(id => `<span title="${ITEMS[id].name}" style="color:${ITEMS[id].color}">${svg(id)}</span>`).join('')}</div>` : '', items: [{ label: 'RESUME', act: play }, { label: 'COMBOS', act: () => uiPush('combos') }, { label: 'OPTIONS', act: () => uiPush('options') }, { label: 'QUIT RUN', act: () => uiPush('confirm') }], foot: `${floorLabel()} · ${score.toLocaleString()} · ${run.coins} COINS` }),
   confirm: () => ({ kicker: 'QUIT THIS RUN?', items: [{ label: 'NO', act: uiBack }, { label: 'YES, QUIT', act: toTitle }] }),
   brewer: () => ({ kicker: 'YOUR BREWER', items: [
@@ -2024,7 +2053,7 @@ const SCREENS = {
 };
 const valHtml = it => `<span class="mv"><b class="arr" data-d="-1">◀</b>${it.val()}<b class="arr" data-d="1">▶</b></span>`;
 function navHint() {
-  const back = ui.stack.length || ui.screen === 'pause';
+  const back = ui.stack.length || ui.screen === 'pause' || ui.screen === 'lab';
   return padSeen ? `<span><kbd>A</kbd>OK</span>${back ? '<span><kbd>B</kbd>BACK</span>' : ''}`
     : `<span><kbd>↑↓</kbd>SELECT</span><span><kbd>ENTER</kbd>OK</span>${back ? '<span><kbd>ESC</kbd>BACK</span>' : ''}`;
 }
@@ -2063,7 +2092,7 @@ function uiPush(screen) { ui.stack.push([ui.screen, ui.idx]); ui.screen = screen
 function uiBack() {
   if (ui.screen === 'link') linkReset(); // leaving the link screen lets go of the camera and any half-made link
   if (ui.stack.length) { [ui.screen, ui.idx] = ui.stack.pop(); renderUI(); }
-  else if (ui.screen === 'pause') play();
+  else if (ui.screen === 'pause' || ui.screen === 'lab') play();
 }
 function uiActivate(j) {
   const it = ui.items[j]; if (!it) return; audio(); SFX.pop();
@@ -2636,6 +2665,144 @@ function slamHit(e) {
   if (e.moves && e.moves.has('quake')) aftershocks(e);
 }
 
+/* ================= the test lab: a sealed containment chamber for watching any creature's whole repertoire ================= */
+const lab = { on: false, idx: 0, tier: 3, ai: true, god: true, move: 0, cur: null, hits: 0, respawnT: 0, beacons: [] };
+const LAB_SUBJECTS = ['chief', 'king', 'cyclops', 'slime', 'spitter', 'moth', 'stump', 'knight'];
+const LAB_NOTES = {
+  chief: ['KETER', 'Large and territorial. Learns new attacks the deeper it is found.'],
+  king: ['KETER', 'Elite variant. Calls for reinforcements when injured.'],
+  cyclops: ['EUCLID', 'Hostile. Stares, then swings.'],
+  slime: ['SAFE', 'Gelatinous. Mostly harmless. Mostly.'],
+  spitter: ['EUCLID', 'Lobs corrosive goo at wherever you are standing.'],
+  moth: ['EUCLID', 'Airborne. Wind does nothing to it.'],
+  stump: ['EUCLID', 'Immune to water. Do not attempt to drown.'],
+  knight: ['EUCLID', 'Armoured. Fire does nothing to it.'],
+};
+const LAB_MOVES = [
+  { id: 'swing', name: 'SWING', ok: e => !e.T.ranged, run: e => { e.atk = e.T.windup; } },
+  { id: 'slam', name: 'GROUND SLAM', ok: e => e.T.boss, run: e => startSlam(e) },
+  { id: 'toss', name: 'ROCK TOSS', ok: e => e.T.boss, run: e => throwRock(e, player.pos) },
+  { id: 'charge', name: 'CHARGE', ok: e => e.T.boss, run: e => startCharge(e, player.pos) },
+  { id: 'quake', name: 'AFTERSHOCKS', ok: e => e.T.boss, run: e => aftershocks(e) },
+  { id: 'enrage', name: 'RAGE', ok: e => e.T.boss, run: e => { if (!e.enraged) enrage(e); } },
+  { id: 'spread', name: 'SPREAD LOB', ok: e => e.T.king, run: e => [-1.8, 0, 1.8].forEach((l, i) => setTimeout(() => { if (!e.dead) spitGoo(e, l, player.pos); }, i * 140)) },
+  { id: 'summon', name: 'SUMMON', ok: e => e.T.king, run: e => kingSummon(e) },
+  { id: 'spit', name: 'SPIT', ok: e => e.T.ranged, run: e => spitGoo(e, 0, player.pos) },
+];
+const labMoves = () => lab.cur && !lab.cur.dead ? LAB_MOVES.filter(m => m.ok(lab.cur)) : [];
+const labLearn = (type, id) => { const f = (BOSS_MOVES[type] || {})[id]; return f && f > lab.tier ? f : 0; }; // the floor it would learn this on, if not yet
+function labClear() {
+  for (const e of enemies) { endCharge(e); endSlam(e); scene.remove(e.root); scene.remove(e.shadow); disposeTree(e.root); e.label.remove(); }
+  enemies = []; clearGoos(); lab.cur = null;
+}
+function labSpawn() {
+  labClear(); lab.respawnT = 0;
+  const type = LAB_SUBJECTS[lab.idx]; floorNum = lab.tier; // health, moves and speed all follow the chosen floor
+  const e = spawnEnemy(type, 0, -3.2); e.pos.y = 2.5; e.labHold = !lab.ai; lab.cur = e;
+  const known = e.moves ? [...e.moves].map(k => MOVE_NAME[k]) : [];
+  banner(TYPES[type].name.toUpperCase(), known.length ? 'KNOWS ' + known.join(' · ') : 'CLASS: ' + LAB_NOTES[type][0]);
+  lab.move = Math.min(lab.move, Math.max(0, labMoves().length - 1)); labHud();
+}
+function labTrigger(i) {
+  const list = labMoves(), m = list[i]; if (!m || !lab.cur) return;
+  const e = lab.cur; if (e.charge) endCharge(e);
+  e.stun = 0; e.atk = 0; endSlam(e); m.run(e); labHud(m.name);
+}
+function enterLab() {
+  if (net.on) return;
+  hideUI(); resetRun(); lab.on = true; lab.hits = 0;
+  const r = { x: 0, y: 0, type: 'lab', theme: 'lab', n: {}, visited: true, cleared: true, caps: [], chestOpen: false, fountainUsed: false, fightActive: false, depth: 0 };
+  floorMap = new Map([[keyXY(0, 0), r]]); enterRoom(r, null, true);
+  player.pos.set(0, 0, 5.5); player.yaw = 0; player.pitch = -0.06;
+  camMode = 'return'; setTimeout(() => { if (camMode === 'return') camMode = 'fp'; }, 650);
+  play(); labSpawn(); setTimeout(() => banner('TEST CHAMBER 07', coarse ? 'SITE-19 · PAUSE OPENS THE CONSOLE' : 'SITE-19 · ESC OPENS THE CONSOLE'), 2600);
+}
+function leaveLab() { lab.on = false; lab.cur = null; labHud(); toTitle(); }
+function labHud(flash) {
+  let el = document.getElementById('labHud');
+  if (!lab.on) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'labHud'; stage.appendChild(el); }
+  const type = LAB_SUBJECTS[lab.idx], list = labMoves();
+  el.innerHTML = `<b>SUBJECT · ${esc(TYPES[type].name.toUpperCase())} <em>FLOOR ${lab.tier}</em></b>`
+    + `<span>${list.map((m, i) => `<i${flash === m.name ? ' class="on"' : ''}><kbd>${i + 1}</kbd>${m.name}</i>`).join('')}<i><kbd>0</kbd>RESPAWN</i></span>`
+    + `<small>${lab.ai ? 'AI ON' : 'AI HELD'} · ${lab.god ? 'GOD MODE' : 'MORTAL'} · HITS TAKEN ${lab.hits}${coarse ? '' : ' · ESC CONSOLE'}</small>`;
+}
+function labTick(rdt) {
+  if (!lab.on) return;
+  const live = lab.cur && !lab.cur.dead;
+  for (const b of lab.beacons) { b.beam.visible = live; b.beam.rotation.y += rdt * 5; b.dome.material.emissiveIntensity = live ? 0.6 + 0.6 * Math.abs(Math.sin(T * 5)) : 0.15; }
+  if (lab.cur && lab.cur.dead && !lab.respawnT) lab.respawnT = 2.5;
+  if (lab.respawnT > 0 && (lab.respawnT -= rdt) <= 0) labSpawn(); // a fresh subject is brought in
+}
+function labBody() {
+  const type = LAB_SUBJECTS[lab.idx], [cls, note] = LAB_NOTES[type], e = lab.cur;
+  const known = e && e.moves ? [...e.moves].map(k => MOVE_NAME[k]).join(' · ') : '';
+  return `<div class="labcard"><b>${esc(TYPES[type].name.toUpperCase())}</b><span>OBJECT CLASS: <em class="c-${cls.toLowerCase()}">${cls}</em></span><p>${esc(note)}</p>`
+    + `${known ? `<p class="lk">KNOWS ON FLOOR ${lab.tier}: ${known}</p>` : ''}${e && !e.dead ? `<p class="lk">HEALTH ${e.hp}/${e.maxHp}</p>` : ''}</div>`
+    + `<p class="cnote">${coarse ? 'Pick an attack and press it to watch it.' : 'In the chamber, the number keys fire attacks and 0 brings in a fresh subject.'}</p>`;
+}
+function labItems() {
+  const list = labMoves(), m = list[lab.move], type = LAB_SUBJECTS[lab.idx];
+  const learn = m ? labLearn(type, m.id) : 0;
+  return [
+    { label: 'SUBJECT', val: () => esc(TYPES[LAB_SUBJECTS[lab.idx]].name.toUpperCase()), adjust: d => { lab.idx = (lab.idx + d + LAB_SUBJECTS.length) % LAB_SUBJECTS.length; lab.move = 0; labSpawn(); renderUI(); } },
+    { label: 'FLOOR', val: () => String(lab.tier), adjust: d => { lab.tier = Math.max(1, Math.min(8, lab.tier + d)); labSpawn(); renderUI(); } },
+    ...(list.length ? [{ label: 'ATTACK', val: () => m ? m.name + (learn ? ` <small>· FLOOR ${learn}+</small>` : '') : '-', adjust: d => { lab.move = (lab.move + d + list.length) % list.length; renderUI(); } },
+      { label: 'RUN IT', act: () => { const i = lab.move; play(); setTimeout(() => labTrigger(i), 450); } }] : []),
+    { label: 'AI', val: () => lab.ai ? 'ON' : 'HELD', adjust: () => { lab.ai = !lab.ai; if (lab.cur) lab.cur.labHold = !lab.ai; labHud(); } },
+    { label: 'GOD MODE', val: () => lab.god ? 'ON' : 'OFF', adjust: () => { lab.god = !lab.god; if (!lab.god) { player.hp = player.maxHp; renderHearts(); } labHud(); } },
+    { label: 'FRESH SUBJECT', act: () => { labSpawn(); play(); } },
+    { label: 'LEAVE LAB', act: leaveLab },
+  ];
+}
+// the chamber itself: clinical tile, hazard stripes, an observation window, signage, beacons and cameras
+function labSign(lines, w, h, bg, fg) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+  x.fillStyle = bg; x.fillRect(0, 0, w, h); x.fillStyle = fg; x.textAlign = 'center'; x.textBaseline = 'middle';
+  lines.forEach(([t, size, y, font]) => { x.font = `${font || 400} ${size}px ${font ? '"Barlow Condensed", "Arial Narrow"' : 'Anton, Impact'}, sans-serif`; x.fillText(t, w / 2, y); });
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4; return tex;
+}
+function buildLab(grp) {
+  lab.beacons = [];
+  const plane = (w, h, mat, x, y, z, ry = 0, rx = 0) => { const m = meshOf(new THREE.PlaneGeometry(w, h), mat); m.position.set(x, y, z); m.rotation.set(rx, ry, 0, 'YXZ'); grp.add(m); return m; }; // lay flat first, then turn
+  // hazard stripes round the containment square, and a stencil in the middle
+  const stripeTex = (() => { const c = document.createElement('canvas'); c.width = 256; c.height = 32; const x = c.getContext('2d'); x.fillStyle = '#16161A'; x.fillRect(0, 0, 256, 32); x.fillStyle = '#F2C81E'; for (let i = -2; i < 10; i++) { x.beginPath(); x.moveTo(i * 32, 32); x.lineTo(i * 32 + 16, 32); x.lineTo(i * 32 + 32, 0); x.lineTo(i * 32 + 16, 0); x.fill(); } const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.repeat.set(4, 1); return t; })();
+  const stripe = new THREE.MeshBasicMaterial({ map: stripeTex });
+  const S = 4.2, cz = -2.6;
+  for (const [x, z, ry] of [[0, cz - S, 0], [0, cz + S, 0], [-S, cz, Math.PI / 2], [S, cz, Math.PI / 2]]) plane(S * 2 + 0.5, 0.5, stripe, x, 0.032, z, ry, -Math.PI / 2); // clear of the tiles' little height jitter
+  const stencil = new THREE.MeshBasicMaterial({ map: labSign([['CONTAINMENT', 120, 128]], 1024, 256, 'rgba(0,0,0,0)', 'rgba(20,20,26,.55)'), transparent: true, depthWrite: false });
+  plane(5.2, 1.3, stencil, 0, 0.034, cz + S - 1.2, 0, -Math.PI / 2); // reads the right way up from the door
+  // the spawn pad
+  grp.add(at(meshOf(new THREE.CylinderGeometry(1.5, 1.6, 0.08, 12), M(0x3A3E46, { metalness: 0.4, roughness: 0.5 })), 0, 0.04, -3.2));
+  const padRing = at(meshOf(new THREE.TorusGeometry(1.42, 0.05, 4, 24), M(0xF2C81E, { emissive: 0x4A3A06 })), 0, 0.09, -3.2); padRing.rotation.x = Math.PI / 2; grp.add(padRing); // (add() hands back the group, not the mesh)
+  // the observation window on the far wall: dark glass in a steel frame, a faint glow from the control room behind
+  const [wx, wz] = wallXZ('N', 0, -0.07);
+  plane(5.6, 1.7, M(0x0C1820, { emissive: 0x0A2232, emissiveIntensity: 1, metalness: 0.6, roughness: 0.1 }), wx, 2.55, wz);
+  for (const [x, y, w, h] of [[0, 3.45, 6.0, 0.16], [0, 1.65, 6.0, 0.16], [-2.92, 2.55, 0.16, 1.9], [2.92, 2.55, 0.16, 1.9], [0, 2.55, 0.08, 1.7]]) grp.add(at(meshOf(new THREE.BoxGeometry(w, h, 0.16), M(0x3A3E46, { metalness: 0.5 })), wx + x, y, wz + 0.02));
+  // signage
+  const [sx, sz] = wallXZ('N', 0, -0.09);
+  plane(4.4, 0.62, new THREE.MeshBasicMaterial({ map: labSign([['TEST CHAMBER 07', 74, 58], ['SITE-19 · HOSTILE SUBJECT TESTING', 26, 110, 700]], 1024, 144, '#F2C81E', '#111114') }), sx, 4.15, sz);
+  for (const [dir, along, lines] of [['W', -2, [['WARNING', 84, 90], ['DO NOT ENGAGE', 34, 170, 700], ['WITHOUT CLEARANCE', 34, 214, 700]]], ['E', -2, [['CAUTION', 84, 90], ['SUBJECT MAY', 34, 170, 700], ['THROW ROCKS', 34, 214, 700]]]]) {
+    const [x, z] = wallXZ(dir, along, -0.09); plane(1.5, 1.2, new THREE.MeshBasicMaterial({ map: labSign(lines, 320, 256, '#E8E8EC', '#B01818') }), x, 2.5, z, WALL_RY[dir]);
+  }
+  // red beacons either side of the window, spinning while a subject is loose
+  for (const s of [-1, 1]) {
+    const [bx, bz] = wallXZ('N', s * 3.9, -0.25), dome = at(meshOf(new THREE.SphereGeometry(0.16, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xFF3B30, emissive: 0xFF2010, emissiveIntensity: 0.2, flatShading: true })), bx, 3.62, bz);
+    grp.add(at(meshOf(new THREE.CylinderGeometry(0.17, 0.19, 0.12, 8), M(0x2A2E36)), bx, 3.56, bz)); grp.add(dome);
+    const beam = new THREE.Group(); beam.position.set(bx, 3.72, bz); grp.add(beam);
+    const cone = meshOf(new THREE.ConeGeometry(0.5, 2.2, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xFF3B30, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    cone.rotation.z = Math.PI / 2; cone.position.x = 1.1; beam.add(cone);
+    lab.beacons.push({ beam, dome });
+  }
+  // security cameras in the near corners, looking at the pad
+  for (const s of [-1, 1]) {
+    const cam = new THREE.Group(); cam.position.set(s * (W - 0.5), H - 0.5, D - 0.5); cam.lookAt(0, 0.5, -3.2); grp.add(cam);
+    cam.add(at(meshOf(new THREE.BoxGeometry(0.22, 0.2, 0.42), M(0xD8DCE2)), 0, 0, 0));
+    const lens = at(meshOf(new THREE.CylinderGeometry(0.07, 0.07, 0.08, 8), M(0x111114)), 0, 0, 0.23); lens.rotation.x = Math.PI / 2; cam.add(lens);
+    const led = at(meshOf(GEO.sphere, new THREE.MeshBasicMaterial({ color: 0xFF2010 })), 0.07, 0.07, 0.2); led.scale.setScalar(0.02); cam.add(led);
+  }
+}
+
 /* ================= bosses: a random one guards each floor's stairs, and the deeper you go the more moves it knows ================= */
 const BOSS_POOL = [{ id: 'chief', from: 1 }, { id: 'king', from: 3 }]; // the king turns up as the elite pick from floor 3; the last floor is fixed
 const BOSS_MOVES = { chief: { toss: 2, enrage: 2, charge: 3, quake: 4 }, king: { quake: 3, charge: 4, enrage: 5 } }; // the floor each move is learned on
@@ -2646,6 +2813,10 @@ function pickBoss(n) { // runs inside the floor's seeded generation, so co-op pa
 }
 const bossMoves = (type, n) => new Set(Object.entries(BOSS_MOVES[type] || {}).filter(([, f]) => f <= n).map(([k]) => k));
 const bossCd = e => e.T.boss ? Math.max(0.6, 1 - 0.07 * ((e.tier || 1) - 1)) * (e.enraged ? 0.7 : 1) : 1; // deeper floors, shorter breathers
+function enrage(e) {
+  e.enraged = true; e.tiltV -= 14; shake = Math.max(shake, 0.45); SFX.charge(); puff(centerOf(e), 0xFF3B30, 14, 1.2, 0.6, 1.4, 0.3, 0.8);
+  const sp_ = project(centerOf(e).add(new THREE.Vector3(0, e.h * 0.5, 0))); if (!sp_.behind) callout('ENRAGED', 2, { at: true, x: sp_.x, y: sp_.y });
+}
 function bossIntro(r) {
   const type = r.king ? 'king' : r.boss || 'chief', name = TYPES[type].name.toUpperCase(), moves = BOSS_MOVES[type] || {};
   const learned = Object.keys(moves).filter(k => moves[k] === floorNum), known = [...bossMoves(type, floorNum)];
@@ -3808,7 +3979,8 @@ function renderHearts(hit) {
 function giveGrace(secs) { player.grace = Math.max(player.grace, secs); enemies.forEach(e => { e.atk = 0; e.cd = Math.max(e.cd, secs * 0.8); }); }
 function hurtPlayer(n, from) {
   if (player.hp <= 0 || koOpen || player.grace > 0) return;
-  player.hp = Math.max(0, player.hp - n); player.grace = 1.0;
+  const godded = lab.on && lab.god; // the lab's god mode: every hit lands and counts, no heart is lost
+  if (godded) { lab.hits += n; player.grace = 0.6; labHud(); } else { player.hp = Math.max(0, player.hp - n); player.grace = 1.0; }
   if (from) { const away = player.pos.clone().sub(from.pos || from).setY(0); if (away.lengthSq() > 0.0001) player.kb.copy(away.normalize().multiplyScalar(6 + n * 2)); } // knocked back a step
   shake = Math.max(shake, 0.35); SFX.ouch();
   const h = $('#hurt'); h.classList.add('on'); setTimeout(() => h.classList.remove('on'), 60);
@@ -4977,7 +5149,7 @@ function frame(now) {
     const tg = netTarget(e), tp = tg.pos;
     const pd = Math.hypot(e.pos.x - tp.x, e.pos.z - tp.z), reach = e.T.reach;
     const grounded = e.lev <= 0 && e.pos.y < 0.05 && e.stun <= 0 && !(e.frozen > 0) && !e.kbv, canHit = grounded && cine.state === 'idle' && !transit && (tg.local ? player.hp > 0 && !player.fall && !player.down : !tg.ko);
-    if (grounded && e.atk <= 0) {
+    if (grounded && e.atk <= 0 && !e.labHold) {
       // each creature keeps to its own side of you, so a room surrounds you instead of queueing up
       const gx = tp.x + Math.sin(e.ang) * reach * 0.8, gz = tp.z + Math.cos(e.ang) * reach * 0.8;
       const dx = gx - e.pos.x, dz = gz - e.pos.z, d = Math.hypot(dx, dz);
@@ -4985,7 +5157,7 @@ function frame(now) {
       if (d > 0.35 && hopOK) { const sp = e.T.speed * sdt * (e.wet > 0 ? 0.65 : 1) * (e.chill > 0 ? 0.5 : 1) * (e.enraged ? 1.3 : 1) * (e.T.boss ? 1 + 0.04 * ((e.tier || 1) - 1) : 1), nx = e.pos.x + dx / d * sp, nz = e.pos.z + dz / d * sp; if (e.T.flying || !room.pits || !pitAt(nx, nz, 0.75)) { e.pos.x = nx; e.pos.z = nz; moving = true; } } // they walk round holes; it takes a shove to put them in one
     }
     // melee: a readable wind-up (it leans back, a red ! shows), then a swing that lands if you're still in reach
-    e.cd = Math.max(0, e.cd - sdt);
+    e.cd = e.labHold ? Math.max(e.cd, 1) : Math.max(0, e.cd - sdt); // held in the lab: it only does what you trigger
     if (!grounded) { e.atk = 0; endSlam(e); }
     else if (e.atk > 0) { e.atk -= sdt; if (e.atk <= 0) { e.atk = 0; e.lungeT = 0.3; e.cd = e.T.cooldown * bossCd(e); if (canHit) { if (e.slam) slamHit(e); else if (e.T.ranged) spitGoo(e, 0, tp); else if (pd < reach + 0.6) { if (tg.local) hurtPlayer(e.T.dmg, e); else netHurt(tg, e.T.dmg, e.pos); } } endSlam(e); } }
     else if (canHit && e.cd <= 0 && pd < reach + (e.T.ranged ? 2.5 : e.T.boss ? 1.2 : 0)) {
@@ -4994,10 +5166,7 @@ function frame(now) {
     else if (canHit && e.cd <= 0 && e.moves && e.moves.has('charge') && pd > 3.4 && pd < 12 && Math.random() < sdt * 0.9) startCharge(e, tp); // learned moves, for when you keep your distance
     else if (canHit && e.cd <= 0 && e.moves && e.moves.has('toss') && pd > reach + 2.2 && Math.random() < sdt * 1.4) { throwRock(e, tp); e.cd = e.T.cooldown * bossCd(e); }
     else if (canHit && e.cd <= 0 && e.T.king && pd > reach + 2) { [-1.8, 0, 1.8].forEach((l, i) => setTimeout(() => { if (!e.dead) spitGoo(e, l, tp); }, i * 140)); e.cd = 3.4 * bossCd(e); } // keep your distance and it lobs a spread
-    if (e.moves && e.moves.has('enrage') && !e.enraged && e.hp <= e.maxHp * 0.35) { // low on health, it gets faster and meaner
-      e.enraged = true; e.tiltV -= 14; shake = Math.max(shake, 0.45); SFX.charge(); puff(centerOf(e), 0xFF3B30, 14, 1.2, 0.6, 1.4, 0.3, 0.8);
-      const sp_ = project(centerOf(e).add(new THREE.Vector3(0, e.h * 0.5, 0))); if (!sp_.behind) callout('ENRAGED', 2, { at: true, x: sp_.x, y: sp_.y });
-    }
+    if (e.moves && e.moves.has('enrage') && !e.enraged && e.hp <= e.maxHp * 0.35) enrage(e); // low on health, it gets faster and meaner
     if (e.enraged && Math.random() < sdt * 5) puff(centerOf(e).add(new THREE.Vector3(rand(-0.4, 0.4), e.h * 0.3, rand(-0.4, 0.4))), 0xFF3B30, 1, 0.8, 0.2, 1.2, 0.14, 0.6);
     if (e.T.king && !e.clone) for (const [k, f] of [['sum1', 0.6], ['sum2', 0.3]]) if (!e[k] && e.hp <= e.maxHp * f) { e[k] = true; kingSummon(e); }
     if (e.lungeT > 0) e.lungeT = Math.max(0, e.lungeT - sdt);
@@ -5103,7 +5272,7 @@ function frame(now) {
 
   renderer.render(scene, camera);
   brewer.update(rdt, ui.screen);
-  netFrame(rdt);
+  netFrame(rdt); labTick(rdt);
   if (invOpen || potParts.length) drawPotFx(rdt);
   if (rec) captureFrame(now);
 

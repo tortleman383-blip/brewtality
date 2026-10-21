@@ -20,6 +20,10 @@ A first-person dungeon crawler where you brew potions and fling them at things w
 
 **Touchscreen:** put a finger down anywhere on the left side and drag to walk; drag on the right to look. The on-screen buttons sling, bonk, scrape and swap.
 
+## Test lab
+
+**TEST LAB** on the title screen opens a containment chamber for watching any creature's attacks. Esc opens the console: pick the subject, the floor it's from (bosses learn moves the deeper they are), hold its AI, toggle god mode, and run any attack. In the chamber, the number keys fire attacks and 0 brings in a fresh subject.
+
 ## Co-op
 
 1. One player picks **CO-OP → HOST WITH CODE** and reads out the 4-character code.
