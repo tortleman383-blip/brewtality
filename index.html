@@ -4307,7 +4307,7 @@ function codeRoom(code, hosting) {
 const CODE_ERR = { 'peer-unavailable': 'NO GAME WITH THAT CODE', timeout: 'NO ANSWER. CHECK THE CODE AND TRY AGAIN', load: "COULDN'T LOAD THE CONNECTION LIBRARY", 'browser-incompatible': "THIS BROWSER CAN'T CONNECT DIRECTLY" };
 function codeFail(err) {
   const blocked = !CODE_ERR[err] || err === 'load';
-  net.coopMsg = (CODE_ERR[err] || "COULDN'T REACH THE CONNECTION SERVER") + (blocked && window.claude ? '. THIS PAGE MAY BLOCK IT: TRY THE DOWNLOADED GAME FILE' : '');
+  net.coopMsg = (CODE_ERR[err] || "COULDN'T REACH THE CONNECTION SERVER") + (blocked && window.claude ? '. CLAUDE.AI MAY BLOCK IT HERE: TRY THE GITHUB LINK' : blocked ? '. A BLOCKER OR FIREWALL MAY BE IN THE WAY' : '') + ` (${String(err).slice(0, 24)})`; // the reason code, so a failure can be tracked down
   net.busy = false; if (ui.screen === 'coop' || ui.screen === 'join') renderUI();
 }
 function useCodeRoom(r) {
@@ -4321,16 +4321,19 @@ async function hostCode() {
   try { await loadPeerJS(); } catch (e) { codeFail('load'); return; }
   for (let i = 0; i < 4; i++) {
     const code = Array.from({ length: 4 }, () => CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]).join('');
-    try { useCodeRoom(await codeRoom(code, true)); return; } catch (err) { if (err !== 'unavailable-id') { codeFail(err); return; } }
+    try { useCodeRoom(await codeRoom(code, true)); return; } catch (err) { if (err === 'unavailable-id') continue; if (i < 3 && CODE_RETRY.includes(err)) { net.coopMsg = 'RETRYING…'; renderUI(); await wait(1500); continue; } codeFail(err); return; }
   }
   codeFail('error');
 }
+const CODE_RETRY = ['network', 'server-error', 'socket-error', 'socket-closed', 'error']; // worth one more go: the server or the line hiccuped
 async function joinCode() {
   const code = (net.codeDraft || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length !== 4) { net.coopMsg = 'CODES ARE 4 CHARACTERS'; renderUI(); return; }
   if (net.busy) return; net.busy = true; net.coopMsg = 'CONNECTING…'; renderUI();
   try { await loadPeerJS(); } catch (e) { codeFail('load'); return; }
-  try { useCodeRoom(await codeRoom(code, false)); } catch (err) { codeFail(err); }
+  for (let i = 0; i < 2; i++) {
+    try { useCodeRoom(await codeRoom(code, false)); return; } catch (err) { if (i === 0 && CODE_RETRY.includes(err)) { net.coopMsg = 'RETRYING…'; renderUI(); await wait(1500); continue; } codeFail(err); return; }
+  }
 }
 function leaveCode() {
   if (!net.code) return;
