@@ -643,7 +643,7 @@ if (savedSettings.sound === false && savedSettings.vol === undefined) settings.v
 delete settings.sound; delete settings.reel;
 const FINAL_FLOOR = 5; // the Cyclops King waits at the bottom of floor 5; after that it's endless
 const newUse = () => ({ feather: 0, bog: 0, horn: 0, doom: 0, glowcap: 0, eye: 0, boil: 0 });
-const run = { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set() };
+const run = { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set() };
 
 /* ================= audio (all synthesised) ================= */
 let AC = null, master = null, noiseBuf = null;
@@ -855,6 +855,7 @@ function genFloorRaw(n) {
   let ti = Math.floor(Math.random() * 3);
   for (const r of map.values()) {
     r.king = r.type === 'stairs' && n % FINAL_FLOOR === 0;
+    if (r.type === 'stairs') r.boss = r.king ? 'king' : pickBoss(n);
     r.theme = r.type === 'garden' ? 'garden' : r.type === 'treasure' ? 'vault' : r.type === 'stairs' ? (r.king ? 'forge' : pick(['forge', 'crypt'])) : r.type === 'start' && n === 1 ? 'crypt' : FIGHT_THEMES[ti++ % 3];
     r.caps = THEMES[r.theme].spots.map(() => Math.random() < (r.type === 'garden' ? 0.5 : 0.22) ? 1 : 0); r.depth = dist.get(r) || 0; // most walls are bare now; a cap is a find
     if (r.type === 'stairs') { const inDir = Object.keys(r.n).find(d => r.n[d]), free = ['N', 'S', 'W', 'E'].filter(d => !r.n[d]); r.shopDir = inDir && free.includes(DIRS[inDir].opp) ? DIRS[inDir].opp : pick(free); }
@@ -1347,6 +1348,7 @@ function spawnEnemy(type, x, z) {
   };
   e.shadow = meshOf(shadowGeo, shadowMat); e.shadow.rotation.x = -Math.PI / 2; scene.add(e.shadow);
   e.stars = new THREE.Group(); for (let i = 0; i < 3; i++) e.stars.add(meshOf(starGeo, starMat)); e.stars.position.y = e.h + 0.25; e.stars.visible = false; e.root.add(e.stars);
+  if (T.boss) { e.tier = floorNum; e.moves = bossMoves(type, floorNum); }
   e.root.traverse(o => { o.userData.enemy = e; });
   scene.add(e.root);
   e.label = document.createElement('div'); e.label.className = 'lbl'; $('#labels').appendChild(e.label);
@@ -2631,6 +2633,83 @@ function slamHit(e) {
   shake = Math.max(shake, 0.55); SFX.boom(); burst(e.pos.clone().setY(0.2), 0x8A6A4A, 26, 6, 0.9, 0.12); floorRing(e.pos, 0xFF6A3D, SLAM_R, 0.5);
   if (!player.down && Math.hypot(e.pos.x - player.pos.x, e.pos.z - player.pos.z) < SLAM_R) hurtPlayer(2, e);
   hurtRemotesNear(e.pos, SLAM_R, 2);
+  if (e.moves && e.moves.has('quake')) aftershocks(e);
+}
+
+/* ================= bosses: a random one guards each floor's stairs, and the deeper you go the more moves it knows ================= */
+const BOSS_POOL = [{ id: 'chief', from: 1 }, { id: 'king', from: 3 }]; // the king turns up as the elite pick from floor 3; the last floor is fixed
+const BOSS_MOVES = { chief: { toss: 2, enrage: 2, charge: 3, quake: 4 }, king: { quake: 3, charge: 4, enrage: 5 } }; // the floor each move is learned on
+const MOVE_NAME = { toss: 'ROCK TOSS', charge: 'CHARGE', quake: 'AFTERSHOCKS', enrage: 'RAGE' };
+function pickBoss(n) { // runs inside the floor's seeded generation, so co-op partners get the same boss
+  const pool = BOSS_POOL.filter(b => b.from <= n), fresh = pool.filter(b => !run.bossLog.includes(b.id));
+  const id = pick(fresh.length ? fresh : pool).id; run.bossLog.push(id); return id;
+}
+const bossMoves = (type, n) => new Set(Object.entries(BOSS_MOVES[type] || {}).filter(([, f]) => f <= n).map(([k]) => k));
+const bossCd = e => e.T.boss ? Math.max(0.6, 1 - 0.07 * ((e.tier || 1) - 1)) * (e.enraged ? 0.7 : 1) : 1; // deeper floors, shorter breathers
+function bossIntro(r) {
+  const type = r.king ? 'king' : r.boss || 'chief', name = TYPES[type].name.toUpperCase(), moves = BOSS_MOVES[type] || {};
+  const learned = Object.keys(moves).filter(k => moves[k] === floorNum), known = [...bossMoves(type, floorNum)];
+  let sub = r.king && !run.won ? 'FINAL BOSS' : '';
+  if (!sub && known.length) sub = !run.bossMet.has(type) ? 'KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : learned.length ? 'LEARNED ' + learned.map(k => MOVE_NAME[k]).join(' · ') : '';
+  run.bossMet.add(type);
+  banner(r.king ? 'THE ' + name : name, sub, 'boss');
+}
+// charge: it plants its feet, a red lane lights up the floor, then it barrels down it; hit a wall and it knocks itself silly
+const laneMat = new THREE.MeshBasicMaterial({ color: 0xFF3B30, transparent: true, opacity: 0.32, depthWrite: false }); laneMat.userData.shared = true;
+function chargeLane(pos, dir) { const lane = meshOf(GEO.box, laneMat); lane.scale.set(1.3, 0.01, 9); lane.position.copy(pos).addScaledVector(dir, 4.5).setY(0.03); lane.rotation.y = Math.atan2(dir.x, dir.z); scene.add(lane); return lane; }
+function startCharge(e, at) {
+  const dir = new THREE.Vector3(at.x - e.pos.x, 0, at.z - e.pos.z); if (dir.lengthSq() < 0.01) return; dir.normalize();
+  e.charge = { phase: 'wind', t: 0, dir, lane: chargeLane(e.pos, dir), hit: new Set() }; e.atk = 0; SFX.charge();
+  if (net.on && net.host) netEmit('goo', { k: 'lane', rk: rkOf(room), f: [+e.pos.x.toFixed(2), 0, +e.pos.z.toFixed(2)], t: [+dir.x.toFixed(3), 0, +dir.z.toFixed(3)] });
+}
+function endCharge(e) { if (!e.charge) return; scene.remove(e.charge.lane); e.charge = null; }
+function bossCharge(e, sdt) { // true while the charge owns this creature's frame
+  const c = e.charge;
+  if (e.lev > 0 || e.frozen > 0 || e.kbv || e.stun > 0) { endCharge(e); e.atk = 0; return false; } // knocked out of it
+  c.t += sdt;
+  if (c.phase === 'wind') {
+    e.yaw = Math.atan2(c.dir.x, c.dir.z); e.atk = e.T.windup * Math.max(0.02, 1 - c.t / 0.8); // leans back as it winds up
+    if (c.t >= 0.8) { c.phase = 'run'; c.t = 0; e.atk = 0; scene.remove(c.lane); SFX.whoosh(); shake = Math.max(shake, 0.15); }
+    enemyLook(e, sdt, false); return true;
+  }
+  e.pos.addScaledVector(c.dir, 11 * sdt);
+  const hitR = e.r * e.scale + 0.55;
+  if (!c.hit.has('me') && !player.down && !player.fall && Math.hypot(e.pos.x - player.pos.x, e.pos.z - player.pos.z) < hitR) { c.hit.add('me'); hurtPlayer(2, e); }
+  if (net.on && net.host) for (const R of net.remotes.values()) if (R.here && !c.hit.has(R.peer) && Math.hypot(e.pos.x - R.pos.x, e.pos.z - R.pos.z) < hitR) { c.hit.add(R.peer); netHurt(R, 2, e.pos); }
+  let wall = Math.abs(e.pos.x) > W - 0.9 || Math.abs(e.pos.z) > D - 0.9;
+  if (!wall) for (const col of colliders) if (Math.hypot(e.pos.x - col.x, e.pos.z - col.z) < col.r + e.r * e.scale) { wall = true; break; }
+  e.pos.x = Math.max(-W + 0.8, Math.min(W - 0.8, e.pos.x)); e.pos.z = Math.max(-D + 0.8, Math.min(D - 0.8, e.pos.z));
+  if (wall) { // your opening
+    endCharge(e); e.stun = 1.8; e.tiltV -= 18; e.cd = e.T.cooldown * bossCd(e); shake = Math.max(shake, 0.4); SFX.thud(); SFX.boom();
+    puff(centerOf(e), 0x8A7A6A, 10, 1, 0.5, 0.9, 0.3, 0.7); damage(e, 1, 'WALLED', e.pos); return false;
+  }
+  if (c.t > 1.4) { endCharge(e); e.cd = e.T.cooldown * bossCd(e); return false; }
+  enemyLook(e, sdt, true); return true;
+}
+// rock toss: from a distance it lobs a boulder at where you're standing
+function throwRock(e, at) {
+  const from = centerOf(e).add(new THREE.Vector3(0, e.h * 0.4, 0)), to = new THREE.Vector3(at.x + rand(-0.4, 0.4), 0.08, at.z + rand(-0.4, 0.4));
+  launchGoo(from, to, false, 'rock'); e.tiltV -= 10; e.lungeT = 0.3;
+  if (net.on && net.host) netEmit('goo', { k: 'rock', rk: rkOf(room), f: from.toArray().map(v => +v.toFixed(2)), t: to.toArray().map(v => +v.toFixed(2)) });
+}
+// aftershocks: after a slam the floor cracks open under you, three times, with a moment's warning each
+function quakeAt(x, z, delay, fake) {
+  const mat = new THREE.MeshBasicMaterial({ color: 0xFF6A3D, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }), ring = meshOf(GEO.ring, mat);
+  ring.rotation.x = -Math.PI / 2; ring.position.set(x, 0.045, z); ring.scale.setScalar(1.15); ring.visible = false; scene.add(ring);
+  let t = -delay;
+  addFx(sdt => {
+    t += sdt; if (t < 0) return true;
+    ring.visible = true; mat.opacity = 0.35 + 0.55 * Math.abs(Math.sin(t * 13)); if (t < 0.85) return true;
+    scene.remove(ring); mat.dispose(); const p = new THREE.Vector3(x, 0.2, z);
+    burst(p, 0x8A6A4A, 16, 5, 0.7, 0.1); floorRing(p, 0xFF6A3D, 1.2, 0.4); SFX.thud(); shake = Math.max(shake, 0.22);
+    if (!fake) { if (!player.down && !player.fall && cine.state === 'idle' && Math.hypot(x - player.pos.x, z - player.pos.z) < 1.15) hurtPlayer(1, p); hurtRemotesNear(p, 1.15, 1); }
+    return false;
+  });
+}
+function aftershocks(e) {
+  const at = netTarget(e).pos, spots = [[at.x, at.z]];
+  for (let i = 0; i < 2; i++) { const a = rand(0, Math.PI * 2), d = rand(1.6, 2.4); spots.push([Math.max(-W + 1, Math.min(W - 1, at.x + Math.cos(a) * d)), Math.max(-D + 1, Math.min(D - 1, at.z + Math.sin(a) * d))]); }
+  spots.forEach(([x, z], i) => { quakeAt(x, z, 0.25 + i * 0.3, false); if (net.on && net.host) netEmit('goo', { k: 'quake', rk: rkOf(room), f: [+x.toFixed(2), 0, +z.toFixed(2)], t: [0.25 + i * 0.3, 0, 0] }); });
 }
 
 /* ================= spitter goo ================= */
@@ -2645,11 +2724,13 @@ function spitGoo(e, lat = 0, at = player.pos) { // lat: how far to the side of i
   launchGoo(from, to); e.tiltV -= 8;
   if (net.on && net.host) netEmit('goo', { rk: rkOf(room), f: from.toArray().map(v => +v.toFixed(2)), t: to.toArray().map(v => +v.toFixed(2)) });
 }
-function launchGoo(from, to, fake) { // fake: a partner's copy of the host's goo, which only the host scores
-  const T = 1.2, g = 12, vel = new THREE.Vector3((to.x - from.x) / T, (to.y - from.y + 0.5 * g * T * T) / T, (to.z - from.z) / T);
-  const m = meshOf(GEO.ico1, gooMat); m.scale.setScalar(0.2); m.position.copy(from); scene.add(m);
-  const mark = meshOf(GEO.ring, gooMarkMat); mark.rotation.x = -Math.PI / 2; mark.position.set(to.x, 0.04, to.z); scene.add(mark);
-  goos.push({ m, mark, pos: from.clone(), vel, t: 0, fake }); SFX.spit();
+const rockMat = new THREE.MeshStandardMaterial({ color: 0x6E6276, roughness: 0.9, flatShading: true }), rockMarkMat = new THREE.MeshBasicMaterial({ color: 0xFFB547, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide });
+rockMat.userData.shared = rockMarkMat.userData.shared = true;
+function launchGoo(from, to, fake, kind = 'goo') { // fake: a partner's copy of the host's, which only the host scores; kind 'rock' is a boss's boulder
+  const rock = kind === 'rock', T = rock ? 1.35 : 1.2, g = 12, vel = new THREE.Vector3((to.x - from.x) / T, (to.y - from.y + 0.5 * g * T * T) / T, (to.z - from.z) / T);
+  const m = meshOf(rock ? GEO.ico0 : GEO.ico1, rock ? rockMat : gooMat); m.scale.setScalar(rock ? 0.3 : 0.2); m.position.copy(from); scene.add(m);
+  const mark = meshOf(GEO.ring, rock ? rockMarkMat : gooMarkMat); mark.rotation.x = -Math.PI / 2; mark.position.set(to.x, 0.04, to.z); scene.add(mark);
+  goos.push({ m, mark, pos: from.clone(), vel, t: 0, fake, rock }); if (rock) SFX.whoosh(); else SFX.spit();
 }
 function updateGoos(sdt) {
   for (let i = goos.length - 1; i >= 0; i--) {
@@ -2657,7 +2738,8 @@ function updateGoos(sdt) {
     g.mark.scale.setScalar(1.25 * (0.65 + 0.35 * Math.abs(Math.sin(g.t * 9))));
     if (g.pos.y <= 0.08 || g.t > 3) {
       scene.remove(g.m); scene.remove(g.mark); goos.splice(i, 1);
-      burst(g.pos.clone().setY(0.2), 0xB06BE0, 12, 3, 0.6, 0.08); puddle(g.pos, 0x7A3AA0, 0.6); SFX.splash(false);
+      if (g.rock) { burst(g.pos.clone().setY(0.2), 0x8A7A6A, 16, 4, 0.7, 0.1); floorRing(g.pos, 0xFFB547, 1.3, 0.35); SFX.thud(); shake = Math.max(shake, 0.2); }
+      else { burst(g.pos.clone().setY(0.2), 0xB06BE0, 12, 3, 0.6, 0.08); puddle(g.pos, 0x7A3AA0, 0.6); SFX.splash(false); }
       if (!g.fake && !player.down && Math.hypot(g.pos.x - player.pos.x, g.pos.z - player.pos.z) < 1.3 && cine.state === 'idle') hurtPlayer(1, g.pos);
       if (!g.fake) hurtRemotesNear(g.pos, 1.3, 1);
     }
@@ -3761,7 +3843,7 @@ function knockedOut(final) {
 }
 function resetRun() {
   clearLoose(); satchel = []; potPending = []; strains = {}; seenTraits.clear(); reserve = null;
-  Object.assign(run, { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set() });
+  Object.assign(run, { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set() });
   player.maxHp = 8; $('#coinNum').textContent = '0';
   { const effs = shuffle(Object.keys(EXTRAS)); ['cyclops', 'drain', 'torch', 'high'].forEach((o, i) => { originEff[o] = effs[i]; }); }
   stockUp(); hasGun = false; tool = 'ladle'; score = 0; shownScore = 0; $('#scoreNum').textContent = '0';
@@ -3782,7 +3864,7 @@ const POOL = n => n === 1 ? ['slime', 'slime', 'cyclops', 'moth'] : n === 2 ? ['
 function rosterFor(r) {
   if (r.king) return ['king', 'slime', floorNum >= 2 ? 'spitter' : 'slime'];
   let list;
-  if (r.type === 'stairs') list = floorNum === 1 ? ['chief', 'slime'] : ['chief', pick(POOL(floorNum)), pick(POOL(floorNum))];
+  if (r.type === 'stairs') { const b = r.boss || 'chief'; list = floorNum === 1 ? [b, 'slime'] : [b, pick(POOL(floorNum)), pick(POOL(floorNum))]; }
   else if (r.type === 'start' && floorNum === 1) list = ['slime', 'slime', 'cyclops'];
   else { list = [pick(POOL(floorNum)), pick(POOL(floorNum)), pick(POOL(floorNum))]; if (r.depth >= 2) list.push(pick(POOL(floorNum))); }
   for (let i = 1; i < floorNum; i++) list.push(pick(POOL(floorNum)));
@@ -3820,7 +3902,7 @@ function enterRoom(r, fromDir, instant) {
     if (instant) { setDoors(false, true); doors.forEach(d => { d.y = 0; }); spawn(true); }
     else setTimeout(() => { if (room !== r) return; setDoors(false); spawn(false); }, 450);
   }
-  if (r.type === 'stairs' && firstVisit) banner(r.king ? 'THE CYCLOPS KING' : 'CYCLOPS CHIEF', r.king && !run.won ? 'FINAL BOSS' : '', 'boss');
+  if (r.type === 'stairs' && firstVisit) bossIntro(r);
   else if (r.type === 'secret' && firstVisit) { const b = { shop: [r.shop && r.shop.name, 'SECRET STOCK'], den: [r.shop && r.shop.name, 'PLACE YOUR BETS'], gift: ['A GIFT', 'IT\'S FREE'], hoard: ['A HOARD', ''] }[r.secret]; banner(b[0], b[1]); SFX.fanfare(); if (r.shop && r.shopDir) SFX.gob(); }
   else if (firstVisit && fromDir) banner(th.name.toUpperCase(), r.trap ? { pits: 'PITFALLS', spikes: 'SPIKES', turrets: 'TURRETS' }[r.trap] : '');
   renderMap();
@@ -4612,7 +4694,13 @@ const NET_ON = {
     if (!net.on || d.run !== net.run || d.rk !== rkOf(room) || !Array.isArray(d.o) || !Array.isArray(d.v)) return;
     fakeThrow(d.o.map(Number), d.v.map(Number), +d.c || 0xCFE8F0); const R = net.remotes.get(m.peer); if (R) R.throwT = 0.35;
   },
-  goo(d) { if (netGuest() && d.run === net.run && d.rk === rkOf(room) && Array.isArray(d.f) && Array.isArray(d.t)) launchGoo(new THREE.Vector3(...d.f.map(Number)), new THREE.Vector3(...d.t.map(Number)), true); },
+  goo(d) {
+    if (!netGuest() || d.run !== net.run || d.rk !== rkOf(room) || !Array.isArray(d.f) || !Array.isArray(d.t)) return;
+    const f = new THREE.Vector3(...d.f.map(Number)), t = new THREE.Vector3(...d.t.map(Number));
+    if (d.k === 'quake') quakeAt(f.x, f.z, Math.min(2, Math.max(0, t.x)), true);
+    else if (d.k === 'lane') { const lane = chargeLane(f, t.normalize()); setTimeout(() => scene.remove(lane), 800); }
+    else launchGoo(f, t, true, d.k === 'rock' ? 'rock' : 'goo');
+  },
   xpress(d) { if (net.on && d.run === net.run && d.rk === rkOf(room) && xBrick && !room.xPressed) pressX(true); },
   over(d) { if (net.on && d.run === net.run && !koOpen) { player.down = false; knockedOut(true); } },
 };
@@ -4884,6 +4972,7 @@ function frame(now) {
       e.root.position.copy(e.pos); e.shadow.visible = false; continue;
     }
     if (room.pits && !e.T.flying && !e.T.boss && (e.kbv ? e.pos.y < 2.2 : e.lev <= 0 && e.pos.y <= 0.001) && pitAt(e.pos.x, e.pos.z, 0.55)) { e.inPit = true; e.lev = 0; e.fallV = 0; e.atk = 0; e.kbv = null; endSlam(e); continue; } // shoved over a hole, there's no floor to land on
+    if (e.charge) { const owned = bossCharge(e, sdt); if (e.dead) continue; if (owned) continue; }
     let moving = false;
     const tg = netTarget(e), tp = tg.pos;
     const pd = Math.hypot(e.pos.x - tp.x, e.pos.z - tp.z), reach = e.T.reach;
@@ -4893,16 +4982,23 @@ function frame(now) {
       const gx = tp.x + Math.sin(e.ang) * reach * 0.8, gz = tp.z + Math.cos(e.ang) * reach * 0.8;
       const dx = gx - e.pos.x, dz = gz - e.pos.z, d = Math.hypot(dx, dz);
       const hopOK = !e.T.hops || Math.sin(e.walk) > 0;
-      if (d > 0.35 && hopOK) { const sp = e.T.speed * sdt * (e.wet > 0 ? 0.65 : 1) * (e.chill > 0 ? 0.5 : 1), nx = e.pos.x + dx / d * sp, nz = e.pos.z + dz / d * sp; if (e.T.flying || !room.pits || !pitAt(nx, nz, 0.75)) { e.pos.x = nx; e.pos.z = nz; moving = true; } } // they walk round holes; it takes a shove to put them in one
+      if (d > 0.35 && hopOK) { const sp = e.T.speed * sdt * (e.wet > 0 ? 0.65 : 1) * (e.chill > 0 ? 0.5 : 1) * (e.enraged ? 1.3 : 1) * (e.T.boss ? 1 + 0.04 * ((e.tier || 1) - 1) : 1), nx = e.pos.x + dx / d * sp, nz = e.pos.z + dz / d * sp; if (e.T.flying || !room.pits || !pitAt(nx, nz, 0.75)) { e.pos.x = nx; e.pos.z = nz; moving = true; } } // they walk round holes; it takes a shove to put them in one
     }
     // melee: a readable wind-up (it leans back, a red ! shows), then a swing that lands if you're still in reach
     e.cd = Math.max(0, e.cd - sdt);
     if (!grounded) { e.atk = 0; endSlam(e); }
-    else if (e.atk > 0) { e.atk -= sdt; if (e.atk <= 0) { e.atk = 0; e.lungeT = 0.3; e.cd = e.T.cooldown; if (canHit) { if (e.slam) slamHit(e); else if (e.T.ranged) spitGoo(e, 0, tp); else if (pd < reach + 0.6) { if (tg.local) hurtPlayer(e.T.dmg, e); else netHurt(tg, e.T.dmg, e.pos); } } endSlam(e); } }
+    else if (e.atk > 0) { e.atk -= sdt; if (e.atk <= 0) { e.atk = 0; e.lungeT = 0.3; e.cd = e.T.cooldown * bossCd(e); if (canHit) { if (e.slam) slamHit(e); else if (e.T.ranged) spitGoo(e, 0, tp); else if (pd < reach + 0.6) { if (tg.local) hurtPlayer(e.T.dmg, e); else netHurt(tg, e.T.dmg, e.pos); } } endSlam(e); } }
     else if (canHit && e.cd <= 0 && pd < reach + (e.T.ranged ? 2.5 : e.T.boss ? 1.2 : 0)) {
       if (e.T.boss && (e.swings = (e.swings || 0) + 1) % 3 === 0) startSlam(e); else e.atk = e.T.windup;
     }
-    else if (canHit && e.cd <= 0 && e.T.king && pd > reach + 2) { [-1.8, 0, 1.8].forEach((l, i) => setTimeout(() => { if (!e.dead) spitGoo(e, l, tp); }, i * 140)); e.cd = 3.4; } // keep your distance and it lobs a spread
+    else if (canHit && e.cd <= 0 && e.moves && e.moves.has('charge') && pd > 3.4 && pd < 12 && Math.random() < sdt * 0.9) startCharge(e, tp); // learned moves, for when you keep your distance
+    else if (canHit && e.cd <= 0 && e.moves && e.moves.has('toss') && pd > reach + 2.2 && Math.random() < sdt * 1.4) { throwRock(e, tp); e.cd = e.T.cooldown * bossCd(e); }
+    else if (canHit && e.cd <= 0 && e.T.king && pd > reach + 2) { [-1.8, 0, 1.8].forEach((l, i) => setTimeout(() => { if (!e.dead) spitGoo(e, l, tp); }, i * 140)); e.cd = 3.4 * bossCd(e); } // keep your distance and it lobs a spread
+    if (e.moves && e.moves.has('enrage') && !e.enraged && e.hp <= e.maxHp * 0.35) { // low on health, it gets faster and meaner
+      e.enraged = true; e.tiltV -= 14; shake = Math.max(shake, 0.45); SFX.charge(); puff(centerOf(e), 0xFF3B30, 14, 1.2, 0.6, 1.4, 0.3, 0.8);
+      const sp_ = project(centerOf(e).add(new THREE.Vector3(0, e.h * 0.5, 0))); if (!sp_.behind) callout('ENRAGED', 2, { at: true, x: sp_.x, y: sp_.y });
+    }
+    if (e.enraged && Math.random() < sdt * 5) puff(centerOf(e).add(new THREE.Vector3(rand(-0.4, 0.4), e.h * 0.3, rand(-0.4, 0.4))), 0xFF3B30, 1, 0.8, 0.2, 1.2, 0.14, 0.6);
     if (e.T.king && !e.clone) for (const [k, f] of [['sum1', 0.6], ['sum2', 0.3]]) if (!e[k] && e.hp <= e.maxHp * f) { e[k] = true; kingSummon(e); }
     if (e.lungeT > 0) e.lungeT = Math.max(0, e.lungeT - sdt);
     if (e.dead) continue;
