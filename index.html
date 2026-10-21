@@ -377,6 +377,16 @@
   .bigcode small{font:700 13px var(--ui);letter-spacing:.24em;color:var(--muted);text-shadow:none;margin-bottom:6px}
   .codein{width:5.2ch;box-sizing:content-box;background:#000;border:0;border-bottom:4px solid var(--yell);color:#fff;font:400 clamp(52px,8vw,88px)/1 var(--display);letter-spacing:.14em;text-transform:uppercase;padding:6px 14px 4px;outline:none}
   .codein::placeholder{color:#3A3044}
+  .lrow{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-bottom:10px}
+  #ui.scr-link .ui-in{padding-top:6vh;gap:10px;display:grid;grid-template-columns:auto minmax(0,auto);column-gap:36px;align-items:start}
+  #ui.scr-link .ui-in > .kicker{grid-column:1 / -1;justify-self:start}
+  #ui.scr-link .ui-in > .mlist{grid-column:2;grid-row:2;min-width:min(380px,100%)}
+  #ui.scr-link .mi{font-size:clamp(24px,3vw,38px)}
+  #ui.scr-link .ui-in > div:not(.kicker):not(.mlist){max-width:min(560px,46vw)}
+  @media (max-width:759px){#ui.scr-link .ui-in{display:flex}#ui.scr-link .ui-in > div:not(.kicker):not(.mlist){max-width:none}}
+  .lqr{width:min(280px,60vw,34vh);height:auto;image-rendering:pixelated;box-shadow:0 0 0 4px #000}
+  .lcam{width:min(240px,56vw,30vh);transform:scaleX(-1);box-shadow:0 0 0 3px var(--yell);background:#000}
+  .codein.lpaste{width:min(440px,78vw);font-size:22px;letter-spacing:.04em;text-transform:none;margin-top:8px}
   .ptag{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none;white-space:nowrap}
   .ptag b{font:400 16px/1 var(--display);letter-spacing:.06em;color:#fff;background:#000;padding:4px 9px 3px;transform:skewX(-10deg)}
   .ptag span{display:flex;gap:2px} .ptag i{width:7px;height:7px;background:#FF3B4E;box-shadow:0 0 0 1.5px #000;transform:rotate(45deg)}
@@ -1884,7 +1894,7 @@ $('#hagBtn').addEventListener('click', () => { if (inter.cur && inter.cur.type =
 const NAV = { arrowup: 'up', w: 'up', arrowdown: 'down', s: 'down', arrowleft: 'left', a: 'left', arrowright: 'right', d: 'right', enter: 'ok', ' ': 'ok', escape: 'back', backspace: 'back' };
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
-  if (e.target && e.target.tagName === 'INPUT') { if (k === 'enter') { e.preventDefault(); if (ui.screen === 'join') joinCode(); } else if (k === 'escape') { e.target.blur(); net.coopMsg = ''; uiBack(); } return; }
+  if (e.target && e.target.tagName === 'INPUT') { if (k === 'enter') { e.preventDefault(); if (ui.screen === 'join') joinCode(); else if (ui.screen === 'link') linkPasteSubmit(); } else if (k === 'escape') { e.target.blur(); net.coopMsg = ''; uiBack(); } return; }
   if (reelOn) { if ([' ', 'enter', 'escape', 'e'].includes(k)) { e.preventDefault(); skipReel(); } return; }
   if (ui.screen) {
     if (k === 'tab') e.preventDefault();
@@ -1973,7 +1983,8 @@ const SCREENS = {
     { label: 'DANCE', val: brewer.danceName, adjust: d => brewer.set('dance', d) },
     { label: 'DONE', act: uiBack }] }),
   coop: () => ({ kicker: 'CO-OP', body: coopBody(), items: [...(net.room ? [{ label: 'START RUN', act: netStart }] : []),
-    ...(net.code ? [{ label: 'LEAVE CODE GAME', act: leaveCode }] : [{ label: 'HOST WITH CODE', act: hostCode }, { label: 'JOIN WITH CODE', act: () => { net.coopMsg = ''; uiPush('join'); } }]), { label: 'BACK', act: uiBack }] }),
+    ...(net.code ? [{ label: net.code.code === 'LOCAL' ? 'DISCONNECT' : 'LEAVE CODE GAME', act: leaveCode }] : [{ label: 'HOST WITH CODE', act: hostCode }, { label: 'JOIN WITH CODE', act: () => { net.coopMsg = ''; uiPush('join'); } }, { label: 'NO-INTERNET LINK', act: () => { net.coopMsg = ''; uiPush('link'); } }]), { label: 'BACK', act: uiBack }] }),
+  link: () => ({ kicker: 'NO-INTERNET LINK', body: linkBody(), items: linkItems() }),
   join: () => ({ kicker: 'JOIN WITH CODE', body: `<input id="joinCode" class="codein" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Game code"><p class="${net.coopMsg ? 'cmsg' : 'cnote'}">${esc(net.coopMsg || 'Type the 4-character code on your friend\'s screen.')}</p>`,
     items: [{ label: 'CONNECT', act: joinCode }, { label: 'BACK', act: () => { net.coopMsg = ''; uiBack(); } }] }),
   options: () => ({ kicker: 'OPTIONS', items: [...OPTIONS, { label: 'BACK', act: uiBack }] }),
@@ -1997,6 +2008,10 @@ function renderUI() {
   placeCursor();
   const ci = uiEl.querySelector('#joinCode');
   if (ci) { ci.value = net.codeDraft || ''; ci.addEventListener('input', () => { ci.value = ci.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4); net.codeDraft = ci.value; }); setTimeout(() => ci.focus(), 60); }
+  if (ui.screen === 'link' && net.link) {
+    const v = uiEl.querySelector('#linkCam'); if (v && net.link.stream) { v.srcObject = net.link.stream; v.play().catch(() => {}); }
+    linkShowQR(); const lp = uiEl.querySelector('#linkPaste'); if (lp) setTimeout(() => lp.focus(), 60);
+  }
 }
 function placeCursor() {
   const btns = uiEl.querySelectorAll('.mi'), cur = uiEl.querySelector('.mcur'), b = btns[ui.idx]; if (!b || !cur) return;
@@ -2016,6 +2031,7 @@ function hideUI() {
 }
 function uiPush(screen) { ui.stack.push([ui.screen, ui.idx]); ui.screen = screen; ui.idx = 0; renderUI(); }
 function uiBack() {
+  if (ui.screen === 'link') linkReset(); // leaving the link screen lets go of the camera and any half-made link
   if (ui.stack.length) { [ui.screen, ui.idx] = ui.stack.pop(); renderUI(); }
   else if (ui.screen === 'pause') play();
 }
@@ -4253,57 +4269,206 @@ function loadPeerJS() {
   if (window.Peer) return Promise.resolve();
   return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js'; sc.onload = () => res(); sc.onerror = () => rej('load'); document.head.appendChild(sc); });
 }
-// the same calls as claude.ai's room (emit, on, presence, peers, onPeers), carried over WebRTC; the host relays between guests
+// the same calls as claude.ai's room (emit, on, presence, peers, onPeers), over whatever links connect us; the host relays between guests.
+// a link is { peer, send(msg), onData(fn), onClose(fn) }: a PeerJS connection or a bare WebRTC data channel
+function linkRoom(meId, hosting, label) {
+  const links = new Map(), others = new Map(), topicFns = {}, peerFns = [];
+  let mine = {}, snap = Object.freeze([]), live = true;
+  const S = (id, pr, me) => Object.freeze({ peer: id, by: null, isMe: me, sameTab: me, kind: 'viewer', guest: false, presence: Object.freeze(Object.assign({}, pr)), updatedAt: Date.now() });
+  const rebuild = () => { snap = Object.freeze([S(meId, mine, true), ...[...others].map(([id, pr]) => S(id, pr, false))]); };
+  const tell = (joined = [], left = []) => { rebuild(); const ch = { peers: snap, joined, left, updated: [] }; peerFns.forEach(f => { try { f(ch); } catch (e) { console.error(e); } }); };
+  const send = (msg, except) => { for (const [id, l] of links) if (id !== except) { try { l.send(msg); } catch (e) {} } };
+  function onMsg(l, m) {
+    if (!m || typeof m !== 'object') return;
+    const from = hosting ? l.peer : (typeof m.from === 'string' ? m.from : l.peer); // only the host says who a relayed message is from
+    if (hosting) send(Object.assign({}, m, { from: l.peer }), l.peer);
+    if (m.k === 'pres') {
+      const pr = m.p && typeof m.p === 'object' ? m.p : {}, old = others.get(from); others.set(from, pr);
+      if (!old) tell([{ peer: from }]); else if (old.st !== pr.st || String(old.look) !== String(pr.look)) tell(); else rebuild();
+    } else if (m.k === 'bye') { if (others.delete(from)) tell([], [{ peer: from }]); }
+    else if (m.k === 'emit' && typeof m.topic === 'string') (topicFns[m.topic] || []).forEach(f => { try { f({ topic: m.topic, data: m.data, peer: from, by: null, isMe: false, sameTab: false, kind: 'viewer', guest: false }); } catch (e) { console.error(e); } });
+  }
+  const api = {
+    code: label, hosting, me: meId, onLeave: null,
+    addLink(l) {
+      links.set(l.peer, l); l.onData(m => onMsg(l, m)); l.send({ k: 'pres', p: mine });
+      if (hosting) for (const [id, pr] of others) l.send({ k: 'pres', p: pr, from: id });
+      l.onClose(() => {
+        if (!links.delete(l.peer)) return;
+        if (hosting) { if (others.delete(l.peer)) { send({ k: 'bye', from: l.peer }); tell([], [{ peer: l.peer }]); } }
+        else { const ids = [...others.keys()]; others.clear(); tell([], ids.map(id => ({ peer: id }))); net.coopMsg = 'LOST THE CONNECTION TO THE HOST'; }
+      });
+    },
+    emit: async (topic, data) => send({ k: 'emit', topic, data }),
+    on: (t, f) => { (topicFns[t] = topicFns[t] || []).push(f); return () => {}; },
+    presence: async patch => { mine = Object.assign({}, mine, patch); for (const k in mine) if (mine[k] === null) delete mine[k]; send({ k: 'pres', p: mine }); rebuild(); },
+    peers: () => snap,
+    onPeers: f => { peerFns.push(f); setTimeout(() => f({ peers: snap, joined: snap.slice(), left: [], updated: [] }), 0); return () => {}; },
+    connected: () => live,
+    leave: () => { live = false; send({ k: 'bye' }); if (api.onLeave) api.onLeave(); },
+  };
+  rebuild();
+  return api;
+}
+// a code game: PeerJS's free server introduces the players, then they talk directly
 function codeRoom(code, hosting) {
   return new Promise((resolve, reject) => {
     const peer = hosting ? new Peer('brewtality-' + code) : new Peer();
-    const conns = new Map(), others = new Map(), topicFns = {}, peerFns = [];
-    let mine = {}, snap = Object.freeze([]), live = true, settled = false;
+    let room = null, settled = false;
     const done = (ok, v) => { if (settled) return; settled = true; clearTimeout(tm); if (ok) resolve(v); else { try { peer.destroy(); } catch (e) {} reject(v); } };
     const tm = setTimeout(() => done(false, 'timeout'), 15000);
-    const S = (id, pr, me) => Object.freeze({ peer: id, by: null, isMe: me, sameTab: me, kind: 'viewer', guest: false, presence: Object.freeze(Object.assign({}, pr)), updatedAt: Date.now() });
-    const rebuild = () => { snap = Object.freeze([S(peer.id, mine, true), ...[...others].map(([id, pr]) => S(id, pr, false))]); };
-    const tell = (joined = [], left = []) => { rebuild(); const ch = { peers: snap, joined, left, updated: [] }; peerFns.forEach(f => { try { f(ch); } catch (e) { console.error(e); } }); };
-    const send = (msg, except) => { for (const [id, c] of conns) if (id !== except && c.open) { try { c.send(msg); } catch (e) {} } };
-    function onMsg(c, m) {
-      if (!m || typeof m !== 'object') return;
-      const from = hosting ? c.peer : (typeof m.from === 'string' ? m.from : c.peer); // only the host says who a relayed message is from
-      if (hosting) send(Object.assign({}, m, { from: c.peer }), c.peer);
-      if (m.k === 'pres') {
-        const pr = m.p && typeof m.p === 'object' ? m.p : {}, old = others.get(from); others.set(from, pr);
-        if (!old) tell([{ peer: from }]); else if (old.st !== pr.st || String(old.look) !== String(pr.look)) tell(); else rebuild();
-      } else if (m.k === 'bye') { if (others.delete(from)) tell([], [{ peer: from }]); }
-      else if (m.k === 'emit' && typeof m.topic === 'string') (topicFns[m.topic] || []).forEach(f => { try { f({ topic: m.topic, data: m.data, peer: from, by: null, isMe: false, sameTab: false, kind: 'viewer', guest: false }); } catch (e) { console.error(e); } });
-    }
-    function addConn(c) {
-      c.on('open', () => {
-        conns.set(c.peer, c); c.send({ k: 'pres', p: mine });
-        if (hosting) for (const [id, pr] of others) c.send({ k: 'pres', p: pr, from: id }); else done(true, api);
-      });
-      c.on('data', m => onMsg(c, m));
-      const gone = () => {
-        if (!conns.delete(c.peer)) return;
-        if (hosting) { if (others.delete(c.peer)) { send({ k: 'bye', from: c.peer }); tell([], [{ peer: c.peer }]); } }
-        else { const ids = [...others.keys()]; others.clear(); tell([], ids.map(id => ({ peer: id }))); net.coopMsg = 'LOST THE CONNECTION TO THE HOST'; }
-      };
-      c.on('close', gone); c.on('error', gone);
-    }
-    peer.on('open', () => { rebuild(); if (hosting) done(true, api); else addConn(peer.connect('brewtality-' + code, { reliable: true, serialization: 'json' })); });
-    peer.on('connection', c => { if (hosting && live) addConn(c); else c.close(); });
+    const wrap = c => ({ peer: c.peer, send: m => { if (c.open) c.send(m); }, onData: f => c.on('data', f), onClose: f => { c.on('close', f); c.on('error', f); } });
+    peer.on('open', id => {
+      room = linkRoom(id, hosting, code); room.onLeave = () => setTimeout(() => { try { peer.destroy(); } catch (e) {} }, 150);
+      if (hosting) done(true, room);
+      else { const c = peer.connect('brewtality-' + code, { reliable: true, serialization: 'json' }); c.on('open', () => { room.addLink(wrap(c)); done(true, room); }); }
+    });
+    peer.on('connection', c => { if (hosting && room && room.connected()) c.on('open', () => room.addLink(wrap(c))); else c.close(); });
     peer.on('error', err => done(false, (err && err.type) || 'error'));
-    peer.on('disconnected', () => { if (live) try { peer.reconnect(); } catch (e) {} }); // only the matchmaking server dropped; open links carry on
-    const api = {
-      code, hosting, get me() { return peer.id; },
-      emit: async (topic, data) => send({ k: 'emit', topic, data }),
-      on: (t, f) => { (topicFns[t] = topicFns[t] || []).push(f); return () => {}; },
-      presence: async patch => { mine = Object.assign({}, mine, patch); for (const k in mine) if (mine[k] === null) delete mine[k]; send({ k: 'pres', p: mine }); rebuild(); },
-      peers: () => snap,
-      onPeers: f => { peerFns.push(f); setTimeout(() => f({ peers: snap, joined: snap.slice(), left: [], updated: [] }), 0); return () => {}; },
-      connected: () => live,
-      leave: () => { live = false; send({ k: 'bye' }); setTimeout(() => { try { peer.destroy(); } catch (e) {} }, 150); },
-    };
+    peer.on('disconnected', () => { if (room && room.connected()) try { peer.reconnect(); } catch (e) {} }); // only the matchmaking server dropped; open links carry on
   });
 }
+
+/* ---------- the no-internet link: two devices on the same network swap codes by camera (or copy and paste), then talk directly ---------- */
+const LINK_ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }; // used if it's reachable; on a network without internet it's skipped
+const rid = () => Math.random().toString(36).slice(2, 10);
+const SETUP = { actpass: 'x', active: 'c', passive: 'p' }, SETUP_BACK = { x: 'actpass', c: 'active', p: 'passive' }, CAND = { host: 'h', srflx: 's', prflx: 'p', relay: 'r' }, CAND_BACK = { h: 'host', s: 'srflx', p: 'prflx', r: 'relay' };
+// boil a session description down to what it needs (keys, fingerprint, addresses), short enough for a QR code
+function packDesc(desc, id) {
+  const sdp = desc.sdp, get = re => (sdp.match(re) || [])[1] || '';
+  const fp = get(/a=fingerprint:sha-256 (\S+)/i).split(':').map(h => parseInt(h, 16));
+  const cands = [...sdp.matchAll(/a=candidate:\S+ 1 udp \d+ (\S+) (\d+) typ (\w+)/gi)].slice(0, 6).map(m => (CAND[m[3]] || 'h') + m[1] + '/' + m[2]);
+  return ['B1', desc.type === 'offer' ? 'o' : 'a', id, get(/a=ice-ufrag:(\S+)/), get(/a=ice-pwd:(\S+)/), btoa(String.fromCharCode(...fp)), SETUP[get(/a=setup:(\S+)/)] || 'x', cands.join(',')].join('|');
+}
+// and build a full one back out of it
+function unpackDesc(code) {
+  const p = String(code).trim().split('|');
+  if (p[0] !== 'B1' || p.length < 8) throw new Error('not a link code');
+  const [, t, id, ufrag, pwd, fpB, su, cs] = p, hex = [...atob(fpB)].map(c => c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()).join(':');
+  const lines = ['v=0', 'o=- 1 2 IN IP4 127.0.0.1', 's=-', 't=0 0', 'a=group:BUNDLE 0', 'a=msid-semantic: WMS', 'm=application 9 UDP/DTLS/SCTP webrtc-datachannel', 'c=IN IP4 0.0.0.0',
+    `a=ice-ufrag:${ufrag}`, `a=ice-pwd:${pwd}`, 'a=ice-options:trickle', `a=fingerprint:sha-256 ${hex}`, `a=setup:${SETUP_BACK[su] || 'actpass'}`, 'a=mid:0', 'a=sctp-port:5000', 'a=max-message-size:262144'];
+  (cs ? cs.split(',') : []).forEach((c, i) => {
+    const typ = CAND_BACK[c[0]] || 'host', [ip, port] = c.slice(1).split('/');
+    lines.push(`a=candidate:${i + 1} 1 udp ${(typ === 'host' ? 2122260223 : 1686052607) - i} ${ip} ${port} typ ${typ}${typ === 'host' ? '' : ' raddr 0.0.0.0 rport 0'}`);
+  });
+  lines.push('a=end-of-candidates');
+  return { type: t === 'o' ? 'offer' : 'answer', sdp: lines.join('\r\n') + '\r\n', id };
+}
+const gathered = pc => new Promise(res => { if (pc.iceGatheringState === 'complete') return res(); const tm = setTimeout(res, 2500); pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(tm); res(); } }); });
+const dcLink = (dc, peer) => ({ peer, send: m => { if (dc.readyState === 'open') dc.send(JSON.stringify(m)); }, onData: f => dc.addEventListener('message', e => { try { f(JSON.parse(e.data)); } catch (err) {} }), onClose: f => dc.addEventListener('close', f) });
+const loadScript = src => new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.onload = () => res(); sc.onerror = () => rej(new Error('load')); document.head.appendChild(sc); });
+const qrLib = () => window.qrcode ? Promise.resolve() : loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js');
+const scanLib = () => (window.BarcodeDetector || window.jsQR) ? Promise.resolve() : loadScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js');
+
+function linkReset(msg = '') {
+  const L = net.link; if (L) { linkCamOff(); if (L.pc && !L.up) try { L.pc.close(); } catch (e) {} clearTimeout(L.timer); }
+  net.link = null; net.coopMsg = msg;
+}
+function linkFail(msg) { linkReset(msg); if (ui.screen === 'link') renderUI(); }
+async function linkHost() {
+  linkReset(); const L = net.link = { role: 'host', stage: 'making', id: rid() }; renderUI();
+  qrLib().catch(() => {}); scanLib().catch(() => {});
+  await linkCamOn(true); // asking for the camera now also lets the code carry this device's real address
+  if (net.link !== L) return;
+  try {
+    const pc = L.pc = new RTCPeerConnection(LINK_ICE), dc = pc.createDataChannel('brew', { ordered: true });
+    dc.onopen = () => linkUp(L, dc);
+    await pc.setLocalDescription(await pc.createOffer()); await gathered(pc);
+    if (net.link !== L) return;
+    L.myCode = packDesc(pc.localDescription, L.id); L.stage = 'offer'; renderUI();
+  } catch (err) { console.error(err); linkFail("THIS BROWSER COULDN'T SET UP A DIRECT LINK"); }
+}
+function linkJoin() {
+  linkReset(); net.link = { role: 'guest', stage: 'scan', id: rid() }; renderUI();
+  qrLib().catch(() => {}); scanLib().catch(() => {}); linkCamOn();
+}
+async function linkGotCode(code) {
+  const L = net.link; if (!L || L.busy) return;
+  let d; try { d = unpackDesc(code); } catch (e) { net.coopMsg = "THAT DOESN'T LOOK LIKE A LINK CODE"; renderUI(); return; }
+  L.busy = true; linkCamOff(); L.paste = false;
+  try {
+    if (L.role === 'host') {
+      if (d.type !== 'answer') { L.busy = false; net.coopMsg = "THAT'S A HOST CODE: SCAN YOUR FRIEND'S REPLY"; renderUI(); return; }
+      L.theirId = d.id; L.stage = 'connecting'; renderUI(); await L.pc.setRemoteDescription(d);
+    } else {
+      if (d.type !== 'offer') { L.busy = false; net.coopMsg = "THAT'S A REPLY CODE: SCAN THE HOST'S CODE"; renderUI(); return; }
+      L.theirId = d.id; const pc = L.pc = new RTCPeerConnection(LINK_ICE);
+      pc.ondatachannel = e => { const dc = e.channel; if (dc.readyState === 'open') linkUp(L, dc); else dc.onopen = () => linkUp(L, dc); };
+      await pc.setRemoteDescription(d); await pc.setLocalDescription(await pc.createAnswer()); await gathered(pc);
+      if (net.link !== L) return;
+      L.myCode = packDesc(pc.localDescription, L.id); L.stage = 'answer'; renderUI();
+    }
+    clearTimeout(L.timer);
+    L.timer = setTimeout(() => { if (net.link === L && !L.up) linkFail("COULDN'T CONNECT. BOTH DEVICES NEED TO BE ON THE SAME NETWORK, AND SCHOOL WI-FI OFTEN BLOCKS THIS: TRY A PHONE HOTSPOT"); }, L.role === 'host' ? 20000 : 90000);
+  } catch (err) { console.error(err); linkFail("THAT CODE DIDN'T WORK. START OVER AND TRY AGAIN"); }
+}
+function linkUp(L, dc) {
+  if (L.up) return; L.up = true; clearTimeout(L.timer);
+  const room = linkRoom(L.id, L.role === 'host', 'LOCAL'), pc = L.pc;
+  room.onLeave = () => setTimeout(() => { try { pc.close(); } catch (e) {} }, 150);
+  pc.addEventListener('connectionstatechange', () => { if (pc.connectionState === 'failed') try { dc.close(); } catch (e) {} });
+  room.addLink(dcLink(dc, L.theirId));
+  linkCamOff(); net.link = null;
+  useCodeRoom(room); SFX.fanfare();
+}
+// the webcam, for reading the other screen's code
+async function linkCamOn(justAsk) {
+  const L = net.link; if (!L || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 } } });
+    if (net.link !== L) { stream.getTracks().forEach(t => t.stop()); return; }
+    if (justAsk) { stream.getTracks().forEach(t => t.stop()); return; }
+    L.stream = stream; renderUI(); linkScanLoop(L);
+  } catch (e) { if (!justAsk && net.link === L) { L.noCam = true; renderUI(); } }
+}
+function linkCamOff() { const L = net.link; if (!L) return; clearInterval(L.scanT); if (L.stream) L.stream.getTracks().forEach(t => t.stop()); L.stream = null; }
+function linkScanLoop(L) {
+  clearInterval(L.scanT);
+  const det = window.BarcodeDetector ? new BarcodeDetector({ formats: ['qr_code'] }) : null, cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+  L.scanT = setInterval(async () => {
+    const v = document.getElementById('linkCam'); if (net.link !== L || !L.stream) { clearInterval(L.scanT); return; }
+    if (!v || v.readyState < 2) return;
+    try {
+      let text = null;
+      if (det) { const r = await det.detect(v); if (r.length) text = r[0].rawValue; }
+      else if (window.jsQR) { cv.width = v.videoWidth; cv.height = v.videoHeight; cx.drawImage(v, 0, 0); const img = cx.getImageData(0, 0, cv.width, cv.height), r = jsQR(img.data, img.width, img.height); if (r) text = r.data; }
+      if (text && text.startsWith('B1|')) linkGotCode(text);
+    } catch (e) {}
+  }, 300);
+}
+function linkShowQR() {
+  const L = net.link, cv = document.getElementById('linkQR'); if (!L || !cv || !L.myCode) return;
+  const draw = () => {
+    const q = qrcode(0, 'L'); q.addData(L.myCode); q.make();
+    const n = q.getModuleCount(), cell = Math.max(3, Math.floor(300 / (n + 8))), size = cell * (n + 8), x = cv.getContext('2d');
+    cv.width = cv.height = size; x.fillStyle = '#fff'; x.fillRect(0, 0, size, size); x.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) x.fillRect((c + 4) * cell, (r + 4) * cell, cell, cell);
+  };
+  if (window.qrcode) draw(); else qrLib().then(() => { if (net.link === L) draw(); }).catch(() => { cv.replaceWith(Object.assign(document.createElement('p'), { className: 'cnote', textContent: "Couldn't draw the QR code. Use COPY MY CODE instead." })); });
+}
+function linkBody() {
+  const L = net.link, msg = net.coopMsg ? `<p class="cmsg">${esc(net.coopMsg)}</p>` : '';
+  const cam = L && L.stream ? '<video id="linkCam" class="lcam" autoplay playsinline muted></video>' : '';
+  const paste = L && L.paste ? `<input id="linkPaste" class="codein lpaste" autocomplete="off" spellcheck="false" placeholder="PASTE CODE" aria-label="Paste the other device's code">` : '';
+  if (!L) return `${msg}<p class="cnote">Connects two devices on the same network without the connection server, so it works on a phone hotspot even with its data turned off. School Wi-Fi often blocks devices talking to each other.</p><p class="cnote">One of you hosts, the other joins. Each shows a code and scans the other's with the webcam.</p>`;
+  if (L.stage === 'making') return `${msg}<p class="cmsg">MAKING YOUR CODE…</p>`;
+  if (L.stage === 'connecting') return `${msg}<p class="cmsg">CONNECTING…</p>`;
+  if (L.role === 'host' && L.stage === 'offer') return `${msg}<div class="lrow"><canvas id="linkQR" class="lqr"></canvas>${cam}</div><p class="cnote"><b>1.</b> Your friend picks NO-INTERNET LINK → JOIN and points their webcam at this code.<br><b>2.</b> Then pick SCAN THEIR REPLY and point yours at the code on their screen.</p>${paste}`;
+  if (L.role === 'guest' && L.stage === 'scan') return `${msg}<div class="lrow">${cam || (L.noCam ? '<p class="cnote">No camera, so paste the host\'s code instead.</p>' : '<p class="cmsg">STARTING THE CAMERA…</p>')}</div><p class="cnote">Point your webcam at the code on the host's screen.</p>${paste}`;
+  if (L.role === 'guest' && L.stage === 'answer') return `${msg}<div class="lrow"><canvas id="linkQR" class="lqr"></canvas></div><p class="cnote">Now the host picks SCAN THEIR REPLY and points their webcam at this code. You'll connect when they've read it.</p>`;
+  return msg;
+}
+function linkItems() {
+  const L = net.link, copy = { label: 'COPY MY CODE', act: () => { if (navigator.clipboard) navigator.clipboard.writeText(L.myCode).then(() => notice('CODE COPIED'), () => notice("COULDN'T COPY")); } };
+  const pasteIt = label => ({ label, act: () => { L.paste = true; renderUI(); } });
+  const cancel = { label: L ? 'CANCEL' : 'BACK', act: () => { if (L) { linkReset(); renderUI(); } else uiBack(); } };
+  if (!L) return [{ label: 'HOST', act: linkHost }, { label: 'JOIN', act: linkJoin }, cancel];
+  if (L.stage === 'offer') return [{ label: L.stream ? 'SCANNING…' : 'SCAN THEIR REPLY', act: () => { if (!L.stream) linkCamOn(); } }, L.paste ? { label: 'USE PASTED CODE', act: linkPasteSubmit } : pasteIt('PASTE THEIR REPLY'), copy, cancel];
+  if (L.stage === 'scan') return [L.paste ? { label: 'USE PASTED CODE', act: linkPasteSubmit } : pasteIt("PASTE THE HOST'S CODE"), cancel];
+  if (L.stage === 'answer') return [copy, cancel];
+  return [cancel];
+}
+function linkPasteSubmit() { const el = document.getElementById('linkPaste'); if (el && el.value.trim()) linkGotCode(el.value.trim()); }
 const CODE_ERR = { 'peer-unavailable': 'NO GAME WITH THAT CODE', timeout: 'NO ANSWER. CHECK THE CODE AND TRY AGAIN', load: "COULDN'T LOAD THE CONNECTION LIBRARY", 'browser-incompatible': "THIS BROWSER CAN'T CONNECT DIRECTLY" };
 function codeFail(err) {
   const blocked = !CODE_ERR[err] || err === 'load';
@@ -4314,7 +4479,7 @@ function useCodeRoom(r) {
   if (net.code) net.code.leave();
   net.code = r; net.room = r; net.me = r.me; net.presKey = ''; net.coopMsg = ''; net.busy = false;
   attachRoom(r);
-  if (ui.screen === 'join') uiBack(); else if (ui.screen === 'coop') renderUI();
+  if (ui.screen === 'join' || ui.screen === 'link') uiBack(); else if (ui.screen === 'coop') renderUI();
 }
 async function hostCode() {
   if (net.busy) return; net.busy = true; net.coopMsg = 'SETTING UP…'; renderUI();
@@ -4356,7 +4521,7 @@ const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 function coopBody() {
   const msg = net.coopMsg ? `<p class="cmsg">${esc(net.coopMsg)}</p>` : '';
   if (!net.room) return `${msg}<p class="cnote">Host a game and send your friend the code, or type in theirs. You both need this game open, on claude.ai or from the downloaded file.</p>`;
-  const head = net.code ? (net.code.hosting ? `<div class="bigcode"><small>YOUR CODE</small>${esc(net.code.code)}</div>` : `<div class="bigcode"><small>IN GAME</small>${esc(net.code.code)}</div>`) : '';
+  const head = !net.code ? '' : net.code.code === 'LOCAL' ? '<div class="bigcode"><small>NO-INTERNET LINK</small>LINKED</div>' : net.code.hosting ? `<div class="bigcode"><small>YOUR CODE</small>${esc(net.code.code)}</div>` : `<div class="bigcode"><small>IN GAME</small>${esc(net.code.code)}</div>`;
   const row = (name, lk, you) => { const b = Array.isArray(lk) ? lk : [0, 0, 0]; return `<div class="crow"><i class="sw" style="background:${brewer.colourOf(b[0], b[1])}"></i><b>${esc(name)}</b><span>${brewer.bodyOf(b[0])}${you ? ' · YOU' : ''}</span></div>`; };
   const others = lobbyPeers();
   return `${head}${msg}<div class="coop">${row('YOU', brewer.lookArr(), true)}${others.map(p => row(nameOf(p), p.presence.look, false)).join('')}</div>`

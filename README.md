@@ -24,4 +24,14 @@ A first-person dungeon crawler where you brew potions and fling them at things w
 2. Everyone else picks **CO-OP → JOIN WITH CODE** and types it in.
 3. Anyone presses **START RUN**.
 
+### No-internet link
+
+For two devices on the same network without the connection server (a phone hotspot works even with its data off; school Wi-Fi often blocks devices talking to each other):
+
+1. Both pick **CO-OP → NO-INTERNET LINK**. One picks **HOST**, the other **JOIN**.
+2. The joiner points their webcam at the QR code on the host's screen and gets a reply code.
+3. The host picks **SCAN THEIR REPLY** and points their webcam at that.
+
+No webcam? **COPY MY CODE** and paste it on the other device instead.
+
 Everyone shares the floors, doors and enemies; hearts, coins, brews and loot are your own. If you go down, a partner clearing the room gets you back up. Connections are peer to peer through the free PeerJS service.
