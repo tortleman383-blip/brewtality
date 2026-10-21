@@ -110,6 +110,13 @@
   #swapBtn{right:24px;bottom:172px;padding:8px 12px;font-size:14px}
   #hagBtn{right:120px;bottom:166px;padding:8px 12px;font-size:14px}
   #bonkBtn{right:212px;bottom:76px;width:68px;height:68px;border-radius:50%;font-size:15px}
+  #joy{position:absolute;z-index:4;width:112px;height:112px;margin:-56px 0 0 -56px;border-radius:50%;border:3px solid rgba(255,255,255,.4);background:rgba(0,0,0,.25);pointer-events:none;display:none}
+  #joy i{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:var(--yell);box-shadow:0 0 0 3px #000}
+  #joy span{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:8px;font:700 11px var(--ui);letter-spacing:.18em;color:var(--muted);white-space:nowrap}
+  #joy.on{display:block} #joy.on span{display:none}
+  #joy.ghost{display:block;left:96px;top:auto;bottom:150px;margin:0 0 -56px -56px;opacity:.55}
+  .menu-on #joy,.cine #joy{display:none}
+  @media (max-width:560px){#bonkBtn{right:126px;bottom:160px}#hagBtn{right:24px;bottom:268px}} /* phones: keep the left side clear for the move stick */
   #prompt .hg{font-style:normal;color:var(--yell);margin-left:14px}
   #prompt .hg kbd{margin-right:5px}
   /* boss health: one bar along the bottom, TBOI style */
@@ -1875,11 +1882,30 @@ canvas.addEventListener('mousedown', e => {
 });
 addEventListener('mouseup', e => { if (e.button === 0 && locked) useUp(); });
 addEventListener('mousemove', e => { if (!locked || menuOpen || camMode !== 'fp' || reelOn) return; const k = 0.0022 * lookK(); player.yaw -= e.movementX * k; player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch - e.movementY * k)); });
-// drag-to-look when pointer lock isn't available (touch, some app views)
-let drag = null;
-canvas.addEventListener('pointerdown', e => { if (locked || menuOpen || reelOn) return; drag = { x: e.clientX, y: e.clientY, id: e.pointerId }; canvas.setPointerCapture(e.pointerId); });
-canvas.addEventListener('pointermove', e => { if (!drag || e.pointerId !== drag.id || camMode !== 'fp') return; const k = 0.005 * lookK(); player.yaw -= (e.clientX - drag.x) * k; player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch - (e.clientY - drag.y) * k)); drag.x = e.clientX; drag.y = e.clientY; });
-const endDrag = () => { drag = null; };
+// touch: a finger on the left side becomes a joystick wherever it lands; drag anywhere else to look (also used when pointer lock isn't available)
+let drag = null, joy = null; const JOY_R = 56;
+const joyEl = document.createElement('div'); joyEl.id = 'joy'; joyEl.innerHTML = '<i></i><span>DRAG TO MOVE</span>'; stage.appendChild(joyEl);
+const joyKnob = joyEl.querySelector('i');
+function joyShow() {
+  if (joy) { joyEl.className = 'on'; joyEl.style.left = joy.ox + 'px'; joyEl.style.top = joy.oy + 'px'; joyKnob.style.transform = `translate(${joy.dx}px,${joy.dy}px)`; }
+  else { joyEl.className = (coarse || !locked) && !menuOpen && !joyEl.dataset.used ? 'ghost' : ''; joyEl.style.left = joyEl.style.top = ''; joyKnob.style.transform = ''; }
+}
+canvas.addEventListener('pointerdown', e => {
+  if (menuOpen || reelOn) return;
+  const r_ = stage.getBoundingClientRect(), x = e.clientX - r_.left, y = e.clientY - r_.top;
+  if (e.pointerType !== 'mouse' && !joy && x < r_.width * 0.42) { // the move stick, even while the mouse is locked
+    joy = { id: e.pointerId, ox: x, oy: y, dx: 0, dy: 0 }; joyEl.dataset.used = '1'; try { canvas.setPointerCapture(e.pointerId); } catch (err) {} joyShow(); return;
+  }
+  if (locked && e.pointerType === 'mouse') return;
+  drag = { x: e.clientX, y: e.clientY, id: e.pointerId }; try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+});
+canvas.addEventListener('pointermove', e => {
+  if (joy && e.pointerId === joy.id) {
+    const r_ = stage.getBoundingClientRect(); let dx = e.clientX - r_.left - joy.ox, dy = e.clientY - r_.top - joy.oy; const d = Math.hypot(dx, dy);
+    if (d > JOY_R) { dx *= JOY_R / d; dy *= JOY_R / d; } joy.dx = dx; joy.dy = dy; joyShow(); return;
+  }
+  if (!drag || e.pointerId !== drag.id || camMode !== 'fp') return; const k = 0.005 * lookK(); player.yaw -= (e.clientX - drag.x) * k; player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch - (e.clientY - drag.y) * k)); drag.x = e.clientX; drag.y = e.clientY; });
+const endDrag = e => { if (joy && e.pointerId === joy.id) { joy = null; joyShow(); } if (drag && e.pointerId === drag.id) drag = null; }; // one finger lifting doesn't stop the other
 canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 const holdBtn = (el, down, up) => {
@@ -1948,6 +1974,7 @@ function updateHint() {
   $('#slingBtn').innerHTML = tool === 'gun' ? 'HOLD<br>TO SPRAY' : 'HOLD<br>TO SLING';
   $('#swapBtn').hidden = hide || !usingButtons || !hasGun;
   $('#bonkBtn').hidden = hide || !usingButtons;
+  joyShow();
   const ib = !hide && usingButtons;
   $('#menuBtn').hidden = $('#invBtn').hidden = !ib; stage.classList.toggle('ptr', ib);
 }
@@ -4781,8 +4808,9 @@ function frame(now) {
     if (keys.has('s') || keys.has('arrowdown')) mv.sub(f);
     if (keys.has('d') || keys.has('arrowright')) mv.add(r);
     if (keys.has('a') || keys.has('arrowleft')) mv.sub(r);
+    if (joy) { const jx = joy.dx / JOY_R, jy = joy.dy / JOY_R; if (Math.hypot(jx, jy) > 0.15) mv.addScaledVector(f, -jy).addScaledVector(r, jx); } // the stick is analog: a small push walks slowly
     player.moving = mv.lengthSq() > 0 && !player.down; if (player.moving && player.dance >= 0) player.dance = -1;
-    if (player.moving) { mv.normalize().multiplyScalar(4.5 * rdt); player.pos.add(mv); player.bob += rdt * 10; }
+    if (player.moving) { const amt = Math.min(1, mv.length()); mv.normalize().multiplyScalar(4.5 * rdt * amt); player.pos.add(mv); player.bob += rdt * 10 * amt; }
     if (player.kb.lengthSq() > 0.01) { player.pos.addScaledVector(player.kb, rdt); player.kb.multiplyScalar(Math.exp(-9 * rdt)); }
     for (const c of colliders) { const dx = player.pos.x - c.x, dz = player.pos.z - c.z, d = Math.hypot(dx, dz), rr = c.r + 0.4; if (d < rr && d > 0.001) { player.pos.x = c.x + dx / d * rr; player.pos.z = c.z + dz / d * rr; } }
     if (!transit) doorClamp();
