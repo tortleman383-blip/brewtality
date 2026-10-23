@@ -20,6 +20,12 @@ A first-person dungeon crawler where you brew potions and fling them at things w
 
 **Touchscreen:** put a finger down anywhere on the left side and drag to walk; drag on the right to look. The on-screen buttons sling, bonk, scrape and swap.
 
+## Bosses
+
+Each floor's stairs are guarded by a boss picked at random, and bosses learn new moves the deeper you find them.
+
+The **Lurker** hides as one mushroom in a room full of them, on the floor, the walls and the ceiling. Hit the real one and it bursts out of the floor and chases you for a few seconds before burrowing and reshuffling the lot. Hit a wrong one and a bug comes out instead: Rootskitters from floor 1, Capbeetles from floor 2, Mantishrooms from floor 3 and Lampcaps from floor 4. The real one's tell is two spots that blink like clockwork on a doom shroom, or a ring of teeth clenching in the dirt round a glowcap.
+
 ## Test lab
 
 **TEST LAB** on the title screen opens a containment chamber for watching any creature's attacks. Esc opens the console: pick the subject, the floor it's from (bosses learn moves the deeper they are), hold its AI, toggle god mode, and run any attack. In the chamber, the number keys fire attacks and 0 brings in a fresh subject.

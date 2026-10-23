@@ -661,7 +661,7 @@ if (savedSettings.sound === false && savedSettings.vol === undefined) settings.v
 delete settings.sound; delete settings.reel;
 const FINAL_FLOOR = 5; // the Cyclops King waits at the bottom of floor 5; after that it's endless
 const newUse = () => ({ feather: 0, bog: 0, horn: 0, doom: 0, glowcap: 0, eye: 0, boil: 0 });
-const run = { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set() };
+const run = { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false };
 
 /* ================= audio (all synthesised) ================= */
 let AC = null, master = null, noiseBuf = null;
@@ -1176,7 +1176,7 @@ function setDoors(open, quiet) {
   if (!quiet && doors.length) SFX.clang();
 }
 function teardownRoom() {
-  enemies.forEach(e => { endSlam(e); scene.remove(e.root); scene.remove(e.shadow); disposeTree(e.root); e.label.remove(); }); enemies = [];
+  enemies.forEach(e => { endSlam(e); scene.remove(e.root); scene.remove(e.shadow); disposeTree(e.root); e.label.remove(); }); enemies = []; fieldReset();
   pickups.forEach(p => { scene.remove(p.g); disposeTree(p.g); satchel.push(newItem(p.kind, p.origin)); loot(p.kind); }); pickups.length = 0;
   drops.forEach(d => scene.remove(d.m)); drops.length = 0; clearGoos();
   if (coins.length) { coins.forEach(c => scene.remove(c.g)); gainCoins(coins.length, true); coins.length = 0; }
@@ -1363,8 +1363,8 @@ const starGeo = new THREE.TetrahedronGeometry(0.07, 0), starMat = new THREE.Mesh
 shadowGeo.userData.shared = shadowMat.userData.shared = starGeo.userData.shared = starMat.userData.shared = true;
 let enemies = [], eidSeq = 0;
 let adaptedNow = null;
-function spawnEnemy(type, x, z) {
-  const T = TYPES[type], m = T.hops ? buildSlime(T.base, T.core, T.emis) : type === 'king' ? buildCyclops(2.35, true, T.base) : type === 'chief' ? buildCyclops(1.9, true, T.base) : type === 'stump' ? buildStump(T.base) : type === 'moth' ? buildMoth(T.base) : type === 'knight' ? buildKnight(T.base) : buildCyclops();
+function spawnEnemy(type, x, z, opt = {}) {
+  const T = TYPES[type], m = T.mimic ? MK_BUILD[type](opt.kind || 'doom') : T.hops ? buildSlime(T.base, T.core, T.emis) : type === 'king' ? buildCyclops(2.35, true, T.base) : type === 'chief' ? buildCyclops(1.9, true, T.base) : type === 'stump' ? buildStump(T.base) : type === 'moth' ? buildMoth(T.base) : type === 'knight' ? buildKnight(T.base) : buildCyclops();
   const hpS = Math.round(T.hp * (1 + 0.3 * (floorNum - 1))); // +30% health per floor down
   const e = {
     id: ++eidSeq, type, T, ...m, hp: hpS, maxHp: hpS, pos: new THREE.Vector3(x, 7, z), fallV: 0,
@@ -1376,6 +1376,7 @@ function spawnEnemy(type, x, z) {
   e.shadow = meshOf(shadowGeo, shadowMat); e.shadow.rotation.x = -Math.PI / 2; scene.add(e.shadow);
   e.stars = new THREE.Group(); for (let i = 0; i < 3; i++) e.stars.add(meshOf(starGeo, starMat)); e.stars.position.y = e.h + 0.25; e.stars.visible = false; e.root.add(e.stars);
   if (T.boss) { e.tier = floorNum; e.moves = bossMoves(type, floorNum); }
+  if (T.mimic) { e.kind = opt.kind || 'doom'; e.ph = type === 'lurker' ? 'hidden' : 'live'; e.lt = 0; e.fired = new Set(); e.pos.y = 0; e.open = 0; }
   e.root.traverse(o => { o.userData.enemy = e; });
   scene.add(e.root);
   e.label = document.createElement('div'); e.label.className = 'lbl'; $('#labels').appendChild(e.label);
@@ -1733,8 +1734,9 @@ function pull(e, to) {
 }
 let slingKills = [], dmgSrc = 'ladle';
 function damage(e, n, how, from, launch = 1) {
-  if (e.dead) return;
+  if (e.dead || e.hidden) return;
   if (e.pup) { const q = netQ(e); q.d = (q.d || 0) + n; q.how = how; e.dmgT = playT; } // the host applies the real hit
+  if (e.open > 0.5) n *= 2; if (e.T.hover && e.stun > 0) n += 1;
   if (e.glow > 0) n += 1;
   if (e.glass) n = Math.ceil(n * 1.5);
   e.hp -= n; e.tiltV -= 8 + n * 2; hitmarker(e);
@@ -1751,6 +1753,7 @@ function kill(e, how, from, launch = 1) {
   if (!e.clone && e.T.boss) { const n = e.T.king ? 8 : Math.random() < (has('lucky') ? 0.7 : 0.35) ? 3 : 0; if (n) dropCoins(centerOf(e), n); } // coins are a chest thing; a boss only sometimes has a few
   run.kills++; slingKills.push(e); xp(100, how); feed(e.T.name, how, dmgSrc);
   e.label.remove(); endSlam(e);
+  if (e.type === 'lurker' && field.lurk === e) fieldClear(); // the lure goes, and so does the rest of the patch
 }
 function applyBeat(b, point, targets) {
   const tg = (b.targets || targets).filter(e => !e.dead), open = tg.filter(e => !(b.resisted || []).includes(e)), c = groupCenter(tg.length ? tg : targets);
@@ -1881,12 +1884,13 @@ function bonkLand() {
   if (menuOpen && !net.on) return;
   const fx_ = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), hits = [];
   for (const e of alive()) {
+    if (e.hidden) continue;
     const dx = e.pos.x - player.pos.x, dz = e.pos.z - player.pos.z, d = Math.hypot(dx, dz), body = e.r * e.scale;
     if (d > BONK_REACH + body || (e.pos.y > 2.4 && !e.T.flying)) continue;
     if ((dx * fx_ + dz * fz) / (d || 1) < 0.5 && d > body + 0.35) continue; // a wide arc in front of you
     hits.push(e);
   }
-  if (!hits.length) return;
+  if (!hits.length) { const s = bonkShroom(fx_, fz); if (s) { SFX.bonk(false); const sp = project(s.c); if (!sp.behind) callout('bonk', 1, { at: true, x: sp.x, y: sp.y }); shroomStruck(s); } return; }
   bonkChain = bonkChainT > 0 ? bonkChain + 1 : 1; bonkChainT = 1.3;
   const big = bonkChain >= 3; if (big) bonkChain = 0; // every third bonk in a row is a big one
   shake = Math.max(shake, big ? 0.3 : 0.16); SFX.bonk(big); dmgSrc = 'ladle';
@@ -2385,7 +2389,8 @@ function launchParams(power) {
   return { origin, v };
 }
 function collide(p, pad = 0.2) {
-  for (const e of alive()) if (p.distanceTo(centerOf(e)) < (e.r + (e.T.tall ? 0.25 : 0)) * e.scale + pad) return { hitE: e };
+  for (const e of alive()) if (!e.hidden && p.distanceTo(centerOf(e)) < (e.r + (e.T.tall ? 0.25 : 0)) * e.scale + pad) return { hitE: e };
+  for (const s of field.list) if (s.live && s.grow > 0.6 && p.distanceTo(s.c) < FIELD_HIT + pad * 0.5) return { hitS: s };
   if (p.y <= 0.05) { p.y = 0.05; return {}; }
   if (p.y >= H - 0.1) { p.y = H - 0.1; return {}; }
   if (Math.abs(p.x) > W - 0.3 || Math.abs(p.z) > D - 0.3) { p.x = Math.max(-W + 0.3, Math.min(W - 0.3, p.x)); p.z = Math.max(-D + 0.3, Math.min(D - 0.3, p.z)); return {}; }
@@ -2396,13 +2401,13 @@ function trace(o, v0) {
   const p = o.clone(), v = v0.clone(), pts = [p.clone()], step = 1 / 90;
   for (let i = 0; i < 360; i++) {
     v.y -= G * step; p.addScaledVector(v, step);
-    const hit = collide(p); if (hit) { pts.push(p.clone()); return { point: p, pts, hitE: hit.hitE }; }
+    const hit = collide(p); if (hit) { pts.push(p.clone()); return { point: p, pts, hitE: hit.hitE, hitS: hit.hitS }; }
     if (i % 3 === 0 && pts.length < 239) pts.push(p.clone());
   }
   return { point: p, pts, hitE: null };
 }
 function targetsAt(point, hitE) {
-  const list = alive().filter(e => Math.hypot(e.pos.x - point.x, e.pos.z - point.z) < SPLASH_R + e.r * 0.4 && Math.abs(centerOf(e).y - point.y) < 2.8);
+  const list = alive().filter(e => !e.hidden && Math.hypot(e.pos.x - point.x, e.pos.z - point.z) < SPLASH_R + e.r * 0.4 && Math.abs(centerOf(e).y - point.y) < 2.8);
   if (hitE && !hitE.dead && !list.includes(hitE)) list.push(hitE);
   return list;
 }
@@ -2435,15 +2440,19 @@ function stepBlob(dt) {
   const wob = 1 + Math.sin(b.t * 40) * 0.12; b.mesh.scale.set(wob * 0.17, (2 - wob) * 0.17, wob * 0.17);
   b.trail += dt; if (b.trail > 0.025) { b.trail = 0; burst(b.pos, b.color.getHex(), 1, 0.4, 0.45, 0.05, 2); }
   const hit = collide(b.pos);
-  if (hit || b.t > 4) { scene.remove(b.mesh); b.mesh.material.dispose(); blob = null; onImpact(b.pos.clone(), hit && hit.hitE, b.items, b.color, b.toss); }
+  if (hit || b.t > 4) { scene.remove(b.mesh); b.mesh.material.dispose(); blob = null; onImpact(b.pos.clone(), hit && hit.hitE, b.items, b.color, b.toss, hit && hit.hitS); }
 }
 
 /* ================= the sling cinematic ================= */
-async function onImpact(point, hitE, items, color, toss) {
-  const targets = targetsAt(point, hitE);
+async function onImpact(point, hitE, items, color, toss, hitS) {
+  let targets = targetsAt(point, hitE);
   burst(point, color.getHex(), 18, 5, 0.8, 0.09); floorRing(point, color.getHex(), 1.6, 0.4); SFX.splash(false);
+  if (hitS) shroomStruck(hitS);
   if (toss) { tossLand(point); return endSling(); }
-  if (!targets.length) { callout('whiff', 1); return endSling(); }
+  const swatted = targets.filter(e => e.T.swats && e.ph === 'live' && !(e.stun > 0) && !(e.frozen > 0) && mkFacing(e)); // a mantis bats away what you throw at its front
+  if (swatted.length) { targets = targets.filter(e => !swatted.includes(e)); swatted.forEach(e => { e.swatT = 0.35; SFX.clang(); const sp = project(centerOf(e)); if (!sp.behind) callout('SWATTED', 1, { at: true, x: sp.x, y: sp.y }); }); }
+  if (hitE && hitE.T.hover && !hitE.dead && !swatted.includes(hitE)) { hitE.stun = Math.max(hitE.stun, 2.6); const sp = project(centerOf(hitE)); if (!sp.behind) callout('KNOCKED DOWN', 2, { at: true, x: sp.x, y: sp.y }); } // a direct hit puts a lampcap on the floor
+  if (!targets.length) { if (!hitS && !swatted.length) callout('whiff', 1); return endSling(); }
   if (!items.length) { // boiling water: scalds whatever it lands on, and just soaks the rest of the splash
     puff(point.clone().setY(0.6), 0xF2F2F2, 8, 1.2, 0.8, 1.6, 0.25, 0.6);
     const hit = hitE && !hitE.dead ? hitE : targets.slice().sort((a, b) => Math.hypot(a.pos.x - point.x, a.pos.z - point.z) - Math.hypot(b.pos.x - point.x, b.pos.z - point.z))[0];
@@ -2580,6 +2589,7 @@ function updateGun(rdt, sdt) {
     const hit = d.t > 0.02 ? collide(d.pos, d.flame ? 0.2 : 0.08) : null;
     if (hit || d.t > (d.flame ? 0.55 : 2)) {
       if (hit && hit.hitE) gunHit(hit.hitE, d.flame);
+      else if (hit && hit.hitS) shroomStruck(hit.hitS);
       else if (hit && Math.random() < 0.25) burst(d.pos, dropMat.color.getHex(), 2, 1.2, 0.3, 0.04, d.flame ? -2 : 6, d.flame);
       scene.remove(d.m); drops.splice(i, 1);
     }
@@ -2667,7 +2677,7 @@ function slamHit(e) {
 
 /* ================= the test lab: a sealed containment chamber for watching any creature's whole repertoire ================= */
 const lab = { on: false, idx: 0, tier: 3, ai: true, god: true, move: 0, cur: null, hits: 0, respawnT: 0, beacons: [] };
-const LAB_SUBJECTS = ['chief', 'king', 'cyclops', 'slime', 'spitter', 'moth', 'stump', 'knight'];
+const LAB_SUBJECTS = ['chief', 'king', 'lurker', 'cyclops', 'slime', 'spitter', 'moth', 'stump', 'knight', 'skitter', 'beetle', 'mantis', 'lampcap'];
 const LAB_NOTES = {
   chief: ['KETER', 'Large and territorial. Learns new attacks the deeper it is found.'],
   king: ['KETER', 'Elite variant. Calls for reinforcements when injured.'],
@@ -2677,14 +2687,23 @@ const LAB_NOTES = {
   moth: ['EUCLID', 'Airborne. Wind does nothing to it.'],
   stump: ['EUCLID', 'Immune to water. Do not attempt to drown.'],
   knight: ['EUCLID', 'Armoured. Fire does nothing to it.'],
+  lurker: ['KETER', 'Hides as one mushroom among many. Strike the wrong one and something else comes out.'],
+  skitter: ['EUCLID', 'Fast. Waits inside a mushroom on six root legs.'],
+  beetle: ['EUCLID', 'Armoured while shut. Takes double damage mid-hop, wing cases open.'],
+  mantis: ['EUCLID', 'Swats projectiles away from its front. Approach from behind.'],
+  lampcap: ['SAFE', 'Airborne light source. A direct hit grounds it.'],
 };
 const LAB_MOVES = [
+  { id: 'surface', name: 'POP OUT', ok: e => !!e.T.mimic, run: e => labSurface(e) },
+  { id: 'burrow', name: 'BURROW', ok: e => e.type === 'lurker', run: e => { if (e.ph === 'out') mkPhase(e, 'hide'); } },
+  { id: 'wrong', name: 'WRONG GUESS', ok: e => e.type === 'lurker', run: () => { const f = field.list.filter(s => s.live && !s.real); if (f.length) shroomHit(pick(f)); } },
+  { id: 'hop', name: 'HOP', ok: e => e.type === 'beetle', run: e => { if (e.ph === 'live') startHop(e, player.pos); } },
   { id: 'swing', name: 'SWING', ok: e => !e.T.ranged, run: e => { e.atk = e.T.windup; } },
-  { id: 'slam', name: 'GROUND SLAM', ok: e => e.T.boss, run: e => startSlam(e) },
-  { id: 'toss', name: 'ROCK TOSS', ok: e => e.T.boss, run: e => throwRock(e, player.pos) },
-  { id: 'charge', name: 'CHARGE', ok: e => e.T.boss, run: e => startCharge(e, player.pos) },
+  { id: 'slam', name: 'GROUND SLAM', ok: e => e.T.boss && !e.T.mimic, run: e => startSlam(e) },
+  { id: 'toss', name: 'ROCK TOSS', ok: e => e.T.boss && !e.T.mimic, run: e => throwRock(e, player.pos) },
+  { id: 'charge', name: 'CHARGE', ok: e => e.T.boss && !e.T.mimic, run: e => startCharge(e, player.pos) },
   { id: 'quake', name: 'AFTERSHOCKS', ok: e => e.T.boss, run: e => aftershocks(e) },
-  { id: 'enrage', name: 'RAGE', ok: e => e.T.boss, run: e => { if (!e.enraged) enrage(e); } },
+  { id: 'enrage', name: 'RAGE', ok: e => e.T.boss && !e.T.mimic, run: e => { if (!e.enraged) enrage(e); } },
   { id: 'spread', name: 'SPREAD LOB', ok: e => e.T.king, run: e => [-1.8, 0, 1.8].forEach((l, i) => setTimeout(() => { if (!e.dead) spitGoo(e, l, player.pos); }, i * 140)) },
   { id: 'summon', name: 'SUMMON', ok: e => e.T.king, run: e => kingSummon(e) },
   { id: 'spit', name: 'SPIT', ok: e => e.T.ranged, run: e => spitGoo(e, 0, player.pos) },
@@ -2693,12 +2712,13 @@ const labMoves = () => lab.cur && !lab.cur.dead ? LAB_MOVES.filter(m => m.ok(lab
 const labLearn = (type, id) => { const f = (BOSS_MOVES[type] || {})[id]; return f && f > lab.tier ? f : 0; }; // the floor it would learn this on, if not yet
 function labClear() {
   for (const e of enemies) { endCharge(e); endSlam(e); scene.remove(e.root); scene.remove(e.shadow); disposeTree(e.root); e.label.remove(); }
-  enemies = []; clearGoos(); lab.cur = null;
+  enemies = []; clearGoos(); lab.cur = null; fieldWipe();
 }
 function labSpawn() {
   labClear(); lab.respawnT = 0;
   const type = LAB_SUBJECTS[lab.idx]; floorNum = lab.tier; // health, moves and speed all follow the chosen floor
   const e = spawnEnemy(type, 0, -3.2); e.pos.y = 2.5; e.labHold = !lab.ai; lab.cur = e;
+  if (e.T.bug) bugEmerge(e, 0, -3.2); else if (e.type === 'lurker') fieldStart(e, 10); // these come out of the ground, not down from the vent
   const known = e.moves ? [...e.moves].map(k => MOVE_NAME[k]) : [];
   banner(TYPES[type].name.toUpperCase(), known.length ? 'KNOWS ' + known.join(' · ') : 'CLASS: ' + LAB_NOTES[type][0]);
   lab.move = Math.min(lab.move, Math.max(0, labMoves().length - 1)); labHud();
@@ -2822,6 +2842,7 @@ function bossIntro(r) {
   const learned = Object.keys(moves).filter(k => moves[k] === floorNum), known = [...bossMoves(type, floorNum)];
   let sub = r.king && !run.won ? 'FINAL BOSS' : '';
   if (!sub && known.length) sub = !run.bossMet.has(type) ? 'KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : learned.length ? 'LEARNED ' + learned.map(k => MOVE_NAME[k]).join(' · ') : '';
+  if (type === 'lurker' && !run.bossMet.has(type)) sub = 'FIND THE REAL ONE' + (known.length ? ' · KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : '');
   run.bossMet.add(type);
   banner(r.king ? 'THE ' + name : name, sub, 'boss');
 }
@@ -2882,6 +2903,743 @@ function aftershocks(e) {
   for (let i = 0; i < 2; i++) { const a = rand(0, Math.PI * 2), d = rand(1.6, 2.4); spots.push([Math.max(-W + 1, Math.min(W - 1, at.x + Math.cos(a) * d)), Math.max(-D + 1, Math.min(D - 1, at.z + Math.sin(a) * d))]); }
   spots.forEach(([x, z], i) => { quakeAt(x, z, 0.25 + i * 0.3, false); if (net.on && net.host) netEmit('goo', { k: 'quake', rk: rkOf(room), f: [+x.toFixed(2), 0, +z.toFixed(2)], t: [0.25 + i * 0.3, 0, 0] }); });
 }
+
+/* ================= the Mimicshroom fight: a field of mushrooms, one of them the Lurker's lure, and a bug in every wrong one ================= */
+Object.assign(TYPES, {
+  lurker:  { name: 'Lurker', hp: 15, speed: 1.5, base: 0xC9A094, eyes: 0, boss: true, mimic: true, reach: 2.1, dmg: 1, windup: 0.65, cooldown: 1.7, immune: ['feather'], immTxt: 'WIND DOES NOTHING' },
+  skitter: { name: 'Rootskitter', hp: 3, speed: 2.6, base: 0x8A6A48, eyes: 0, mimic: true, bug: true, reach: 1.5, dmg: 1, windup: 0.45, cooldown: 1.4 },
+  beetle:  { name: 'Capbeetle', hp: 5, speed: 1.25, base: 0x2E2226, eyes: 0, mimic: true, bug: true, reach: 1.7, dmg: 1, windup: 0.7, cooldown: 2.2 },
+  mantis:  { name: 'Mantishroom', hp: 5, speed: 0.85, base: 0xCFC3A8, eyes: 0, mimic: true, bug: true, swats: true, tall: true, reach: 2.5, dmg: 1, windup: 0.75, cooldown: 2.3 },
+  lampcap: { name: 'Lampcap', hp: 3, speed: 2.1, base: 0x241E26, eyes: 0, mimic: true, bug: true, flying: true, hover: true, reach: 1.7, dmg: 1, windup: 0.55, cooldown: 1.9 },
+});
+BOSS_POOL.push({ id: 'lurker', from: 1 });
+BOSS_MOVES.lurker = { lies: 2, quake: 3, swarm: 4 };
+Object.assign(MOVE_NAME, { lies: 'FAKE TELLS', swarm: 'SWARM' });
+
+/* ---------- little helpers for these models ---------- */
+const MK = {
+  win: (t, a, b) => Math.max(0, Math.min(1, (t - a) / (b - a))),
+  back: u => { u = Math.max(0, Math.min(1, u)) - 1; return 1 + 2.70158 * u * u * u + 1.70158 * u * u; },
+  sm: u => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); },
+  ein: u => Math.max(0, Math.min(1, u)) ** 2,
+  eout: u => 1 - (1 - Math.max(0, Math.min(1, u))) ** 2,
+  bump: u => Math.sin(Math.PI * Math.max(0, Math.min(1, u))),
+  mix: (p, q, u) => [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u, p[2] + (q[2] - p[2]) * u],
+};
+const mkBall = new THREE.SphereGeometry(1, 8, 6); mkBall.userData.shared = true;
+const mkLathe = (pts, n = 9) => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), n);
+const MKM = {
+  stem: M(0xE8DCC8), spot: M(0xFFF6EA, { roughness: 0.5 }), pupil: M(0x140C12, { roughness: 0.2 }), glint: M(0xFFFFFF, { emissive: 0x777777 }),
+  tooth: M(0xFFF6E6, { roughness: 0.4 }), gum: M(0x5A1A24, { side: THREE.DoubleSide }), chitin: M(0x3A2A22), dirt: M(0x4A3626, { side: THREE.DoubleSide }),
+  dirt2: M(0x3A2A1E), rootD: M(0x6E5236), moss: M(0x2E3A26, { side: THREE.DoubleSide }),
+};
+const mkHole = new THREE.MeshBasicMaterial({ color: 0x0E0A08 }); mkHole.userData.shared = true;
+const mkWing = new THREE.MeshStandardMaterial({ color: 0xDCE8F2, transparent: true, opacity: 0.42, side: THREE.DoubleSide, roughness: 0.3, depthWrite: false }); mkWing.userData.shared = true;
+const mkAdd = (parent, geo, mat, x = 0, y = 0, z = 0) => { const m = at(meshOf(geo, mat), x, y, z); parent.add(m); return m; }; // hands back the new mesh, never the parent
+const mkV = new THREE.Vector3(), mkZ = new THREE.Vector3(0, 0, 1), mkY = new THREE.Vector3(0, 1, 0);
+const mkDirt = (p, n, sp = 2.4, up = 1) => { burst(p, 0x4A3626, Math.ceil(n * 0.6), sp, 0.8, 0.06, 9); burst(p, 0x6A5038, Math.floor(n * 0.4), sp * 1.1, 0.8, 0.05, 9); };
+const mkDust = (p, n = 3) => puff(p, 0x8A7A64, n, 0.7, 0.3, 0.5, 0.14, 0.5);
+const mkW = (obj, x, y, z) => obj.localToWorld(new THREE.Vector3(x, y, z));
+
+// a mushroom cap: a faceted dome with gills under it; glowcaps breathe, and anything can flare on top
+function mkCapMat(kind, list) {
+  const glow = kind === 'glow', m = new THREE.MeshStandardMaterial({ color: glow ? 0x5FF2D6 : 0xE2483B, emissive: glow ? 0x22C9AE : 0x5A1008, emissiveIntensity: 0.9, flatShading: true, roughness: 0.8 });
+  m.userData.mk = { glow, ph: Math.random() * 6, flare: 0 }; list.push(m); return m;
+}
+function mkMatsTick(list) { for (const m of list) { const u = m.userData.mk; m.emissiveIntensity = Math.max(0.1, (u.glow ? 0.7 + (Math.sin(T * 2.2 + u.ph) * 0.5 + 0.5) * 0.9 : 0.9) + u.flare); } }
+function mkCap(r, h, kind, mats, n = 9) {
+  const g = new THREE.Group(), mat = mkCapMat(kind, mats);
+  const prof = [[r * 0.9, 0], [r, h * 0.2], [r * 0.93, h * 0.52], [r * 0.66, h * 0.84], [r * 0.32, h * 0.98], [0, h * 1.02]];
+  mkAdd(g, mkLathe(prof, n), mat);
+  const gills = mkAdd(g, new THREE.CircleGeometry(r * 0.9, n), M(kind === 'glow' ? 0x2E8A7A : 0xC8B8A0, { side: THREE.DoubleSide }), 0, 0.004, 0); gills.rotation.x = Math.PI / 2;
+  g.userData = { r, h, prof, n, mat }; return g;
+}
+function mkOnCap(cap, u, a) { // a point on the faceted dome: u runs rim (0) to crown (1), a is the angle round it (0 faces front)
+  const { prof, n } = cap.userData, f = Math.max(0, Math.min(1, u)) * (prof.length - 1), i = Math.min(prof.length - 2, Math.floor(f)), k = f - i;
+  const step = Math.PI * 2 / n, off = ((a % step) + step) % step - step / 2, facet = Math.cos(step / 2) / Math.cos(off);
+  const rx = (prof[i][0] + (prof[i + 1][0] - prof[i][0]) * k) * facet, y = prof[i][1] + (prof[i + 1][1] - prof[i][1]) * k;
+  const dr = prof[i + 1][0] - prof[i][0], dy = prof[i + 1][1] - prof[i][1], nl = Math.hypot(dr, dy) || 1;
+  return { p: new THREE.Vector3(Math.sin(a) * rx, y, Math.cos(a) * rx), n: new THREE.Vector3(Math.sin(a) * dy / nl, -dr / nl, Math.cos(a) * dy / nl).normalize() };
+}
+// a doom shroom's white spot, which can open into an eye. tell 1: the real one's, blinking like a clock; tell 2: a liar's, blinking out of rhythm
+function mkEye(parent, p, n, s, list, tell = 0) {
+  const sock = new THREE.Group(); sock.position.copy(p).addScaledVector(n, s * 0.08); sock.quaternion.setFromUnitVectors(mkZ, n); parent.add(sock);
+  mkAdd(sock, mkBall, MKM.spot).scale.set(s, s, s * 0.5);
+  const pu = mkAdd(sock, mkBall, MKM.pupil, 0, 0, s * 0.5); pu.visible = false;
+  const e = { sock, pu, s, tell, open: tell ? 1 : 0, want: tell ? 1 : 0, order: Math.random(), bt: 1 + Math.random() * 3 }; list.push(e); return e;
+}
+const MK_SPOTS = [[0.96, 0, 1], [0.42, -0.36, 1.25], [0.42, 0.36, 1.25], [0.62, 1.25, 1], [0.6, 2.3, 1], [0.62, 3.14, 1], [0.6, 3.98, 1], [0.62, 5.03, 1],
+  [0.18, 0.95, 0.85], [0.2, 1.9, 0.85], [0.18, 2.75, 0.85], [0.2, 3.55, 0.85], [0.18, 4.4, 0.85], [0.2, 5.35, 0.85], [0.68, 0.66, 0.8], [0.68, -0.66, 0.8]];
+function mkSpots(cap, spots, list, tellIdx = [], tell = 1, S = null) {
+  const r = cap.userData.r;
+  spots.forEach(([u, a, s], i) => {
+    const { p, n } = mkOnCap(cap, u, a), t = tellIdx.includes(i);
+    if (S) { p.multiply(S); n.set(n.x / S.x, n.y / S.y, n.z / S.z).normalize(); }
+    mkEye(cap, p, n, r * 0.12 * s * (t ? 1.45 : 1), list, t ? tell : 0);
+  });
+}
+function mkEyesTo(list, on, lt = 99, t0 = 0, spread = 0.35) {
+  for (const e of list) { if (e.tell) { e.want = 1; continue; } const past = lt >= t0 + e.order * spread; e.want = on ? (past ? 1 : 0) : (past ? 0 : 1); }
+}
+function mkEyesTick(list, sdt) {
+  for (const e of list) {
+    e.open += (e.want - e.open) * Math.min(1, sdt * 14);
+    e.pu.visible = e.open > 0.03; if (!e.pu.visible) { e.sock.scale.y = 1; continue; }
+    let blink = 1;
+    if (e.tell === 1) { const ph = (T % 1.8) / 1.8; if (ph < 0.08) blink = Math.max(0.08, Math.abs(ph - 0.04) / 0.04); }
+    else { e.bt -= sdt; if (e.bt < -0.15) e.bt = (e.tell === 2 ? 0.3 : 1.6) + Math.random() * (e.tell === 2 ? 2.4 : 3); if (e.bt < 0) blink = Math.max(0.08, Math.abs(e.bt + 0.075) / 0.075); }
+    e.sock.scale.y = e.open > 0.9 ? blink : 1;
+    mkV.copy(camera.position); e.sock.worldToLocal(mkV); mkV.normalize();
+    const s = e.s, dx = Math.max(-0.4, Math.min(0.4, mkV.x * 0.55)) * s, dy = Math.max(-0.4, Math.min(0.4, mkV.y * 0.55)) * s;
+    e.pu.position.set(dx, dy, 0.5 * s * Math.sqrt(Math.max(0, 1 - (dx * dx + dy * dy) / (s * s))));
+    e.pu.scale.set(s * 0.46 * e.open, s * 0.46 * e.open, s * 0.14);
+  }
+}
+function mkBeady(parent, y, z, spread, r) {
+  for (const sd of [-1, 1]) { mkAdd(parent, mkBall, MKM.pupil, sd * spread, y, z).scale.setScalar(r); mkAdd(parent, mkBall, MKM.glint, sd * spread + r * 0.3, y + r * 0.35, z + r * 0.8).scale.setScalar(r * 0.35); }
+}
+function mkWingMesh(sd, len, wid) {
+  const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.quadraticCurveTo(wid * sd, len * 0.25, wid * 0.7 * sd, len); sh.quadraticCurveTo(wid * 0.1 * sd, len * 0.8, 0, 0);
+  const m = meshOf(new THREE.ShapeGeometry(sh, 6), mkWing); m.rotation.x = -Math.PI / 2; return m;
+}
+// a two-bone leg: the hip sits on the body, and mkAim bends the knee so the foot lands on a target in the body's frame
+function mkLeg(parent, hip, L1, L2, r, mat, bow = 0.05) {
+  const pv = new THREE.Group(); pv.position.copy(hip); parent.add(pv);
+  const th = new THREE.Group(); pv.add(th);
+  mkAdd(th, hornGeo([[0, 0, 0], [0, bow, L1 * 0.5], [0, 0, L1]], r, r * 0.8, 6, 5), mat);
+  mkAdd(th, mkBall, mat, 0, 0, L1).scale.setScalar(r * 0.9);
+  const sh = new THREE.Group(); sh.position.z = L1; th.add(sh);
+  mkAdd(sh, hornGeo([[0, 0, 0], [0, bow * 0.6, L2 * 0.5], [0, 0, L2]], r * 0.8, r * 0.25, 6, 5), mat);
+  return { pv, th, sh, L1, L2, hip: hip.clone() };
+}
+function mkAim(leg, x, y, z) {
+  const dx = x - leg.hip.x, dy = y - leg.hip.y, dz = z - leg.hip.z, h = Math.hypot(dx, dz), { L1, L2 } = leg;
+  leg.pv.rotation.y = Math.atan2(dx, dz);
+  const d = Math.min(L1 + L2 - 1e-3, Math.max(Math.abs(L1 - L2) + 1e-3, Math.hypot(h, dy)));
+  const a = Math.acos(Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))), b = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + L2 * L2 - d * d) / (2 * L1 * L2))));
+  leg.th.rotation.x = -(Math.atan2(dy, h) + a); leg.sh.rotation.x = Math.PI - b; // knee up, shin back down
+}
+// the patch of dirt each one comes out of: a mound (u=0), or a crater with a hole once it's out (u=1)
+function mkGround(x, z, R = 0.5) {
+  const grp = new THREE.Group(); grp.position.set(x, 0.02, z); (roomGroup || scene).add(grp);
+  const mound = mkAdd(grp, mkLathe([[R, 0], [R * 0.77, 0.06], [R * 0.42, 0.1], [0, 0.11]], 9), MKM.dirt);
+  const rimM = mkAdd(grp, mkLathe([[R * 1.3, 0], [R * 1.08, 0.08], [R * 0.82, 0.1], [R * 0.62, 0.03], [R * 0.56, 0]], 12), MKM.dirt);
+  const hole = mkAdd(grp, new THREE.CircleGeometry(R * 0.62, 12), mkHole, 0, 0.015, 0); hole.rotation.x = -Math.PI / 2;
+  [[0.8, 0.55], [-0.7, 0.4], [0.2, -0.85]].forEach(([cx, cz]) => { const m = mkAdd(grp, GEO.ico0, MKM.dirt2, cx * R, 0.03, cz * R); m.scale.setScalar(0.065); m.rotation.set(cx * 5, cz * 4, 0); });
+  const g = { grp, set(u) {
+    const m = 1 - u, r = Math.max(0, Math.min(1, u)); mound.visible = m > 0.02; mound.scale.set(1 + r * 0.25, Math.max(0.02, m), 1 + r * 0.25);
+    rimM.visible = hole.visible = r > 0.02; rimM.scale.set(0.7 + 0.3 * r, Math.max(0.02, r), 0.7 + 0.3 * r); hole.scale.setScalar(Math.max(0.02, r));
+  } };
+  g.set(0); field.grounds.push(g);
+  if (field.grounds.length > 14) { const old = field.grounds.shift(); if (old.grp.parent) old.grp.parent.remove(old.grp); disposeTree(old.grp); }
+  return g;
+}
+// what every one of these needs each frame: its place in the room, its wobble, its shadow and its stars
+function mkBase(e, sdt) {
+  e.tiltV += (-60 * e.tilt - 7 * e.tiltV) * sdt; e.tilt += e.tiltV * sdt;
+  e.body.rotation.x = e.tilt * 0.06; e.body.rotation.z = e.stun > 0 && !e.T.hover ? Math.sin(T * 5) * 0.1 : 0;
+  e.scale += ((e.shrunk ? 0.62 : 1) - e.scale) * (1 - Math.exp(-6 * sdt)); e.root.scale.setScalar(e.scale);
+  e.root.position.copy(e.pos); e.root.rotation.y = e.yaw;
+  e.stars.visible = e.stun > 0 && !e.hidden; if (e.stars.visible) e.stars.children.forEach((s, i) => { const a = T * 5 + i * 2.1; s.position.set(Math.cos(a) * 0.35, Math.sin(T * 7 + i) * 0.05, Math.sin(a) * 0.35); s.rotation.y += sdt * 6; });
+  e.shadow.visible = e.root.visible && !e.hidden; e.shadow.position.set(e.pos.x, 0.015, e.pos.z); e.shadow.scale.setScalar(e.r * e.scale * 1.1);
+  mkEyesTick(e.mk.eyes, sdt); mkMatsTick(e.mk.mats);
+}
+const mkOnce = (e, k) => { if (!e.fired) e.fired = new Set(); if (e.fired.has(k)) return false; e.fired.add(k); return true; };
+const mkEvery = (e, k, gap, sdt) => { e[k] = (e[k] || 0) - sdt; if (e[k] > 0) return false; e[k] = gap; return true; };
+function mkPhase(e, ph) { e.ph = ph; e.lt = 0; e.fired = new Set(); }
+const lurkHidden = e => e.ph === 'hidden' || (e.ph === 'emerge' && e.lt < 1.0) || (e.ph === 'hide' && e.lt > 0.8);
+const MK_DUR = { lurker: [2.6, 2.2], skitter: [1.9, 0], beetle: [2.0, 0], mantis: [2.35, 0], lampcap: [1.95, 0] };
+
+/* ================= LURKER: the real one ================= */
+function buildLurker(kind) {
+  const root = new THREE.Group(), body = new THREE.Group(), g = new THREE.Group(); root.add(body); body.add(g);
+  const skin = new THREE.MeshStandardMaterial({ color: 0xC9A094, flatShading: true, roughness: 0.75, transparent: true, opacity: 1 });
+  const SKIN2 = M(0xA97C70), CLAW = M(0x2A2026), mats = [], eyes = [];
+  const ringG = new THREE.Group(); g.add(ringG);
+  mkAdd(ringG, mkLathe([[1.32, 0], [1.16, 0.13], [0.98, 0.2], [0.84, 0.12], [0.78, 0]], 12), MKM.dirt);
+  for (let i = 0; i < 8; i++) { const a = i * 0.8 + 0.3, d = 1.05 + (i % 3) * 0.12, cl = mkAdd(ringG, GEO.ico0, i % 2 ? MKM.dirt2 : MKM.dirt, Math.sin(a) * d, 0.1, Math.cos(a) * d); cl.scale.setScalar(0.08 + (i % 4) * 0.02); cl.rotation.set(a, a * 2, 0); }
+  const bulge = mkAdd(g, mkLathe([[1.15, 0], [0.95, 0.16], [0.6, 0.3], [0.25, 0.37], [0, 0.38]], 11), MKM.dirt);
+  const head = new THREE.Group(); g.add(head);
+  mkAdd(head, new THREE.SphereGeometry(1, 10, 4, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), SKIN2).scale.set(0.92, 0.5, 0.86);
+  const gum = mkAdd(head, new THREE.CircleGeometry(0.9, 10), MKM.gum, 0, 0.005, 0); gum.rotation.x = -Math.PI / 2; gum.scale.set(0.98, 0.92, 1);
+  const jaw = new THREE.Group(); jaw.position.set(0, 0.02, -0.62); head.add(jaw);
+  mkAdd(jaw, new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), skin, 0, 0, 0.62).scale.set(0.95, 0.62, 0.9);
+  const roof = mkAdd(jaw, new THREE.CircleGeometry(0.9, 10), MKM.gum, 0, -0.005, 0.62); roof.rotation.x = Math.PI / 2; roof.scale.set(1, 0.95, 1);
+  for (let i = 0; i < 7; i++) {
+    const a = -1.2 + i * 0.4;
+    mkAdd(jaw, new THREE.ConeGeometry(0.06, 0.2, 4), MKM.tooth, Math.sin(a) * 0.82, -0.09, Math.cos(a) * 0.76 + 0.62).rotation.x = Math.PI;
+    mkAdd(head, new THREE.ConeGeometry(0.05, 0.16, 4), MKM.tooth, Math.sin(a + 0.2) * 0.78, 0.08, Math.cos(a + 0.2) * 0.72);
+  }
+  for (const sd of [-1, 1]) mkAdd(jaw, mkBall, MKM.pupil, sd * 0.12, 0.36, 1.38).scale.set(0.05, 0.035, 0.03);
+  for (let i = 0; i < 6; i++) { const a = -1.1 + i * 0.44; mkAdd(jaw, GEO.ico0, SKIN2, Math.sin(a) * 0.55, 0.47 + (i % 2) * 0.06, Math.cos(a) * 0.4 + 0.5).scale.setScalar(0.06 + (i % 3) * 0.02); }
+  // the lure: a stalk with a bend in it, so the mushroom on top whips about on a spring
+  mkAdd(jaw, hornGeo([[0, 0.56, 0.5], [0, 0.8, 0.5], [0, 1.0, 0.54]], 0.07, 0.056, 6, 5), skin);
+  const bend = new THREE.Group(); bend.position.set(0, 1.0, 0.54); jaw.add(bend);
+  mkAdd(bend, mkBall, skin).scale.setScalar(0.058);
+  mkAdd(bend, hornGeo([[0, 0, 0], [0, 0.22, 0.06], [0, 0.42, 0.14]], 0.056, 0.042, 6, 5), skin);
+  const lure = new THREE.Group(); lure.position.set(0, 0.42, 0.14); bend.add(lure);
+  mkAdd(lure, new THREE.CylinderGeometry(0.11, 0.13, 0.26, 7), MKM.stem, 0, 0.1, 0);
+  const caps = {};
+  for (const k of ['doom', 'glow']) { const c = mkCap(0.42, 0.3, k, mats); c.position.y = 0.22; lure.add(c); if (k === 'doom') mkSpots(c, MK_SPOTS, eyes); caps[k] = c; }
+  const claws = [-1, 1].map(sd => {
+    const pv = new THREE.Group(); pv.position.set(sd * 0.92, 0.12, 0.3); pv.rotation.y = sd * 0.5; g.add(pv);
+    mkAdd(pv, mkBall, SKIN2, 0, 0.05, 0.1).scale.set(0.22, 0.2, 0.3);
+    mkAdd(pv, mkBall, skin, 0, 0.1, 0.32).scale.set(0.3, 0.09, 0.26);
+    for (let i = -1; i <= 1; i++) mkAdd(pv, new THREE.ConeGeometry(0.055, 0.3, 4), CLAW, i * 0.15, 0.08, 0.58).rotation.x = Math.PI / 2 + 0.25;
+    return { pv, sd };
+  });
+  const m = { root, body, skin, legs: [], h: 1.2, r: 1.0, baseEmissive: 0x000000, baseOpacity: 1, look: lurkerLook,
+    mk: { mats, eyes, ringG, bulge, head, jaw, bend, lure, caps, claws, spr: { a: 0, v: 0, z: 0, vz: 0 }, prevY: null } };
+  mkSetKind(m, kind); return m;
+}
+function mkSetKind(e, kind) { e.kind = kind; const c = e.mk.caps; if (c) { c.doom.visible = kind === 'doom'; c.glow.visible = kind === 'glow'; } }
+function lurkerLook(e, sdt, moving) {
+  const k = e.mk, ph = e.ph, lt = e.lt;
+  let off = 0, jawA = -0.16, pitch = 0, roll = 0, headZ = 0, ringS = 1, bulgeS = 0, trem = 0, flare = 0, gu = null;
+  const clawY = [0.12, 0.12], clawP = [-0.05, -0.05];
+  e.hidden = lurkHidden(e); e.root.visible = ph !== 'hidden';
+  if (ph === 'emerge') {
+    const r0 = MK.win(lt, 0, 0.5); trem = lt < 0.75 ? 1 : 0;
+    bulgeS = (0.3 + 0.7 * MK.sm(r0) + (lt < 0.76 ? Math.sin(lt * 22) * 0.06 * r0 : 0)) * (1 - MK.sm(MK.win(lt, 0.76, 0.86)));
+    if (lt < 0.75 && mkEvery(e, '_hop', 0.09, sdt)) { const a = Math.random() * 6.3; mkDirt(mkW(e.root, Math.sin(a) * 0.55, 0.35, Math.cos(a) * 0.55), 2, 1.2); }
+    off = -1.66 + 0.36 * MK.eout(MK.win(lt, 0.5, 0.72)); const ub = MK.win(lt, 0.75, 1.35); if (ub > 0) off = -1.3 + 1.3 * MK.back(ub);
+    if (lt > 0.78 && mkOnce(e, 'burst')) { const p = mkW(e.root, 0, 0.4, 0); mkDirt(p, 30, 6); puff(p, 0x8A7A64, 10, 1.2, 1.0, 1.4, 0.3, 0.6); shake = Math.max(shake, 0.5); SFX.boom(); }
+    ringS = MK.back(MK.win(lt, 0.78, 1.1)); pitch = -0.25 * MK.bump(ub); gu = MK.sm(MK.win(lt, 0.76, 0.86));
+    [1.35, 1.5].forEach((s, i) => {
+      const u = MK.win(lt, s, s + 0.2), sl = MK.win(lt, s + 0.2, s + 0.35);
+      clawY[i] = -0.8 + 0.92 * MK.back(u); clawP[i] = u > 0 ? -0.7 * (1 - MK.ein(sl)) : 0;
+      if (u > 0.4 && mkOnce(e, 'claw' + i)) mkDirt(mkW(e.root, k.claws[i].sd * 0.95, 0.2, 0.4), 8, 3);
+      if (sl >= 1 && mkOnce(e, 'slam' + i)) { mkDust(mkW(e.root, k.claws[i].sd, 0.1, 0.55), 4); SFX.thud(); }
+    });
+    const uo = MK.win(lt, 1.8, 2.0), uc = MK.win(lt, 2.35, 2.6);
+    jawA = uo <= 0 ? 0 : -0.78 * MK.back(uo) * (1 - uc) - 0.16 * uc + (uo >= 1 && uc < 1 ? Math.sin(lt * 40) * 0.03 : 0);
+    if (uo > 0 && mkOnce(e, 'roar')) { SFX.wub(); shake = Math.max(shake, 0.3); }
+    pitch += -0.25 * MK.bump(MK.win(lt, 1.8, 2.5));
+    mkEyesTo(k.eyes, 1, lt, 1.85, 0.35); flare = 2.2 * MK.bump(MK.win(lt, 1.85, 2.4));
+  } else if (ph === 'hide') {
+    jawA = -0.16 * (1 - MK.sm(MK.win(lt, 0, 0.12))); pitch = 0.15 * MK.sm(MK.win(lt, 0, 0.3));
+    const ud = MK.win(lt, 0.3, 1.4); off = -1.3 * MK.ein(ud); roll = ud > 0 && ud < 1 ? Math.sin(lt * 10) * 0.12 : 0;
+    k.claws.forEach((cl, i) => { clawP[i] = lt > 0.3 && lt < 1.3 ? Math.sin(lt * 16 + i * Math.PI) * 0.7 : 0; clawY[i] = 0.12 - 0.92 * MK.ein(MK.win(lt, 0.9, 1.35)); });
+    if (lt > 0.3 && lt < 1.3 && mkEvery(e, '_dig', 0.06, sdt)) mkDirt(mkW(e.root, (Math.random() < 0.5 ? -1 : 1) * 0.9, 0.2, 0.1), 3, 3);
+    ringS = 1 - 0.6 * MK.sm(MK.win(lt, 0.6, 1.4)) - 0.4 * MK.sm(MK.win(lt, 1.4, 1.6));
+    const uf = MK.win(lt, 1.4, 2.0); if (ud >= 1) off = -1.3 - 0.36 * MK.sm(uf) + Math.sin((lt - 1.4) * 14) * 0.05 * (1 - uf);
+    mkEyesTo(k.eyes, 0, lt, 1.5, 0.3);
+  } else if (ph === 'out') { // ploughing after you, half under the floor
+    const w = e.atk > 0 ? 1 - e.atk / e.T.windup : 0, ln = e.lungeT > 0 ? Math.sin(e.lungeT / 0.3 * Math.PI) : 0;
+    e.walk += sdt * (moving ? 9 : 2);
+    off = Math.sin(T * 1.4) * 0.02 + (moving ? Math.sin(e.walk) * 0.05 : 0);
+    jawA = ln > 0 ? -0.04 : -(0.16 + Math.max(0, Math.sin(T * 1.6)) ** 3 * 0.18) * (1 - w) - 0.82 * w; // jaws wide on the wind-up, then the snap
+    headZ = ln * 0.35; pitch = -0.22 * w + 0.12 * ln; roll = moving ? Math.sin(e.walk * 0.5) * 0.05 : 0;
+    k.claws.forEach((cl, i) => { clawP[i] = moving ? Math.sin(e.walk + i * Math.PI) * 0.6 - 0.1 : Math.sin(T * 1.1 + i * 2) * 0.08 - 0.05; });
+    if (moving && Math.random() < sdt * 14) mkDirt(mkW(e.root, (Math.random() - 0.5) * 1.6, 0.15, -0.9), 2, 2.2);
+    mkEyesTo(k.eyes, 1); if (e.kind === 'glow') flare = Math.max(0, Math.sin(T * 3.2)) ** 3 * 1.8;
+  }
+  k.head.position.set(0, 0.3 + off, headZ); k.head.rotation.set(pitch, 0, roll); k.jaw.rotation.x = jawA;
+  k.ringG.visible = ringS > 0.01 && !e.dead; k.ringG.scale.setScalar(Math.max(0.01, ringS));
+  k.bulge.visible = bulgeS > 0.01; k.bulge.scale.setScalar(Math.max(0.01, bulgeS));
+  k.claws.forEach(({ pv }, i) => { pv.position.y = clawY[i]; pv.rotation.x = clawP[i]; });
+  // spring on the lure: it lags behind when the head lurches, then wobbles back
+  k.lure.getWorldPosition(mkV); const vy = k.prevY === null || sdt <= 0 ? 0 : (mkV.y - k.prevY) / sdt; k.prevY = mkV.y;
+  const want = Math.max(-0.8, Math.min(0.8, vy * 0.09)), s = k.spr;
+  s.v += ((want - s.a) * 70 - s.v * 7) * sdt; s.a += s.v * sdt; s.vz += ((-roll * 2.5 - s.z) * 60 - s.vz * 6) * sdt; s.z += s.vz * sdt;
+  k.bend.rotation.x = s.a + trem * Math.sin(T * 45) * 0.07 + Math.sin(T * 2.3) * 0.05; k.bend.rotation.z = s.z + trem * Math.sin(T * 37) * 0.06 + Math.sin(T * 1.7) * 0.06;
+  if (gu !== null && e.gr) e.gr.set(gu);
+  k.mats.forEach(m => { m.userData.mk.flare = flare; });
+  mkBase(e, sdt);
+}
+
+/* ================= ROOTSKITTER: claws first, then it unroots itself ================= */
+function buildSkitter(kind) {
+  const root = new THREE.Group(), body = new THREE.Group(), g = new THREE.Group(), cb = new THREE.Group(); root.add(body); body.add(g); g.add(cb); g.scale.setScalar(0.55);
+  const skin = new THREE.MeshStandardMaterial({ color: 0x8A6A48, flatShading: true, roughness: 0.85, transparent: true, opacity: 1 }), mats = [], eyes = [];
+  mkAdd(cb, mkLathe([[0, 0.5], [0.22, 0.52], [0.3, 0.66], [0.28, 1.0], [0.22, 1.22], [0, 1.25]]), MKM.stem);
+  const cap = mkCap(0.8, 0.5, kind, mats); cap.position.y = 1.18; cb.add(cap);
+  if (kind === 'doom') mkSpots(cap, MK_SPOTS, eyes); else mkBeady(cb, 1.05, 0.29, 0.09, 0.04);
+  const ORDER = [0, 3, 1, 4, 2, 5], legs = [];
+  for (let k = 0; k < 6; k++) { const a = (k + 0.5) / 6 * Math.PI * 2; legs.push(Object.assign(mkLeg(cb, new THREE.Vector3(Math.sin(a) * 0.2, 0.75, Math.cos(a) * 0.2), 0.6, 0.7, 0.07, k % 2 ? skin : MKM.rootD, 0.08), { a, slot: ORDER.indexOf(k), grp: k % 2 })); }
+  const hairs = [[0.08, 0.05], [-0.1, 0.02], [0.02, -0.1], [-0.04, 0.12], [0.12, -0.06]].map(([x, z], i) => { const h = new THREE.Group(); h.position.set(x, 0.52, z); h.rotation.y = i * 1.3; cb.add(h); mkAdd(h, hornGeo([[0, 0, 0], [0.03, -0.5, 0.02], [-0.02, -1, 0.03]], 0.03, 0.008, 5, 3), MKM.rootD); return h; });
+  return { root, body, skin, legs: [], h: 0.75, r: 0.5, baseEmissive: 0x000000, baseOpacity: 1, look: skitterLook, mk: { mats, eyes, cb, cap, legs6: legs, hairs, hairLen: 0.25, wob: 0 } };
+}
+function skitterLook(e, sdt, moving) {
+  const k = e.mk, cb = k.cb, lt = e.lt, legs = k.legs6;
+  const P = (i, r, y) => [Math.sin(legs[i].a) * r, y, Math.cos(legs[i].a) * r];
+  let by = 0, rz = 0, rx = 0, bz = 0, gu = null, flare = 0;
+  e.hidden = e.ph === 'emerge' && lt < 0.35;
+  if (e.ph === 'emerge') {
+    rz = Math.sin(lt * 55) * 0.05 * MK.win(lt, 0, 0.1) * (1 - MK.win(lt, 0.3, 0.4));
+    if (lt > 0.06 && mkOnce(e, 'hop1')) mkDirt(mkW(e.root, 0, 0.12, 0), 3, 1.2);
+    const u3 = MK.win(lt, 1.0, 1.5);
+    const tug = u3 < 0.4 ? 0.62 * MK.eout(u3 / 0.4) : u3 < 0.55 ? 0.62 - 0.1 * MK.sm((u3 - 0.4) / 0.15) : 0.52 + 0.48 * MK.back((u3 - 0.55) / 0.45);
+    by = -0.62 * (1 - tug); const gy = -by;
+    legs.forEach((L, i) => {
+      const s0 = 0.25 + L.slot * 0.07, u1 = MK.win(lt, s0, s0 + 0.2), s1 = 0.78 + L.slot * 0.035, u2 = MK.win(lt, s1, s1 + 0.16);
+      const reach = P(i, 1.08, gy + 0.32 + (u1 >= 1 ? Math.sin(T * 20 + i) * 0.04 : 0));
+      let p = MK.mix(P(i, 1.0, gy - 1.0), reach, MK.back(u1));
+      if (u2 > 0) { p = MK.mix(reach, P(i, 1.0, gy), u2 * u2); p[1] += MK.bump(u2) * 0.15; }
+      mkAim(L, ...p);
+      if (u1 > 0.3 && mkOnce(e, 'burst' + i)) mkDirt(mkW(cb, ...P(i, 0.95, gy + 0.05)), 5, 2);
+      if (u2 >= 1 && mkOnce(e, 'plant' + i)) mkDust(mkW(cb, ...P(i, 1.0, gy + 0.03)), 1);
+    });
+    if (u3 > 0.62 && mkOnce(e, 'snap')) { k.wob = 1; mkDirt(mkW(e.root, 0, 0.1, 0), 8, 2); SFX.pop(); }
+    k.hairLen = e.fired.has('snap') ? 0.25 : Math.max(0.25, 0.52 + by + 0.3);
+    gu = MK.sm(MK.win(lt, 1.0, 1.4));
+    const u4 = MK.win(lt, 1.5, 1.85); if (u4 > 0) rz = Math.sin(lt * 45) * 0.14 * (1 - u4);
+    if (lt > 1.5 && mkOnce(e, 'spores')) puff(mkW(cb, 0, 1.6, 0), e.kind === 'glow' ? 0xB8FFF2 : 0xF2E6C8, 6, 1.0, 0.4, 0.8, 0.12, 0.7);
+    mkEyesTo(k.eyes, 1, lt, 1.5, 0.3); flare = MK.bump(u4) * (e.kind === 'glow' ? 2 : 1);
+  } else { // scuttling about on six roots
+    const run = moving ? 1 : 0, w = e.atk > 0 ? 1 - e.atk / e.T.windup : 0, ln = e.lungeT > 0 ? Math.sin(e.lungeT / 0.3 * Math.PI) : 0;
+    e.walk += sdt * (moving ? 17 : 3);
+    by = Math.sin(T * 1.7) * 0.015 + run * Math.abs(Math.sin(e.walk)) * 0.05 + w * 0.12; rx = -0.4 * w + 0.35 * ln; bz = 0.35 * ln;
+    rz = run * Math.sin(e.walk * 0.5) * 0.05; const gy = -by;
+    legs.forEach((L, i) => {
+      const s = Math.sin(e.walk + L.grp * Math.PI), lift = Math.max(0, Math.cos(e.walk + L.grp * Math.PI)) * 0.28 * run;
+      let p = P(i, 1.0, gy + lift + (run ? 0 : Math.max(0, Math.sin(T * 2.6 + i * 1.9)) ** 10 * 0.14)); p[2] += s * 0.24 * run;
+      if (Math.cos(L.a) > 0.8) p = MK.mix(p, P(i, 0.85, gy + 0.75), w * (1 - ln)); // the front pair rears up for the bite
+      mkAim(L, ...p);
+    });
+    k.hairLen = 0.25; mkEyesTo(k.eyes, 1);
+  }
+  cb.position.set(0, by, bz); cb.rotation.set(rx, 0, rz); if (gu !== null && e.gr) e.gr.set(gu);
+  k.wob *= Math.max(0, 1 - sdt * 2.5);
+  k.hairs.forEach((h, i) => { h.scale.y = k.hairLen; h.rotation.x = Math.sin(T * 9 + i * 1.7) * (0.4 * k.wob + (moving ? 0.25 : 0.05)); });
+  k.mats.forEach(m => { m.userData.mk.flare = flare; });
+  mkBase(e, sdt);
+}
+
+/* ================= CAPBEETLE: the stem shatters, the cap splits, it hops clear ================= */
+function buildBeetle(kind) {
+  const root = new THREE.Group(), body = new THREE.Group(), g = new THREE.Group(), bb = new THREE.Group(); root.add(body); body.add(g); g.add(bb);
+  const skin = new THREE.MeshStandardMaterial({ color: 0x2E2226, flatShading: true, roughness: 0.35, transparent: true, opacity: 1 }), mats = [], eyes = [];
+  const mat = mkCapMat(kind, mats); mat.side = THREE.DoubleSide;
+  mkAdd(bb, mkBall, skin, 0, 0.34, -0.12).scale.set(0.4, 0.22, 0.55);
+  mkAdd(bb, mkBall, skin, 0, 0.4, 0.42).scale.set(0.34, 0.2, 0.24);
+  const head = new THREE.Group(); head.position.set(0, 0.34, 0.66); bb.add(head);
+  mkAdd(head, mkBall, skin).scale.set(0.17, 0.12, 0.14);
+  mkAdd(head, hornGeo([[0, 0.02, 0.08], [0, 0.12, 0.2], [0, 0.32, 0.26], [0, 0.46, 0.18]], 0.06, 0.014, 8, 5), skin);
+  mkBeady(head, 0.03, 0.1, 0.12, 0.028);
+  if (kind === 'glow') for (const sd of [-1, 1]) mkAdd(head, hornGeo([[sd * 0.07, -0.05, 0.08], [sd * 0.09, -0.08, 0.16], [sd * 0.02, -0.09, 0.2]], 0.024, 0.006, 5, 4), MKM.chitin);
+  const cases = [], wings = [], r = 0.44, h = 0.36, S = new THREE.Vector3(1, 0.85, 1.2);
+  const prof = [[r * 0.9, 0], [r, h * 0.2], [r * 0.93, h * 0.52], [r * 0.66, h * 0.84], [r * 0.32, h * 0.98], [0, h * 1.02]];
+  for (const sd of [-1, 1]) {
+    const wp = new THREE.Group(); wp.position.set(sd * 0.06, 0.5, 0.22); bb.add(wp); const wm = mkWingMesh(sd, 0.85, 0.32); wp.add(wm); wings.push({ pv: wp, m: wm, sd });
+    const pv = new THREE.Group(); pv.position.set(0, 0.36, 0.3); bb.add(pv);
+    const half = new THREE.Group(); half.position.z = -0.42; pv.add(half); half.userData = { r, h, prof, n: 10 };
+    mkAdd(half, new THREE.LatheGeometry(prof.map(([x, y]) => new THREE.Vector2(x, y)), 5, sd > 0 ? 0 : Math.PI, Math.PI), mat).scale.copy(S);
+    if (kind === 'doom') mkSpots(half, MK_SPOTS.filter(([, a]) => sd * Math.sin(a) > 0.1), eyes, [], 1, S);
+    cases.push({ pv, sd });
+  }
+  const seamPts = [];
+  for (let i = 0; i < prof.length; i++) seamPts.push([0, prof[i][1] * S.y + 0.008, -prof[i][0] * S.z]);
+  for (let i = prof.length - 2; i >= 0; i--) seamPts.push([0, prof[i][1] * S.y + 0.008, prof[i][0] * S.z]);
+  const seamMat = new THREE.MeshBasicMaterial({ color: kind === 'glow' ? 0xD8FFF8 : 0xFFF0B8, transparent: true, opacity: 0, depthWrite: false });
+  const seamG = new THREE.Group(); seamG.position.set(0, 0.36, -0.12); bb.add(seamG); mkAdd(seamG, hornGeo(seamPts, 0.014, 0.014, 20, 4), seamMat);
+  const shards = [];
+  for (let k = 0; k < 5; k++) { const a = (k + 0.5) / 5 * Math.PI * 2, pv = new THREE.Group(); pv.rotation.order = 'YXZ'; pv.rotation.y = a; pv.position.set(Math.sin(a) * 0.15, 0.05, Math.cos(a) * 0.15); g.add(pv); mkAdd(pv, GEO.box, MKM.stem, 0, 0.15, 0).scale.set(0.2, 0.3, 0.035); shards.push({ pv, a }); }
+  const legs = [];
+  [[0.38, 0.25], [0.12, 0], [-0.14, -0.25]].forEach(([z, dz], j) => { for (const sd of [-1, 1]) legs.push(Object.assign(mkLeg(bb, new THREE.Vector3(sd * 0.2, 0.3, z), 0.3, 0.36, 0.035, skin, 0.03), { sd, z, dz, pair: j, grp: (j + (sd > 0 ? 0 : 1)) % 2 })); });
+  return { root, body, skin, legs: [], h: 0.7, r: 0.55, baseEmissive: 0x000000, baseOpacity: 1, look: beetleLook,
+    mk: { mats, eyes, mat, bb, head, cases, wings, seamG, seamMat, shards, legs6: legs } };
+}
+function beetleLook(e, sdt, moving) {
+  const k = e.mk, lt = e.lt, legs = k.legs6;
+  const rest = L => [L.sd * 0.56, 0, L.z + L.dz], tuck = L => [L.sd * 0.15, 0.17, L.z];
+  let by = 0, bz = 0, open = 0, seam = 0, air = 0, headZ = 0.66, headPitch = 0, rattle = 0, flare = 0, shardS = 0, gu = null;
+  const fall = [0, 0, 0, 0, 0], lu = legs.map(() => 0), arc = legs.map(() => 0);
+  e.hidden = e.ph === 'emerge' && lt < 0.35;
+  if (e.ph === 'emerge') {
+    rattle = MK.win(lt, 0, 0.1) * (1 - MK.win(lt, 0.3, 0.4)); seam = MK.win(lt, 0.05, 0.35) * (1 - MK.win(lt, 1.75, 1.95));
+    k.shards.forEach((s, i) => { fall[i] = MK.eout(MK.win(lt, 0.35 + i * 0.02, 0.6 + i * 0.02)) * 1.65; }); shardS = 1 - MK.sm(MK.win(lt, 1.2, 1.5));
+    if (lt > 0.36 && mkOnce(e, 'husk')) { burst(mkW(e.root, 0, 0.2, 0), 0xE8DCC8, 10, 3, 0.7, 0.05, 9); SFX.pop(); }
+    by = -0.75 * (1 - MK.eout(MK.win(lt, 0.4, 0.9)));
+    if (lt > 0.42 && mkOnce(e, 'rise')) mkDirt(mkW(e.root, 0, 0.15, 0), 10, 2.6);
+    gu = MK.sm(MK.win(lt, 0.4, 0.8));
+    headZ = 0.3 + 0.36 * MK.back(MK.win(lt, 0.9, 1.15)); headPitch = 0.5 - 0.8 * MK.sm(MK.win(lt, 0.9, 1.05)) + 0.3 * MK.sm(MK.win(lt, 1.05, 1.25));
+    legs.forEach((L, i) => { const s0 = 0.95 + L.pair * 0.06, u = MK.win(lt, s0, s0 + 0.16); lu[i] = 1 - u; arc[i] = MK.bump(u) * 0.12; if (u >= 1 && mkOnce(e, 'pl' + i)) mkDust(mkW(k.bb, ...rest(L)), 1); });
+    open = MK.win(lt, 1.25, 1.38) * (1 - MK.win(lt, 1.62, 1.78));
+    const uh = MK.win(lt, 1.35, 1.7); air = MK.bump(uh); by += air * 0.35; bz = 0.3 * MK.sm(uh);
+    if (uh >= 1 && mkOnce(e, 'land')) mkDust(mkW(e.root, 0, 0.05, 0.3), 4);
+    mkEyesTo(k.eyes, 1, lt, 1.7, 0.3); flare = MK.bump(MK.win(lt, 1.25, 1.8)) * (e.kind === 'glow' ? 2 : 1);
+  } else { // walking, and hopping with its wings out
+    const run = moving ? 1 : 0, w = e.atk > 0 ? 1 - e.atk / e.T.windup : 0, ln = e.lungeT > 0 ? Math.sin(e.lungeT / 0.3 * Math.PI) : 0;
+    e.walk += sdt * (moving ? 15 : 3);
+    open = e.open > 0.5 ? 1 : Math.max(0, Math.sin(T * 0.9 + e.id)) ** 30 * 0.35; air = e.hop ? 1 : 0;
+    by = run * Math.abs(Math.sin(e.walk)) * 0.03; headPitch = 0.35 * w - 0.25 * ln; bz = 0.25 * ln;
+    legs.forEach((L, i) => { lu[i] = 0; arc[i] = run ? Math.max(0, Math.cos(e.walk + L.grp * Math.PI)) * 0.14 : Math.max(0, Math.sin(T * 2.2 + L.pair * 1.3 + L.sd)) ** 12 * 0.08; });
+    mkEyesTo(k.eyes, 1);
+  }
+  k.bb.position.set(0, by, bz);
+  const lift = Math.max(0, -0.04 - by); // while it's below, the shell waits up on the stem
+  k.cases.forEach(({ pv, sd }) => { pv.position.y = 0.36 + lift; pv.rotation.z = sd * open * 1.1 + Math.sin(T * 50) * 0.025 * rattle; pv.rotation.x = -open * 0.3; });
+  k.seamG.position.y = 0.36 + lift; k.seamMat.opacity = seam * (0.75 + 0.25 * Math.sin(T * 30)); k.seamG.visible = seam > 0.01;
+  k.wings.forEach(({ pv, m, sd }) => { m.visible = open > 0.1; pv.rotation.z = sd * (0.15 + Math.sin(T * 70) * 0.35) * open; });
+  k.head.position.z = headZ; k.head.rotation.x = headPitch + Math.sin(T * 1.5) * 0.06;
+  const gy = -by, run = e.ph === 'live' && moving ? 1 : 0;
+  legs.forEach((L, i) => { const a = rest(L), b = tuck(L), u = MK.sm(lu[i]), st = run ? Math.sin(e.walk + L.grp * Math.PI) * 0.16 : 0; mkAim(L, a[0] + (b[0] - a[0]) * u, (gy + (0.06 - gy) * air) * (1 - u) + b[1] * u + arc[i], a[2] + (b[2] - a[2]) * u + st); });
+  k.shards.forEach(({ pv, a }, i) => { pv.rotation.x = fall[i]; pv.position.set(Math.sin(a) * (0.15 + fall[i] * 0.03), 0.05, Math.cos(a) * (0.15 + fall[i] * 0.03)); pv.scale.setScalar(Math.max(0.001, shardS)); pv.visible = shardS > 0.01; });
+  if (gu !== null && e.gr) e.gr.set(gu);
+  k.mats.forEach(m => { m.userData.mk.flare = flare; });
+  mkBase(e, sdt);
+}
+
+/* ================= MANTISHROOM: the stem keeps rising, then it unfolds ================= */
+function buildMantis(kind) {
+  const root = new THREE.Group(), body = new THREE.Group(), g = new THREE.Group(), mb = new THREE.Group(); root.add(body); body.add(g); g.add(mb);
+  const skin = new THREE.MeshStandardMaterial({ color: 0xCFC3A8, flatShading: true, roughness: 0.8, transparent: true, opacity: 1 }), mats = [], eyes = [];
+  const SK2 = M(0xA89878), LG = M(0xB8AC90), gill = M(kind === 'glow' ? 0x2E8A7A : 0xC8B8A0, { side: THREE.DoubleSide });
+  const ab = new THREE.Group(); ab.position.set(0, 0.5, -0.1); mb.add(ab);
+  mkAdd(ab, mkBall, skin, 0, 0, -0.38).scale.set(0.17, 0.15, 0.48);
+  const fw = [-1, 1].map(sd => { const pv = new THREE.Group(); pv.position.set(sd * 0.04, 0.1, -0.05); ab.add(pv); mkAdd(pv, mkBall, gill, sd * 0.05, 0.02, -0.36).scale.set(0.11, 0.035, 0.44); return { pv, sd }; });
+  mkAdd(mb, hornGeo([[0, 0.48, -0.05], [0, 0.75, 0.04], [0, 1.0, 0.13]], 0.07, 0.065, 6, 5), skin);
+  mkAdd(mb, mkLathe([[0, 0], [0.1, 0.01], [0.115, 0.12], [0.1, 0.26], [0, 0.3]], 7), skin, 0, 0.98, 0.15); // its long neck; while hiding, this is the stem
+  const headG = new THREE.Group(); headG.position.set(0, 1.34, 0.18); mb.add(headG);
+  const hd = mkAdd(headG, new THREE.ConeGeometry(0.15, 0.24, 3), skin); hd.rotation.x = Math.PI; hd.scale.z = 0.6;
+  const ceyes = [-1, 1].map(sd => { const c = new THREE.Group(); c.position.set(sd * 0.13, 0.05, 0.01); headG.add(c); mkAdd(c, mkBall, MKM.pupil).scale.set(0.065, 0.075, 0.065); mkAdd(c, mkBall, MKM.glint, sd * 0.01, 0.03, 0.05).scale.setScalar(0.02); return c; });
+  const hat = mkCap(0.42, 0.3, kind, mats); hat.position.set(0, 0.11, -0.02); headG.add(hat);
+  const mand = new THREE.Group(); headG.add(mand);
+  if (kind === 'doom') mkSpots(hat, MK_SPOTS, eyes); else for (const sd of [-1, 1]) mkAdd(mand, hornGeo([[sd * 0.03, -0.1, 0.02], [sd * 0.045, -0.15, 0.05], [0, -0.17, 0.06]], 0.018, 0.005, 4, 4), MKM.chitin);
+  const arms = [-1, 1].map(sd => {
+    const sh = new THREE.Group(); sh.position.set(sd * 0.07, 1.12, 0.16); mb.add(sh);
+    mkAdd(sh, hornGeo([[0, 0, 0], [sd * 0.02, -0.12, 0.12], [sd * 0.03, -0.2, 0.28]], 0.05, 0.04, 6, 5), skin);
+    for (let i = 0; i < 3; i++) mkAdd(sh, new THREE.ConeGeometry(0.018, 0.07, 3), SK2, sd * 0.03, -0.06 - i * 0.05, 0.07 + i * 0.07).rotation.x = -0.6;
+    const el = new THREE.Group(); el.position.set(sd * 0.03, -0.2, 0.28); sh.add(el);
+    mkAdd(el, hornGeo([[0, 0, 0], [0, 0.1, -0.06], [0, 0.2, -0.04], [0, 0.24, 0.02]], 0.035, 0.015, 6, 4), skin);
+    return { sh, el };
+  });
+  const legs = [];
+  [[0.02, 0.4], [-0.12, -0.43]].forEach(([z, fz], j) => { for (const sd of [-1, 1]) legs.push(Object.assign(mkLeg(mb, new THREE.Vector3(sd * 0.06, 0.52, z), 0.42, 0.62, 0.03, LG, 0.04), { sd, z, fz, idx: j * 2 + (sd > 0 ? 1 : 0), grp: (j + (sd > 0 ? 0 : 1)) % 2 })); });
+  return { root, body, skin, legs: [], h: 1.7, r: 0.45, baseEmissive: 0x000000, baseOpacity: 1, look: mantisLook,
+    mk: { mats, eyes, mb, ab, fw, headG, ceyes, hat, mand, arms, legs4: legs } };
+}
+function mantisLook(e, sdt, moving) {
+  const k = e.mk, lt = e.lt, legs = k.legs4, HID = -1.0;
+  const rest = L => [L.sd * 0.5, 0, L.z + L.fz], tuck = L => [L.sd * 0.08, 0.38, L.z + (L.fz > 0 ? 0.3 : -0.3)];
+  let by = 0, yaw = 0, rollH = 0, eyeS = 1, abR = 0.2, fan = 0, shR = 0, elR = 0, hatT = 0.25, sway = 0, flare = 0, gu = null;
+  const lu = legs.map(() => 0), arc = legs.map(() => 0);
+  e.hidden = e.ph === 'emerge' && lt < 0.45;
+  if (e.ph === 'emerge') {
+    yaw = Math.sin(lt * 14) * 0.5 * MK.win(lt, 0, 0.1) * (1 - MK.win(lt, 0.35, 0.45));
+    by = HID * (1 - MK.sm(MK.win(lt, 0.4, 1.1)));
+    if (lt > 0.4 && lt < 1.1 && mkEvery(e, '_tr', 0.07, sdt)) mkDirt(mkW(e.root, (Math.random() - 0.5) * 0.4, 0.12, (Math.random() - 0.5) * 0.4), 1, 0.8);
+    gu = MK.sm(MK.win(lt, 0.4, 0.75)); eyeS = MK.back(MK.win(lt, 0.9, 1.05));
+    legs.forEach((L, i) => { const s0 = 1.1 + L.idx * 0.1, u = MK.win(lt, s0, s0 + 0.22); lu[i] = 1 - u; arc[i] = MK.bump(u) * 0.4; if (u >= 1 && mkOnce(e, 'pl' + i)) mkDust(mkW(k.mb, ...rest(L)), 1); });
+    abR = -1.2 + 1.4 * MK.back(MK.win(lt, 1.3, 1.6)); fan = MK.win(lt, 1.55, 1.7) * (1 - MK.win(lt, 1.85, 2.05));
+    const ua = MK.back(MK.win(lt, 1.6, 1.85)), uf = MK.sm(MK.win(lt, 2.0, 2.3));
+    shR = (1.0 + (-0.9 - 1.0) * ua) * (1 - uf); elR = 1.8 * ua * (1 - uf);
+    if (ua > 0.5 && mkOnce(e, 'threat')) SFX.shing();
+    yaw *= 1 - MK.win(lt, 1.55, 1.65); rollH = 0.3 * MK.bump(MK.win(lt, 1.85, 2.3)); hatT = 0.25 * MK.sm(MK.win(lt, 1.6, 1.9));
+    mkEyesTo(k.eyes, 1, lt, 1.8, 0.3); flare = MK.bump(MK.win(lt, 1.6, 2.1)) * (e.kind === 'glow' ? 2 : 1);
+  } else { // stalking, swaying like a leaf, then the scythes
+    const run = moving ? 1 : 0, w = e.atk > 0 ? 1 - e.atk / e.T.windup : 0, ln = e.lungeT > 0 ? Math.sin(e.lungeT / 0.3 * Math.PI) : 0, sw = (e.swatT || 0) > 0 ? Math.sin((e.swatT / 0.35) * Math.PI) : 0;
+    e.walk += sdt * (moving ? 11 : 2); if (e.swatT > 0) e.swatT = Math.max(0, e.swatT - sdt);
+    sway = Math.sin(T * 1.2); yaw = Math.sin(T * 0.9 + e.id) * 0.25 * (1 - w);
+    shR = -0.9 * MK.sm(w * 1.5) - 0.6 * sw + 0.5 * ln; elR = 1.8 * MK.sm(w * 1.5) * (1 - ln) + 1.2 * sw;
+    rollH = 0.25 * w; by = run * Math.abs(Math.sin(e.walk)) * 0.03;
+    legs.forEach((L, i) => { arc[i] = run ? Math.max(0, Math.cos(e.walk + L.grp * Math.PI)) * 0.2 : 0; });
+    mkEyesTo(k.eyes, 1);
+  }
+  k.mb.position.y = by; k.mb.rotation.z = sway * 0.05;
+  k.headG.rotation.set(0, yaw, rollH); k.hat.rotation.x = hatT;
+  k.ceyes.forEach(c => c.scale.setScalar(Math.max(0.001, eyeS))); k.mand.scale.setScalar(Math.max(0.001, eyeS));
+  k.arms.forEach(({ sh, el }) => { sh.rotation.x = shR + sway * 0.04; el.rotation.x = elR; });
+  k.ab.rotation.x = abR; k.fw.forEach(({ pv, sd }) => { pv.rotation.z = sd * (0.25 + fan * 1.0); pv.rotation.y = sd * fan * 0.5; });
+  const gy = -by, run = e.ph === 'live' && moving ? 1 : 0;
+  legs.forEach((L, i) => { const a = rest(L), b = tuck(L), u = MK.sm(lu[i]), st = run ? Math.sin(e.walk + L.grp * Math.PI) * 0.22 : 0; mkAim(L, a[0] + (b[0] - a[0]) * u, gy * (1 - u) + b[1] * u + arc[i], a[2] + (b[2] - a[2]) * u + st); });
+  if (gu !== null && e.gr) e.gr.set(gu);
+  k.mats.forEach(m => { m.userData.mk.flare = flare; });
+  mkBase(e, sdt);
+}
+
+/* ================= LAMPCAP: it was upside down the whole time ================= */
+function buildLampcap(kind) {
+  const root = new THREE.Group(), body = new THREE.Group(), g = new THREE.Group(), fb = new THREE.Group(); root.add(body); body.add(g); g.add(fb);
+  const skin = new THREE.MeshStandardMaterial({ color: 0x241E26, flatShading: true, roughness: 0.4, transparent: true, opacity: 1 }), mats = [], eyes = [];
+  const ORG = M(0xE07A3A);
+  const cap = mkCap(0.4, 0.34, kind, mats); cap.rotation.x = -Math.PI / 2 - 0.3; cap.position.set(0, -0.08, -0.3); fb.add(cap);
+  if (kind === 'doom') mkSpots(cap, MK_SPOTS, eyes);
+  mkAdd(fb, new THREE.CylinderGeometry(0.12, 0.14, 0.2, 7), MKM.stem, 0, -0.04, -0.2).rotation.x = Math.PI / 2 + 0.3;
+  mkAdd(fb, mkBall, skin).scale.set(0.15, 0.13, 0.15);
+  mkAdd(fb, mkBall, ORG, 0, 0.1, 0.08).scale.set(0.17, 0.05, 0.15);
+  mkAdd(fb, mkBall, skin, 0, 0.13, 0.1).scale.set(0.06, 0.03, 0.07);
+  const head = new THREE.Group(); head.position.set(0, -0.02, 0.2); fb.add(head);
+  mkAdd(head, mkBall, skin).scale.set(0.11, 0.1, 0.09);
+  for (const sd of [-1, 1]) { mkAdd(head, mkBall, MKM.pupil, sd * 0.085, 0.01, 0.035).scale.setScalar(0.06); mkAdd(head, mkBall, MKM.glint, sd * 0.095, 0.04, 0.08).scale.setScalar(0.017); }
+  if (kind === 'glow') for (const sd of [-1, 1]) mkAdd(head, hornGeo([[sd * 0.03, -0.07, 0.05], [sd * 0.045, -0.11, 0.08], [0, -0.12, 0.1]], 0.015, 0.005, 4, 4), MKM.chitin);
+  for (const sd of [-1, 1]) { const pv = new THREE.Group(); pv.position.set(sd * 0.05, 0.08, 0.06); head.add(pv); mkAdd(pv, hornGeo([[0, 0, 0], [sd * 0.06, 0.14, 0.1], [sd * 0.14, 0.2, 0.26]], 0.016, 0.006, 6, 4), skin); }
+  const elytra = [-1, 1].map(sd => { const el = mkAdd(fb, mkBall, skin, sd * 0.13, 0.13, -0.06); el.scale.set(0.1, 0.022, 0.28); return { el, sd }; });
+  const wings = [-1, 1].map(sd => { const pv = new THREE.Group(); pv.position.set(sd * 0.05, 0.12, 0.03); fb.add(pv); const m = mkWingMesh(sd, 0.6, 0.5); m.rotation.z = sd * 0.5; pv.add(m); return { pv, sd }; });
+  const legG = new THREE.Group(); legG.position.y = -0.1; fb.add(legG);
+  for (let i = 0; i < 6; i++) { const sd = i % 2 ? 1 : -1, z = 0.08 - Math.floor(i / 2) * 0.07; mkAdd(legG, new THREE.CylinderGeometry(0.011, 0.007, 0.17, 4), skin, sd * 0.06, -0.08, z).rotation.z = sd * 0.25; }
+  return { root, body, skin, legs: [], h: 1.1, r: 0.4, baseEmissive: 0x000000, baseOpacity: 1, look: lampLook,
+    mk: { mats, eyes, fb, cap, elytra, wings, legG } };
+}
+function lampLook(e, sdt, moving) {
+  const k = e.mk, lt = e.lt, glow = e.kind === 'glow', DOWN = 1.87, HY = 0.04;
+  let by = HY, bx = 0, bz = 0, pitch = DOWN, rz = 0, wingS = 0, buzz = 1, elO = 0.08, flare = 0, swing = 0, gu = null;
+  e.hidden = e.ph === 'emerge' && lt < 0.4;
+  if (e.ph === 'emerge') {
+    const fl = MK.win(lt, 0, 0.05) * (1 - MK.win(lt, 0.3, 0.38)); flare = fl * (Math.sin(lt * 40) > 0 ? 1.6 : -0.5);
+    wingS = MK.back(MK.win(lt, 0.35, 0.55));
+    if (lt > 0.36 && mkOnce(e, 'burst')) { mkDirt(mkW(e.root, 0, 0.12, 0), 8, 2); SFX.flutter(); }
+    if (lt > 0.4 && lt < 1.1 && mkEvery(e, '_wh', 0.07, sdt)) { const a = Math.random() * 6.3; mkDust(mkW(e.root, Math.sin(a) * 0.35, 0.06, Math.cos(a) * 0.35), 1); }
+    const up = MK.win(lt, 0.6, 1.2); by = HY + 0.57 * MK.eout(up); rz = up > 0 && up < 1 ? Math.sin(lt * 18) * 0.15 : 0;
+    if (lt > 0.75 && mkOnce(e, 'head')) mkDirt(mkW(e.root, 0, 0.1, 0), 6, 1.8);
+    const ff = MK.win(lt, 1.1, 1.5); pitch = DOWN + (0.12 - DOWN) * MK.back(ff); by += 0.2 * MK.sm(ff);
+    elO = 0.08 + 0.6 * MK.sm(ff); swing = MK.bump(ff) * 0.9; gu = MK.sm(MK.win(lt, 0.6, 1.0));
+    flare += MK.bump(MK.win(lt, 1.5, 1.85)) * 2.2;
+    mkEyesTo(k.eyes, 1, lt, 1.5, 0.3);
+  } else if (e.stun > 0) { // knocked out of the air: it lies there buzzing feebly
+    by = 0.16; pitch = 0.15; rz = 1.1 + Math.sin(T * 7) * 0.08; wingS = 1; buzz = 0.25; elO = 0.3; flare = -0.4;
+  } else { // hovering, weaving, then a dive at you
+    const w = e.atk > 0 ? 1 - e.atk / e.T.windup : 0, ln = e.lungeT > 0 ? Math.sin(e.lungeT / 0.3 * Math.PI) : 0;
+    bx = Math.sin(T * 1.3 + e.id) * 0.15; bz = Math.sin(T * 2.6 + e.id) * 0.1 + ln * 0.7;
+    by = 0.75 + Math.sin(T * 2.2 + e.id) * 0.07 + 0.35 * w - 0.45 * ln; pitch = 0.12 - 0.5 * w + 0.6 * ln; rz = Math.cos(T * 1.3) * 0.15 + (moving ? 0.1 : 0);
+    wingS = 1; elO = 0.68; flare = glow ? 0.9 * (0.5 + 0.5 * Math.sin(T * 3)) : (Math.sin(T * (3 + (T % 4) * 4)) > 0.55 ? 1.6 : 0);
+    mkEyesTo(k.eyes, 1);
+  }
+  k.fb.position.set(bx, by, bz); k.fb.rotation.set(pitch, 0, rz);
+  k.wings.forEach(({ pv, sd }) => { pv.scale.setScalar(Math.max(0.001, wingS)); pv.rotation.z = sd * (0.3 + Math.sin(T * 75) * 0.45 * buzz); });
+  k.elytra.forEach(({ el, sd }) => { el.rotation.set(-0.2, 0, sd * elO); });
+  k.legG.rotation.x = swing * Math.sin(T * 8) * 0.6 + Math.sin(T * 3) * 0.1;
+  if (gu !== null && e.gr) e.gr.set(gu);
+  k.mats.forEach(m => { m.userData.mk.flare = flare; });
+  mkBase(e, sdt);
+  e.shadow.scale.setScalar(e.r * e.scale * 1.1 * Math.max(0.4, 1 - (by - 0.2) * 0.5));
+}
+const MK_BUILD = { lurker: buildLurker, skitter: buildSkitter, beetle: buildBeetle, mantis: buildMantis, lampcap: buildLampcap };
+const MK_PH = { hidden: 0, emerge: 1, out: 2, live: 2, hide: 3 };
+
+/* ---------- the field of mushrooms ---------- */
+const field = { list: [], gone: [], grounds: [], seq: 0, lurk: null, sendT: 0 };
+const FIELD_HIT = 0.55;
+const fieldCount = n => Math.min(22, 15 + n);
+function fieldReset() { field.list = []; field.gone = []; field.grounds = []; field.lurk = null; }
+// where they can grow: the floor (away from doors, pillars, the stairs and lava), the walls, and the ceiling
+function fieldSpots(n) {
+  const out = [], r = room, doorsAt = ['N', 'S', 'W', 'E'].filter(d => r.n[d] || r.shopDir === d);
+  const nFloor = Math.round(n * 0.6), nWall = Math.round(n * 0.28), nCeil = n - nFloor - nWall;
+  const okFloor = (x, z) => {
+    if (doorsAt.some(d => { const [dx, dz] = wallXZ(d, 0, -1); return Math.hypot(x - dx, z - dz) < 2.6; })) return false;
+    if (colliders.some(c => Math.hypot(x - c.x, z - c.z) < c.r + 1.0)) return false;
+    if (r.type === 'stairs' && Math.hypot(x - STAIRS.x, z - STAIRS.z) < 1.8) return false;
+    if (lavaRects.some(rc => x > rc[0] - 0.6 && x < rc[1] + 0.6 && z > rc[2] - 0.6 && z < rc[3] + 0.6)) return false;
+    if (Math.hypot(x - player.pos.x, z - player.pos.z) < 2.4) return false;
+    return !out.some(o => o.at === 'f' && Math.hypot(x - o.x, z - o.z) < 1.5);
+  };
+  for (let g = 0; g < 400 && out.filter(o => o.at === 'f').length < nFloor; g++) { const x = rand(-W + 1.5, W - 1.5), z = rand(-D + 1.6, D - 1.6); if (okFloor(x, z)) out.push({ at: 'f', x, y: 0, z }); }
+  for (let g = 0; g < 400 && out.filter(o => o.at.length === 1 && 'NSWE'.includes(o.at)).length < nWall; g++) {
+    const d = pick(['N', 'S', 'W', 'E']), lim = d === 'N' || d === 'S' ? W : D, along = rand(-lim + 1.2, lim - 1.2), y = rand(0.9, 2.7);
+    if (doorsAt.includes(d) && Math.abs(along) < DOOR_HALF + 1.0) continue;
+    const [x, z] = wallXZ(d, along, -0.02);
+    if (out.some(o => o.at === d && Math.hypot(x - o.x, z - o.z, y - o.y) < 1.4)) continue;
+    if (r.theme === 'lab' && d === 'N' && Math.abs(along) < 3.2) continue; // not across the observation window
+    out.push({ at: d, x, y, z });
+  }
+  for (let g = 0; g < 200 && out.filter(o => o.at === 'c').length < nCeil; g++) { const x = rand(-W + 1.5, W - 1.5), z = rand(-D + 1.5, D - 1.5); if (!out.some(o => o.at === 'c' && Math.hypot(x - o.x, z - o.z) < 1.8)) out.push({ at: 'c', x, y: H - 0.02, z }); }
+  return out;
+}
+// one mushroom, on a mound on the floor, or growing out of a mossy patch on a wall or the ceiling
+function buildShroom(s) {
+  const g = new THREE.Group(); g.position.set(s.x, s.y, s.z);
+  if (s.at === 'f') s.up = mkY.clone();
+  else if (s.at === 'c') s.up = new THREE.Vector3(0, -1, 0);
+  else { const v = DIRS[s.at]; s.up = new THREE.Vector3(-v.nx * 0.83, 0.56, -v.nz * 0.83).normalize(); }
+  g.quaternion.setFromUnitVectors(mkY, s.up); s.yaw = rand(0, 6.3);
+  const inner = new THREE.Group(); inner.rotation.y = s.yaw; g.add(inner); s.inner = inner;
+  s.eyes = []; s.mats = [];
+  if (s.at === 'f') {
+    mkAdd(inner, mkLathe([[0.52, 0], [0.4, 0.06], [0.22, 0.1], [0, 0.11]], 9), MKM.dirt);
+    [[0.42, 0.3], [-0.36, 0.2], [0.1, -0.44]].forEach(([x, z]) => { const c = mkAdd(inner, GEO.ico0, MKM.dirt2, x, 0.05, z); c.scale.setScalar(0.07); c.rotation.set(x * 5, z * 4, 0); });
+  } else { const pad = mkAdd(inner, GEO.disc, MKM.moss, 0, 0.01, 0); pad.rotation.x = -Math.PI / 2; pad.scale.setScalar(0.42); }
+  mkAdd(inner, mkLathe([[0, 0.08], [0.17, 0.08], [0.165, 0.2], [0.145, 0.34], [0, 0.36]], 8), MKM.stem);
+  const cap = mkCap(0.42, 0.3, s.kind, s.mats); cap.position.y = 0.32; inner.add(cap);
+  if (s.kind === 'doom') mkSpots(cap, MK_SPOTS, s.eyes, s.real ? [1, 2] : s.lie ? [1, 2] : [], s.real ? 1 : 2);
+  else if (s.real || s.lie) { // the glowcap's tell: teeth in the dirt round the stem, clenching. A liar's never move
+    s.teeth = [];
+    for (let i = 0; i < (s.real ? 6 : 4); i++) { const a = i / (s.real ? 6 : 4) * Math.PI * 2 + 0.3, tg = new THREE.Group(); tg.position.set(Math.sin(a) * 0.29, 0.02, Math.cos(a) * 0.29); tg.rotation.y = a; inner.add(tg); mkAdd(tg, new THREE.ConeGeometry(0.042, 0.17, 4), MKM.tooth, 0, 0.05, 0).rotation.x = -0.35; s.teeth.push(tg); }
+  }
+  g.scale.setScalar(0.001); s.g = g; s.c = new THREE.Vector3(s.x, s.y, s.z).addScaledVector(s.up, 0.45);
+  (roomGroup || scene).add(g);
+}
+function dropShroomMesh(s) { if (s.g && s.g.parent) s.g.parent.remove(s.g); if (s.g) disposeTree(s.g); s.g = null; }
+// hand out a fresh field: the old one shrinks away, the new one sprouts
+function fieldDeal(e, n) {
+  for (const s of field.list) shroomGone(s, 'out');
+  const spots = fieldSpots(n), ri = Math.floor(Math.random() * spots.length), lies = !!(e && e.moves && e.moves.has('lies'));
+  field.list = spots.map((p, i) => Object.assign(p, { id: ++field.seq, kind: Math.random() < 0.5 ? 'doom' : 'glow', real: i === ri, lie: i !== ri && lies && Math.random() < 0.2, live: true, grow: -0.35 - Math.random() * 0.45 }));
+  field.list.forEach(buildShroom); fieldSend();
+}
+function fieldStart(e, n) {
+  field.lurk = e; e.pos.y = 0; mkPhase(e, 'hidden'); e.hidden = true; e.root.visible = false;
+  fieldDeal(e, n || fieldCount(floorNum));
+  if (!lab.on && !run.lurkTip) { run.lurkTip = true; setTimeout(() => notice('ONE OF THESE IS THE LURKER<em>HIT THE REAL ONE · WRONG ONES BITE</em>'), 2600); }
+}
+function fieldClear() { for (const s of field.list) shroomGone(s, 'out'); field.list = []; field.lurk = null; fieldSend(); }
+function fieldSend(pop) {
+  field.sendT = 1.5;
+  if (!net.on || !net.host) return;
+  netEmit('goo', { k: 'field', rk: rkOf(room), f: [0, 0, 0], t: [0, 0, 0], s: field.list.filter(s => s.live).map(s => [s.id, +s.x.toFixed(2), +s.y.toFixed(2), +s.z.toFixed(2), s.at, s.kind === 'glow' ? 1 : 0, s.real ? 1 : 0, s.lie ? 1 : 0]), pop: pop || null });
+}
+// a partner's copy of the host's field: keep what's still there, sprout what's new, and see off what went
+function fieldSync(rows, pop) {
+  const keep = new Map(field.list.map(s => [s.id, s])), next = [];
+  for (const row of rows) {
+    if (!Array.isArray(row)) continue;
+    const [id, x, y, z, a, k, real, lie] = row, old = keep.get(id);
+    if (old) { keep.delete(id); next.push(old); continue; }
+    if (typeof a !== 'string' || !/^[fcNSWE]$/.test(a)) continue;
+    const s = { id, x: +x || 0, y: +y || 0, z: +z || 0, at: a, kind: k ? 'glow' : 'doom', real: !!real, lie: !!lie, live: true, grow: -Math.random() * 0.3 };
+    buildShroom(s); next.push(s);
+  }
+  for (const s of keep.values()) shroomGone(s, pop && pop[0] === s.id ? pop[1] : 'out');
+  field.list = next;
+}
+// a mushroom leaves the field: shrinks away, drops off its wall, or is swallowed by what was under it
+function shroomGone(s, why) {
+  s.live = false; s.why = why; s.gt = 0;
+  if (s.at === 'f' && (why === 'fake' || why === 'real')) { dropShroomMesh(s); return; } // whatever was inside takes its place
+  if (why === 'fake') { s.from = s.g ? s.g.position.clone() : new THREE.Vector3(s.x, s.y, s.z); const fb = floorBelow(s); s.to = new THREE.Vector3(fb.x, 0, fb.z); s.q0 = s.g ? s.g.quaternion.clone() : new THREE.Quaternion(); }
+  field.gone.push(s);
+}
+function floorBelow(s) {
+  let x = s.x, z = s.z;
+  if (s.at !== 'f' && s.at !== 'c') { const v = DIRS[s.at]; x -= v.nx * 1.8; z -= v.nz * 1.8; }
+  x = Math.max(-W + 1.6, Math.min(W - 1.6, x)); z = Math.max(-D + 1.6, Math.min(D - 1.6, z));
+  for (const c of colliders) { const dx = x - c.x, dz = z - c.z, d = Math.hypot(dx, dz), rr = c.r + 1.3; if (d < rr && d > 0.01) { x = c.x + dx / d * rr; z = c.z + dz / d * rr; } }
+  return { x, z };
+}
+function fieldTick(sdt) {
+  for (const s of field.list) {
+    if (!s.g) continue;
+    if (s.grow < 1) { s.grow += sdt * 2.2; s.g.scale.setScalar(Math.max(0.001, MK.back(s.grow))); if (s.grow > 0 && s.grow - sdt * 2.2 <= 0) burst(s.c, 0x6A5038, 4, 1.5, 0.5, 0.04, 6); }
+    if (s.teeth) s.teeth.forEach(t => { t.position.y = 0.02 + (s.real ? Math.max(0, Math.sin(T * 0.9 + s.id)) ** 4 * 0.07 : 0); });
+    if (s.eyes.length) mkEyesTick(s.eyes, sdt);
+    mkMatsTick(s.mats);
+  }
+  for (let i = field.gone.length - 1; i >= 0; i--) {
+    const s = field.gone[i]; s.gt += sdt;
+    if (!s.g) { field.gone.splice(i, 1); continue; }
+    if (s.why === 'fake') { // off the wall, tumbling, and the bug comes out where it lands
+      const u = Math.min(1, s.gt / 0.5); s.g.position.lerpVectors(s.from, s.to, u); s.g.position.y = s.from.y * (1 - u * u) + 0.0; s.g.quaternion.slerpQuaternions(s.q0, new THREE.Quaternion(), u);
+      if (u >= 1) { SFX.thud(); mkDust(s.to.clone().setY(0.1), 4); dropShroomMesh(s); field.gone.splice(i, 1); if (s.onLand) s.onLand(); }
+    } else { // shrinking away (or yanked back into the wall)
+      const u = Math.min(1, s.gt / (s.why === 'real' ? 0.25 : 0.35)); s.g.scale.setScalar(Math.max(0.001, 1 - MK.ein(u)));
+      if (u >= 1) { puff(s.c, 0x8A7A64, 3, 0.6, 0.3, 0.6, 0.14, 0.5); dropShroomMesh(s); field.gone.splice(i, 1); }
+    }
+  }
+  if (net.on && net.host && field.lurk && !field.lurk.dead && (field.sendT -= sdt) <= 0) fieldSend();
+}
+// you hit a mushroom: the host sorts out what that means; a partner tells the host
+function shroomStruck(s) {
+  if (!s || !s.live) return;
+  burst(s.c, s.kind === 'glow' ? 0x5FF2D6 : 0xE2483B, 8, 3, 0.5, 0.06, 6);
+  if (netGuest()) { if (!s.sentT || playT - s.sentT > 0.5) { s.sentT = playT; netEmit('hit', { rk: rkOf(room), l: [], sh: [s.id] }); } return; }
+  shroomHit(s);
+}
+function shroomHit(s) {
+  if (!s.live) return; const e = field.lurk;
+  if (s.real && e && !e.dead && e.ph === 'hidden') lurkerSurface(e, s);
+  else if (!s.real) fakeHit(s);
+}
+const bugsAlive = () => enemies.filter(o => o.T.bug && !o.dead).length;
+function pickBug() { const n = floorNum, list = ['skitter']; if (n >= 2) list.push('beetle'); if (n >= 3) list.push('mantis'); if (n >= 4) list.push('lampcap'); return pick(list); }
+function bugEmerge(b, x, z) {
+  b.pos.set(x, 0, z); b.yaw = Math.atan2(player.pos.x - x, player.pos.z - z); mkPhase(b, 'emerge'); b.hidden = true; b.cd = 1.2;
+  b.gr = mkGround(x, z); b.look(b, 0, false);
+}
+function fakeHit(s) {
+  shroomGone(s, 'fake'); fieldSend([s.id, 'fake']);
+  const lk = field.lurk, n = lk && lk.moves && lk.moves.has('swarm') ? 2 : 1, cap = n > 1 ? 5 : 4, at = s.at === 'f' ? { x: s.x, z: s.z } : floorBelow(s);
+  const go = () => {
+    if (room.cleared && !lab.on) return;
+    for (let i = 0; i < n; i++) {
+      if (bugsAlive() >= cap) { if (i === 0) { puff(new THREE.Vector3(at.x, 0.5, at.z), 0xF2E6C8, 10, 1.2, 0.5, 1.2, 0.2, 0.7); callout('just a mushroom', 1); } break; }
+      const x = at.x + (i ? rand(-1, 1) : 0), z = at.z + (i ? rand(-1, 1) : 0), b = spawnEnemy(pickBug(), x, z, { kind: s.kind });
+      bugEmerge(b, x, z);
+    }
+    SFX.pop();
+  };
+  if (s.at === 'f') go(); else s.onLand = go; // one on a wall drops off first
+}
+function lurkerSurface(e, s) {
+  shroomGone(s, 'real'); fieldSend([s.id, 'real']);
+  const at = s.at === 'f' ? { x: s.x, z: s.z } : floorBelow(s);
+  e.yaw = Math.atan2(player.pos.x - at.x, player.pos.z - at.z);
+  e.pos.set(at.x - Math.sin(e.yaw) * 0.06, 0, at.z - Math.cos(e.yaw) * 0.06); e.kbv = null; e.lev = 0; e.atk = 0;
+  mkSetKind(e, s.kind); mkPhase(e, 'emerge'); e.gr = mkGround(at.x, at.z); e.surfHp = e.hp; e.outT = 0; e.mk.prevY = null;
+  const sp = project(new THREE.Vector3(at.x, 1.4, at.z)); callout('FOUND IT', 2, sp.behind ? {} : { at: true, x: sp.x, y: sp.y }); SFX.rumble();
+}
+const lurkOut = e => Math.max(4.5, 7 - 0.4 * ((e.tier || 1) - 1));
+// the beetle's hop: wing cases open (it takes double while they are), up, over, and down on you
+function startHop(e, to) {
+  const d = new THREE.Vector3(to.x - e.pos.x, 0, to.z - e.pos.z), L = d.length(); if (L < 0.5) return; d.normalize();
+  e.hop = { t: 0, from: e.pos.clone().setY(0), to: e.pos.clone().setY(0).addScaledVector(d, Math.max(1, Math.min(L - 0.7, 5.5))) };
+  e.hop.to.x = Math.max(-W + 0.8, Math.min(W - 0.8, e.hop.to.x)); e.hop.to.z = Math.max(-D + 0.8, Math.min(D - 0.8, e.hop.to.z));
+  e.yaw = Math.atan2(d.x, d.z); e.open = 1; e.atk = 0; SFX.flutter();
+}
+function hopStep(e, sdt) {
+  const h = e.hop; h.t += sdt; const u = Math.min(1, h.t / 0.75);
+  e.pos.lerpVectors(h.from, h.to, MK.sm(u)); e.pos.y = Math.sin(Math.PI * u) * 1.1; e.fallV = 0;
+  if (u >= 1) {
+    e.pos.y = 0; e.hop = null; e.open = 0; e.cd = e.T.cooldown; mkDust(e.pos.clone().setY(0.1), 5); SFX.thud();
+    if (!netGuest()) { if (!player.down && !player.fall && cine.state === 'idle' && Math.hypot(e.pos.x - player.pos.x, e.pos.z - player.pos.z) < 1.2) hurtPlayer(1, e.pos); hurtRemotesNear(e.pos, 1.2, 1); }
+  }
+  e.look(e, sdt, false);
+}
+// true while the mimic owns this creature's frame: hiding, coming out, going under, mid-hop, or knocked down
+function mimicStep(e, sdt) {
+  if (e.type === 'lurker') {
+    if (e.ph === 'hidden') { e.hidden = true; e.root.visible = false; e.shadow.visible = false; e.stars.visible = false; return true; }
+    if (e.ph === 'emerge') {
+      e.lt += sdt;
+      if (e.lt > 0.78 && !e.fired.has('hurt')) { e.fired.add('hurt'); if (!player.down && !player.fall && Math.hypot(e.pos.x - player.pos.x, e.pos.z - player.pos.z) < 1.8) { hurtPlayer(1, e.pos); player.kb.set(player.pos.x - e.pos.x, 0, player.pos.z - e.pos.z).setLength(7); } hurtRemotesNear(e.pos, 1.8, 1); }
+      if (e.lt >= MK_DUR.lurker[0]) mkPhase(e, 'out');
+      e.look(e, sdt, false); return true;
+    }
+    if (e.ph === 'hide') {
+      e.lt += sdt;
+      if (e.lt >= MK_DUR.lurker[1]) { mkPhase(e, 'hidden'); fieldDeal(e, lab.on ? 10 : fieldCount(e.tier || floorNum)); if (e.moves && e.moves.has('quake') && !lab.on) aftershocks(e); }
+      e.look(e, sdt, false); return true;
+    }
+    e.outT = (e.outT || 0) + sdt;
+    if ((e.outT > lurkOut(e) || e.hp <= (e.surfHp || e.maxHp) - e.maxHp * 0.3) && e.atk <= 0 && e.lev <= 0 && !e.labHold) { mkPhase(e, 'hide'); e.kbv = null; return true; }
+    return false;
+  }
+  if (e.ph === 'emerge') { e.lt += sdt; if (e.lt >= MK_DUR[e.type][0]) { mkPhase(e, 'live'); if (e.type === 'beetle') { e.pos.x += Math.sin(e.yaw) * 0.3; e.pos.z += Math.cos(e.yaw) * 0.3; } } e.look(e, sdt, false); return true; }
+  if (e.hop) { hopStep(e, sdt); return true; }
+  if (e.T.hover && e.stun > 0) { e.atk = 0; e.look(e, sdt, false); return true; }
+  if (e.type === 'beetle' && e.cd <= 0 && e.lev <= 0 && !(e.stun > 0) && !(e.frozen > 0) && !e.kbv && !e.labHold && cine.state === 'idle') {
+    const tg = netTarget(e), d = Math.hypot(tg.pos.x - e.pos.x, tg.pos.z - e.pos.z);
+    if (d > 2.6 && d < 7.5 && Math.random() < sdt * 1.5) { startHop(e, tg.pos); return true; }
+  }
+  return false;
+}
+// a partner's copy: what the host says this one is doing
+function mkFromNet(e, mk) {
+  const kind = mk[0] ? 'glow' : 'doom'; if (e.type === 'lurker' && kind !== e.kind) mkSetKind(e, kind);
+  const code = mk[1] | 0, ph = e.type === 'lurker' ? ['hidden', 'emerge', 'out', 'hide'][code] : code === 1 ? 'emerge' : 'live', lt = +mk[2] || 0;
+  if (ph && ph !== e.ph) { mkPhase(e, ph); e.lt = lt; if (ph === 'emerge' && !e.gr) e.gr = mkGround(e.pos.x, e.pos.z); }
+  else if (Math.abs((e.lt || 0) - lt) > 0.35) e.lt = lt;
+  e.open = mk[3] & 1;
+}
+// in the chamber: make it come out again, on demand
+function labSurface(e) {
+  if (e.type === 'lurker') { if (e.ph === 'hidden') { const r = field.list.find(s => s.live && s.real); if (r) shroomHit(r); } return; }
+  e.hop = null; e.open = 0; bugEmerge(e, e.pos.x, e.pos.z);
+}
+// the water gun, the ladle and the bonk can all find a mushroom; this is the bonk's
+function bonkShroom(fx_, fz) {
+  let best = null, bd = 1e9;
+  for (const s of field.list) {
+    if (!s.live || s.c.y > 2.5) continue;
+    const dx = s.c.x - player.pos.x, dz = s.c.z - player.pos.z, d = Math.hypot(dx, dz);
+    if (d > BONK_REACH + 0.45 || ((dx * fx_ + dz * fz) / (d || 1) < 0.5 && d > 0.9)) continue;
+    if (d < bd) { bd = d; best = s; }
+  }
+  return best;
+}
+const mkFacing = e => { let d = Math.atan2(player.pos.x - e.pos.x, player.pos.z - e.pos.z) - e.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); return Math.abs(d) < 1.1; };
+// clear the chamber's field out completely
+function fieldWipe() { for (const s of [...field.list, ...field.gone]) dropShroomMesh(s); for (const g of field.grounds) { if (g.grp.parent) g.grp.parent.remove(g.grp); disposeTree(g.grp); } fieldReset(); }
 
 /* ================= spitter goo ================= */
 // lobbed in an arc at where you're standing, with a pulsing ring on the floor where it'll land: move and it misses
@@ -4015,7 +4773,7 @@ function knockedOut(final) {
 }
 function resetRun() {
   clearLoose(); satchel = []; potPending = []; strains = {}; seenTraits.clear(); reserve = null;
-  Object.assign(run, { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set() });
+  Object.assign(run, { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false });
   player.maxHp = 8; $('#coinNum').textContent = '0';
   { const effs = shuffle(Object.keys(EXTRAS)); ['cyclops', 'drain', 'torch', 'high'].forEach((o, i) => { originEff[o] = effs[i]; }); }
   stockUp(); hasGun = false; tool = 'ladle'; score = 0; shownScore = 0; $('#scoreNum').textContent = '0';
@@ -4034,6 +4792,7 @@ function banner(title, sub = '', tone = '') {
 const seenTraits = new Set();
 const POOL = n => n === 1 ? ['slime', 'slime', 'cyclops', 'moth'] : n === 2 ? ['slime', 'cyclops', 'spitter', 'moth', 'stump'] : ['slime', 'cyclops', 'spitter', 'moth', 'stump', 'knight'];
 function rosterFor(r) {
+  if (r.type === 'stairs' && !r.king && r.boss === 'lurker') return adaptRoster(floorNum >= 3 ? ['lurker', pick(POOL(floorNum))] : ['lurker']); // the bugs come out of the mushrooms instead
   if (r.king) return ['king', 'slime', floorNum >= 2 ? 'spitter' : 'slime'];
   let list;
   if (r.type === 'stairs') { const b = r.boss || 'chief'; list = floorNum === 1 ? [b, 'slime'] : [b, pick(POOL(floorNum)), pick(POOL(floorNum))]; }
@@ -4055,6 +4814,7 @@ function spawnRoomEnemies(r, fromDir, instant) {
   adaptedNow = null;
   const list = rosterFor(r);
   list.forEach((t, i) => { const a = (i / list.length) * Math.PI * 2, e = spawnEnemy(t, cx + Math.cos(a) * 1.4, cz + Math.sin(a) * 1.2); if (pitAt(e.pos.x, e.pos.z, 0.9)) { const sp_ = safeSpot(); e.pos.x = sp_.x; e.pos.z = sp_.z; } if (instant) e.pos.y = 0; if (e.T.immune && !seenTraits.has(t)) { seenTraits.add(t); const T_ = e.T; setTimeout(() => notice(`${T_.name.toUpperCase()}<em>${T_.immTxt}</em>`, 'bad'), 1200); } });
+  { const lk = enemies.find(e => e.type === 'lurker' && !e.dead); if (lk) fieldStart(lk); }
   if (adaptedNow && !run.adapted.has(adaptedNow)) { const why = adaptedNow; run.adapted.add(why); setTimeout(() => notice(`THEY'RE ADAPTING<em>${ADAPT_WHY[why]}</em>`, 'bad'), 2600); }
   r.fightActive = true;
 }
@@ -4850,6 +5610,7 @@ const NET_ON = {
   hit(d, m) {
     if (!net.on || !net.host || d.run !== net.run || d.rk !== rkOf(room) || !Array.isArray(d.l)) return;
     const R = net.remotes.get(m.peer), from = R ? R.pos.clone() : null;
+    if (Array.isArray(d.sh)) for (const id of d.sh.slice(0, 4)) { const s = field.list.find(o => o.id === id && o.live); if (s) shroomHit(s); }
     for (const h of d.l.slice(0, 16)) {
       const e = enemies.find(o => o.id === h.id && !o.dead); if (!e) continue;
       NBITS.forEach(k => { const v = +h[k]; if (v > 0) e[k] = Math.max(e[k] || 0, Math.min(v, 12)); });
@@ -4868,6 +5629,7 @@ const NET_ON = {
   },
   goo(d) {
     if (!netGuest() || d.run !== net.run || d.rk !== rkOf(room) || !Array.isArray(d.f) || !Array.isArray(d.t)) return;
+    if (d.k === 'field') { if (Array.isArray(d.s)) fieldSync(d.s, Array.isArray(d.pop) ? d.pop : null); return; }
     const f = new THREE.Vector3(...d.f.map(Number)), t = new THREE.Vector3(...d.t.map(Number));
     if (d.k === 'quake') quakeAt(f.x, f.z, Math.min(2, Math.max(0, t.x)), true);
     else if (d.k === 'lane') { const lane = chargeLane(f, t.normalize()); setTimeout(() => scene.remove(lane), 800); }
@@ -4910,6 +5672,7 @@ function pupStep(e, sdt) {
   for (const k of NBITS) if (e[k] > 0) e[k] = Math.max(0, e[k] - sdt);
   const n = e.np, k = 1 - Math.exp(-12 * sdt), ox = e.pos.x, oz = e.pos.z;
   if (n && n.x !== undefined) { e.pos.x += (n.x - e.pos.x) * k; e.pos.y += (n.y - e.pos.y) * k; e.pos.z += (n.z - e.pos.z) * k; let dy = n.yaw - e.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); e.yaw += dy * k; }
+  if (e.T.mimic && (e.ph === 'emerge' || e.ph === 'hide')) e.lt += sdt;
   enemyLook(e, sdt, Math.hypot(e.pos.x - ox, e.pos.z - oz) > sdt * 0.4);
 }
 function netPre(rdt) {
@@ -4929,9 +5692,9 @@ function netPre(rdt) {
     net.snapIn = null; const seen = new Set();
     for (const row of s.e) {
       if (!Array.isArray(row)) continue;
-      const [id, type, x, y, z, yaw, hp, maxHp, b, atk, slam] = row; if (!TYPES[type]) continue; seen.add(id);
+      const [id, type, x, y, z, yaw, hp, maxHp, b, atk, slam, mk] = row; if (!TYPES[type]) continue; seen.add(id);
       let e = net.pups.get(id);
-      if (!e) { if (net.deadIds.has(id)) continue; e = spawnEnemy(type, x, z); e.pup = true; e.netId = id; e.pos.set(x, y, z); e.yaw = yaw; e.np = {}; net.pups.set(id, e); }
+      if (!e) { if (net.deadIds.has(id)) continue; e = spawnEnemy(type, x, z, Array.isArray(mk) ? { kind: mk[0] ? 'glow' : 'doom' } : {}); e.pup = true; e.netId = id; e.pos.set(x, y, z); e.yaw = yaw; e.np = {}; net.pups.set(id, e); }
       if (e.dead) continue;
       Object.assign(e.np, { x, y, z, yaw }); e.maxHp = maxHp;
       if (!(playT - (e.dmgT || -9) < 0.5 && hp > e.hp)) e.hp = hp; // don't undo a hit the host hasn't heard about yet
@@ -4939,6 +5702,7 @@ function netPre(rdt) {
       e.glass = !!(b & 128); e.shrunk = !!(b & 256);
       e.atk = atk ? (e.atk > 0 ? e.atk : e.T.windup) : 0;
       if (slam && !e.slam) startSlam(e); else if (!slam && e.slam) endSlam(e);
+      if (Array.isArray(mk) && e.T.mimic) mkFromNet(e, mk);
     }
     for (const [id, e] of net.pups) if (!seen.has(id) && !e.dead) pupDie(e);
   }
@@ -5014,7 +5778,7 @@ function netFrame(rdt) {
     if (net.snapT <= 0) {
       net.snapT = 0.125;
       const list = enemies.filter(e => !e.dead).slice(0, 24).map(e => [e.id, e.type, +e.pos.x.toFixed(2), +e.pos.y.toFixed(2), +e.pos.z.toFixed(2), +e.yaw.toFixed(2), e.hp, e.maxHp,
-        NBITS.reduce((b, k, i) => b | (e[k] > 0 ? 1 << i : 0), 0) | (e.glass ? 128 : 0) | (e.shrunk ? 256 : 0), e.atk > 0 ? 1 : 0, e.slam ? 1 : 0]);
+        NBITS.reduce((b, k, i) => b | (e[k] > 0 ? 1 << i : 0), 0) | (e.glass ? 128 : 0) | (e.shrunk ? 256 : 0), e.atk > 0 ? 1 : 0, e.slam ? 1 : 0, e.T.mimic ? [e.kind === 'glow' ? 1 : 0, MK_PH[e.ph] || 0, +(e.lt || 0).toFixed(2), e.open > 0.5 ? 1 : 0] : 0]);
       netEmit('snap', { rk: rkOf(room), fl: floorNum, e: list });
     }
     const meDown = player.down || player.hp <= 0, rs = [...net.remotes.values()];
@@ -5028,7 +5792,7 @@ function fakeThrow(o, v, c) {
   m.scale.setScalar(0.17); const p = new THREE.Vector3(...o), vel = new THREE.Vector3(...v); m.position.copy(p); scene.add(m); let t = 0;
   addFx(sdt => {
     const dt = Math.min(Math.max(sdt, 1 / 120), 0.05); t += dt; vel.y -= G * dt; p.addScaledVector(vel, dt); m.position.copy(p); m.rotation.x += dt * 9;
-    const hit = p.y <= 0.05 || p.y >= H - 0.1 || Math.abs(p.x) > W - 0.3 || Math.abs(p.z) > D - 0.3 || colliders.some(cc => p.y < cc.h && Math.hypot(p.x - cc.x, p.z - cc.z) < cc.r + 0.15) || alive().some(e => p.distanceTo(centerOf(e)) < e.r * e.scale + 0.2);
+    const hit = p.y <= 0.05 || p.y >= H - 0.1 || Math.abs(p.x) > W - 0.3 || Math.abs(p.z) > D - 0.3 || colliders.some(cc => p.y < cc.h && Math.hypot(p.x - cc.x, p.z - cc.z) < cc.r + 0.15) || alive().some(e => !e.hidden && p.distanceTo(centerOf(e)) < e.r * e.scale + 0.2);
     if (!hit && t < 4) return true;
     scene.remove(m); m.material.dispose(); burst(p, col.getHex(), 18, 5, 0.8, 0.09); floorRing(p, col.getHex(), 1.6, 0.4); SFX.splash(false); return false;
   });
@@ -5036,6 +5800,7 @@ function fakeThrow(o, v, c) {
 
 // how a creature looks this frame: walk cycle, wobble, squash, wings, stars and shadow
 function enemyLook(e, sdt, moving) {
+  if (e.look) { e.look(e, sdt, moving); return; }
   e.walk += sdt * (e.stun > 0 ? 0 : e.T.hops ? 7 : moving ? 10 : 2);
   e.root.rotation.y = e.yaw + (e.lev > 0 ? Math.sin(T * 1.4 + e.id) * 0.5 : 0);
   for (const l of e.legs) l.p.rotation.x = e.lev > 0 ? Math.sin(T * 14 + l.ph) * 0.9 : Math.sin(e.walk + l.ph) * (moving ? 0.6 : 0.05);
@@ -5120,7 +5885,7 @@ function frame(now) {
         let wall = Math.abs(e.pos.x) > W - 0.85 || Math.abs(e.pos.z) > D - 0.85;
         if (!wall) for (const c of colliders) if (Math.hypot(e.pos.x - c.x, e.pos.z - c.z) < c.r + e.r * e.scale) { wall = true; break; }
         if (wall) { e.slamOK = false; e.kbv.multiplyScalar(-0.15); shake = Math.max(shake, 0.2); SFX.thud(); puff(centerOf(e), 0x8A7A6A, 6, 0.8, 0.4, 0.8, 0.25, 0.6); damage(e, 2, 'WALLED', e.pos); if (e.dead) continue; }
-        else for (const o of enemies) if (o !== e && !o.dead && Math.hypot(e.pos.x - o.pos.x, e.pos.z - o.pos.z) < e.r * e.scale + o.r * o.scale) {
+        else for (const o of enemies) if (o !== e && !o.dead && !o.hidden && Math.hypot(e.pos.x - o.pos.x, e.pos.z - o.pos.z) < e.r * e.scale + o.r * o.scale) {
           e.slamOK = false; o.kbv = e.kbv.clone().multiplyScalar(0.6); o.slamOK = true; e.kbv.multiplyScalar(0.3); SFX.thud();
           damage(o, 1, 'BOWLED', e.pos); damage(e, 1, 'BOWLED', o.pos); break;
         }
@@ -5128,7 +5893,7 @@ function frame(now) {
       e.kbv.multiplyScalar(Math.exp(-3 * sdt)); if (sp < 0.3) e.kbv = null;
       if (e.dead) continue;
     }
-    if (e.pos.y < 0.1) {
+    if (e.pos.y < 0.1 && !e.T.hover) {
       const inR = rc => e.pos.x > rc[0] && e.pos.x < rc[1] && e.pos.z > rc[2] && e.pos.z < rc[3];
       if (waterRects.some(inR) && !imm(e, 'bog')) { if (e.wet < 1.2) e.wet = 1.2; if (Math.random() < sdt * 1.2) floorRing(e.pos, 0x8FD3FF, 0.9, 0.7); }
       if (lavaRects.some(inR)) { e.wet = 0; e.burn = (e.burn || 0) + sdt; if (Math.random() < sdt * 10) burst(e.pos.clone().setY(0.2), 0xFF8A2A, 1, 1, 0.6, 0.05, -2, true); if (e.burn > 0.9) { e.burn = 0; damage(e, 1, 'MAGMA', e.pos); } }
@@ -5144,6 +5909,7 @@ function frame(now) {
       e.root.position.copy(e.pos); e.shadow.visible = false; continue;
     }
     if (room.pits && !e.T.flying && !e.T.boss && (e.kbv ? e.pos.y < 2.2 : e.lev <= 0 && e.pos.y <= 0.001) && pitAt(e.pos.x, e.pos.z, 0.55)) { e.inPit = true; e.lev = 0; e.fallV = 0; e.atk = 0; e.kbv = null; endSlam(e); continue; } // shoved over a hole, there's no floor to land on
+    if (e.T.mimic && mimicStep(e, sdt)) continue;
     if (e.charge) { const owned = bossCharge(e, sdt); if (e.dead) continue; if (owned) continue; }
     let moving = false;
     const tg = netTarget(e), tp = tg.pos;
@@ -5161,7 +5927,7 @@ function frame(now) {
     if (!grounded) { e.atk = 0; endSlam(e); }
     else if (e.atk > 0) { e.atk -= sdt; if (e.atk <= 0) { e.atk = 0; e.lungeT = 0.3; e.cd = e.T.cooldown * bossCd(e); if (canHit) { if (e.slam) slamHit(e); else if (e.T.ranged) spitGoo(e, 0, tp); else if (pd < reach + 0.6) { if (tg.local) hurtPlayer(e.T.dmg, e); else netHurt(tg, e.T.dmg, e.pos); } } endSlam(e); } }
     else if (canHit && e.cd <= 0 && pd < reach + (e.T.ranged ? 2.5 : e.T.boss ? 1.2 : 0)) {
-      if (e.T.boss && (e.swings = (e.swings || 0) + 1) % 3 === 0) startSlam(e); else e.atk = e.T.windup;
+      if (e.T.boss && !e.T.mimic && (e.swings = (e.swings || 0) + 1) % 3 === 0) startSlam(e); else e.atk = e.T.windup;
     }
     else if (canHit && e.cd <= 0 && e.moves && e.moves.has('charge') && pd > 3.4 && pd < 12 && Math.random() < sdt * 0.9) startCharge(e, tp); // learned moves, for when you keep your distance
     else if (canHit && e.cd <= 0 && e.moves && e.moves.has('toss') && pd > reach + 2.2 && Math.random() < sdt * 1.4) { throwRock(e, tp); e.cd = e.T.cooldown * bossCd(e); }
@@ -5171,7 +5937,7 @@ function frame(now) {
     if (e.T.king && !e.clone) for (const [k, f] of [['sum1', 0.6], ['sum2', 0.3]]) if (!e[k] && e.hp <= e.maxHp * f) { e[k] = true; kingSummon(e); }
     if (e.lungeT > 0) e.lungeT = Math.max(0, e.lungeT - sdt);
     if (e.dead) continue;
-    for (const o of enemies) if (o !== e && !o.dead) { const dx = e.pos.x - o.pos.x, dz = e.pos.z - o.pos.z, d = Math.hypot(dx, dz), min = (e.r * e.scale + o.r * o.scale); if (d < min && d > 0.001) { const push = (min - d) * 0.5; e.pos.x += dx / d * push; e.pos.z += dz / d * push; } }
+    for (const o of enemies) if (o !== e && !o.dead && !o.hidden) { const dx = e.pos.x - o.pos.x, dz = e.pos.z - o.pos.z, d = Math.hypot(dx, dz), min = (e.r * e.scale + o.r * o.scale); if (d < min && d > 0.001) { const push = (min - d) * 0.5; e.pos.x += dx / d * push; e.pos.z += dz / d * push; } }
     for (const c of colliders) { const dx = e.pos.x - c.x, dz = e.pos.z - c.z, d = Math.hypot(dx, dz), rr = c.r + e.r * e.scale; if (d < rr && d > 0.001) { e.pos.x = c.x + dx / d * rr; e.pos.z = c.z + dz / d * rr; } }
     for (const q of tg.local ? [player.pos] : [player.pos, tp]) { const dx = e.pos.x - q.x, dz = e.pos.z - q.z, d = Math.hypot(dx, dz), rr = e.r * e.scale + 0.75; if (d < rr && d > 0.001 && e.pos.y < 1) { e.pos.x = q.x + dx / d * rr; e.pos.z = q.z + dz / d * rr; } } // personal space: they swing from arm's length, not from inside the camera
     e.pos.x = Math.max(-W + 0.8, Math.min(W - 0.8, e.pos.x)); e.pos.z = Math.max(-D + 0.8, Math.min(D - 0.8, e.pos.z));
@@ -5185,7 +5951,7 @@ function frame(now) {
   // projectile (sub-stepped so slow-mo and fast frames agree)
   if (blob) { let rem = sdt; while (rem > 0 && blob) { const st = Math.min(rem, 1 / 120); rem -= st; stepBlob(st); } }
   updateGun(paused ? 0 : rdt, sdt);
-  updatePickups(sdt); updateGoos(sdt); updateCoins(sdt); updateShop(sdt); updateXBrick(); updateTraps(sdt); updateDen(sdt);
+  updatePickups(sdt); updateGoos(sdt); fieldTick(sdt); updateCoins(sdt); updateShop(sdt); updateXBrick(); updateTraps(sdt); updateDen(sdt);
   for (const e of enemies) if (e.slamRing) { e.slamRing.scale.setScalar(SLAM_R * (0.92 + 0.08 * Math.sin(T * 14))); e.slamRing.material.opacity = 0.5 + 0.4 * (1 - e.atk / 1.7); }
   if (!paused) updateInteract(rdt); else { $('#prompt').hidden = true; $('#actBtn').hidden = true; }
 
@@ -5279,6 +6045,7 @@ function frame(now) {
   // overlay: labels, power ring, tank, score
   for (const e of enemies) {
     if (e.dead) continue;
+    if (e.hidden) { e.label.style.display = 'none'; continue; }
     const s = project(new THREE.Vector3(e.pos.x, e.pos.y + e.h * e.scale + 0.35, e.pos.z));
     const chips = [e.wet > 0 && '<span class="chip wet">wet</span>', e.lev > 0 && '<span class="chip float">float</span>', e.glow > 0 && '<span class="chip glow">glow</span>', e.glass && '<span class="chip glass">glass</span>', e.stun > 0 && '<span class="chip daze">dazed</span>', e.frozen > 0 && '<span class="chip ice">ice</span>', e.fire > 0 && '<span class="chip burn">fire</span>', e.chill > 0 && !(e.frozen > 0) && '<span class="chip cold">cold</span>', e.atk > 0 && '<span class="chip atk">!</span>', e.T.immune && `<span class="chip imm">${svg(e.T.immune[0])}</span>`].filter(Boolean).join('');
     const html = (e.T.boss ? '' : `<div class="pips">${Array.from({ length: e.maxHp }, (_, i) => `<i class="pip ${i < e.hp ? '' : 'e'}"></i>`).join('')}</div>`) + (chips ? `<div class="chips">${chips}</div>` : '') + '<i class="arrow"></i>'; // bosses get the bar at the bottom instead
