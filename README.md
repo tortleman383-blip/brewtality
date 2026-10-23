@@ -22,7 +22,7 @@ A first-person dungeon crawler where you brew potions and fling them at things w
 
 ## Bosses
 
-Each floor's stairs are guarded by a boss picked at random, and bosses learn new moves the deeper you find them.
+Each floor's stairs are guarded by a boss picked at random, and bosses learn new moves the deeper you find them. The whole floor dresses for whoever's waiting at the bottom: the Lurker's floors are overgrown cells and dripping grottos, and you fight it in a cave.
 
 The **Lurker** hides as one mushroom in a room full of them, on the floor, the walls and the ceiling. Hit the real one and it bursts out of the floor and chases you for a few seconds before burrowing and reshuffling the lot. Hit a wrong one and a bug comes out instead: Rootskitters from floor 1, Capbeetles from floor 2, Mantishrooms from floor 3 and Lampcaps from floor 4. The real one's tell is two spots that blink like clockwork on a doom shroom, or a ring of teeth clenching in the dirt round a glowcap.
 
@@ -46,4 +46,4 @@ For two devices on the same network without the connection server (a phone hotsp
 
 No webcam? **COPY MY CODE** and paste it on the other device instead.
 
-Everyone shares the floors, doors and enemies; hearts, coins, brews and loot are your own. If you go down, a partner clearing the room gets you back up. Connections are peer to peer through the free PeerJS service.
+Everyone shares the floors, doors and enemies; hearts, coins, brews and loot are your own. Bonk a partner and they're squished flat for two seconds. It doesn't hurt. If you go down, a partner clearing the room gets you back up. Connections are peer to peer through the free PeerJS service.

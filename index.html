@@ -712,6 +712,8 @@ const SFX = {
   thud() { if (!live()) return; osc('sine', 140, 40, AC.currentTime, 0.22, 0.5); },
   bonk(big) { if (!live()) return; const t = AC.currentTime; osc('sine', big ? 700 : 900, 160, t, big ? 0.2 : 0.13, 0.4); osc('triangle', 1900, 500, t, 0.05, 0.12); noiseBurst('lowpass', 1400, 300, 1, t, 0.06, 0.3); },
   whiff() { if (!live()) return; noiseBurst('bandpass', 1400, 500, 1.8, AC.currentTime, 0.13, 0.14); },
+  squish() { if (!live()) return; const t = AC.currentTime; noiseBurst('lowpass', 1100, 140, 1.4, t, 0.24, 0.4); osc('sine', 280, 60, t, 0.28, 0.28); osc('square', 140, 70, t + 0.02, 0.1, 0.04); },
+  boing() { if (!live()) return; const t = AC.currentTime; osc('sine', 170, 560, t, 0.3, 0.22); osc('sine', 340, 1100, t + 0.03, 0.2, 0.05); osc('triangle', 560, 260, t + 0.22, 0.16, 0.06); },
   ding() { if (!live()) return; const t = AC.currentTime; osc('sine', 1320, null, t, 0.18, 0.1); osc('sine', 1980, null, t + 0.03, 0.2, 0.07); },
   charge() { if (!live()) return; const t = AC.currentTime; osc('sawtooth', 120, 900, t, 0.45, 0.12); noiseBurst('highpass', 500, 5000, 1, t, 0.45, 0.15); },
   scrape() { if (!live()) return; noiseBurst('bandpass', rand(1800, 3200), rand(900, 1600), 3, AC.currentTime, 0.07, 0.3); },
@@ -843,16 +845,38 @@ const THEMES = {
     name: 'Test Chamber', stone: [0xC9CDD3, 0xC1C5CC, 0xD3D7DD, 0xB8BCC4], floor: [0x8E949C, 0x878D95, 0x959BA3], trim: 0x3A3E46, beam: 0x4A4E56, ceil: 0x2C3038,
     fog: 0x14181C, hemi: [0xE0ECF8, 0x3A4048, 0.78], torch: 0xCFE8FF, accent: [0xBFE6FF, 0, 4.6, 0], pillars: [], spots: [], lab: true,
   },
+  mossy: {
+    name: 'Overgrown Cells', stone: [0x444C3E, 0x3D4538, 0x4C5645, 0x373F33], floor: [0x323A2C, 0x2D3428, 0x374031], trim: 0x3E3426, beam: 0x3A2A1A, ceil: 0x11170F,
+    fog: 0x09100A, hemi: [0x86AE7C, 0x1E2614, 0.62], torch: 0xFFB866, accent: [0x9AE86A, 0, 1.0, -4], pillars: [[-4.6, -2.6], [4.6, -2.6]], moss: 1, roots: true,
+    spots: [{ kind: 'glowcap', origin: 'drain', wall: 'W', along: 5.8, y: 1.25 }, { kind: 'frost', origin: 'high', wall: 'N', along: 4.8, y: 2.6 }, { kind: 'doom', origin: 'torch', wall: 'E', along: -3.6, y: 1.1 }],
+  },
+  grotto: {
+    name: 'Dripping Grotto', stone: [0x4A4740, 0x433F39, 0x534F47, 0x3D3A34], floor: [0x35322B, 0x302D27, 0x3A362F], trim: 0x4E3822, beam: 0x3A2A1A, ceil: 0x16140F,
+    fog: 0x0A0B09, hemi: [0x8AA494, 0x22201A, 0.64], torch: 0xFFAE5A, accent: [0x5FE0C8, -4.6, 1.0, -5.4], pillars: [[3.8, -4.2], [-4.2, 3.6]], cave: true, moss: 0.5, roots: true,
+    water: [[-7.2, -2.0, -8.2, -2.8]], tip: 'Anything standing in the pool is wet',
+    spots: [{ kind: 'glowcap', origin: 'drain', wall: 'E', along: 5.8, y: 1.25 }, { kind: 'frost', origin: 'high', wall: 'S', along: -4.8, y: 2.6 }, { kind: 'doom', origin: 'torch', wall: 'W', along: 3.6, y: 1.1 }],
+  },
+  hollow: {
+    name: 'The Hollow', stone: [0x3F4539, 0x393F34, 0x474D40, 0x34392F], floor: [0x30352A, 0x2B3025, 0x353B2D], trim: 0x4E3822, beam: 0x3A2A1A, ceil: 0x10130D,
+    fog: 0x070C08, hemi: [0x84B48E, 0x1A2214, 0.62], torch: 0xFFB060, accent: [0x7CFFB0, 0, 4.4, 0], pillars: [[-5.6, -6.0], [5.6, 5.4]], cave: true, moss: 1.4, roots: true, glow: true,
+    spots: [{ kind: 'frost', origin: 'high', wall: 'N', along: -4.8, y: 2.6 }, { kind: 'frost', origin: 'drain', wall: 'S', along: 5.2, y: 1.25 }],
+  },
   den: {
     name: 'Gambling Den', stone: [0x3E3A2E, 0x38342A, 0x464034, 0x332F26], floor: [0x2E3A2A, 0x293426, 0x334030], trim: 0x6A4A2A, beam: 0x3A2A1A, ceil: 0x14120C,
     fog: 0x0C0E08, hemi: [0xC8B878, 0x1E2410, 0.65], torch: 0xFFB050, accent: [0x9AFFB0, 0, 2.4, 0], pillars: [], spots: [],
   },
 };
 const CRATES = [[-6.8, 7.6, 1], [-5.8, 7.9, 0.75], [6.9, -7.8, 1.1], [6.95, -6.6, 0.8]], COIN_PILES = [[-1.3, -5.9], [1.4, -5.7], [-0.9, -4.7]];
-const FIGHT_THEMES = ['crypt', 'cistern', 'forge'];
+// each floor takes its look from the boss waiting at the bottom of it
+const BIOMES = {
+  chief: { name: 'THE OLD DUNGEON', fight: ['crypt', 'cistern', 'forge'], start: 'crypt', boss: ['crypt', 'forge'] },
+  king: { name: 'THE KING\'S FORGE', fight: ['forge', 'crypt', 'forge', 'cistern'], start: 'crypt', boss: ['forge'] },
+  lurker: { name: 'THE MOSSY HOLLOWS', fight: ['mossy', 'grotto', 'mossy', 'grotto'], start: 'mossy', boss: ['hollow'] },
+};
+let floorBiome = BIOMES.chief;
 const keyXY = (x, y) => x + ',' + y;
 let floorNum = 1, floorMap = new Map(), room = null;
-function genFloor(n) { return withSeed(net.on ? (net.seed + n * 9973) | 0 : null, () => genFloorRaw(n)); }
+function genFloor(n) { const f = withSeed(net.on ? (net.seed + n * 9973) | 0 : null, () => genFloorRaw(n)); floorBiome = f.biome; return f; }
 function genFloorRaw(n) {
   const map = new Map();
   const add = (x, y, type) => { const r = { x, y, type, theme: 'crypt', n: {}, visited: false, cleared: false, caps: [], chestOpen: false, fountainUsed: false, fightActive: false }; map.set(keyXY(x, y), r); return r; };
@@ -874,24 +898,26 @@ function genFloorRaw(n) {
   const treasure = deadEnds[0] || rest[0]; treasure.type = 'treasure';
   const left = rest.filter(r => r !== treasure);
   const garden = deadEnds.find(r => r !== treasure) || left[left.length - 1]; if (garden) garden.type = 'garden';
-  let ti = Math.floor(Math.random() * 3);
+  const top = [...map.values()].find(r => r.type === 'stairs'); top.king = n % FINAL_FLOOR === 0; top.boss = top.king ? 'king' : pickBoss(n);
+  const bio = BIOMES[top.boss] || BIOMES.chief; // the boss is picked first, so the whole floor can dress for it
+  let ti = Math.floor(Math.random() * bio.fight.length);
   for (const r of map.values()) {
     r.king = r.type === 'stairs' && n % FINAL_FLOOR === 0;
-    if (r.type === 'stairs') r.boss = r.king ? 'king' : pickBoss(n);
-    r.theme = r.type === 'garden' ? 'garden' : r.type === 'treasure' ? 'vault' : r.type === 'stairs' ? (r.king ? 'forge' : pick(['forge', 'crypt'])) : r.type === 'start' && n === 1 ? 'crypt' : FIGHT_THEMES[ti++ % 3];
+    r.theme = r.type === 'garden' ? 'garden' : r.type === 'treasure' ? 'vault' : r.type === 'stairs' ? pick(bio.boss) : r.type === 'start' && n === 1 ? bio.start : bio.fight[ti++ % bio.fight.length];
+    r.dseed = 1 + Math.floor(Math.random() * 2147483000); // the room's rocks and moss come out the same on every visit, and on every partner's screen
     r.caps = THEMES[r.theme].spots.map(() => Math.random() < (r.type === 'garden' ? 0.5 : 0.22) ? 1 : 0); r.depth = dist.get(r) || 0; // most walls are bare now; a cap is a find
     if (r.type === 'stairs') { const inDir = Object.keys(r.n).find(d => r.n[d]), free = ['N', 'S', 'W', 'E'].filter(d => !r.n[d]); r.shopDir = inDir && free.includes(DIRS[inDir].opp) ? DIRS[inDir].opp : pick(free); }
   }
   // some fight rooms get a trap: holes in the floor, spike tiles, or dart turrets on the walls
   for (const r of map.values()) if (r.type === 'fight' && Math.random() < (n === 1 ? 0.3 : 0.45)) {
-    const th = THEMES[r.theme]; r.trap = pick(r.theme === 'cistern' ? ['spikes', 'turrets'] : ['pits', 'spikes', 'turrets']);
+    const th = THEMES[r.theme]; r.trap = pick(th.water ? ['spikes', 'turrets'] : ['pits', 'spikes', 'turrets']);
     if (r.trap === 'pits') r.pits = trapTiles(r, 3 + Math.floor(Math.random() * 2), th, true);
     else if (r.trap === 'spikes') r.spikes = trapTiles(r, 6, th, false);
     else r.turrets = turretSlots(r);
   }
   // half the floors hide an X on one floor tile; pressing it opens a secret room somewhere else
   if (Math.random() < 0.5) {
-    const hosts = [...map.values()].filter(r => ['fight', 'garden', 'treasure'].includes(r.type) && r.theme !== 'cistern'), host = hosts.length ? pick(hosts) : null;
+    const hosts = [...map.values()].filter(r => ['fight', 'garden', 'treasure'].includes(r.type) && !THEMES[r.theme].water), host = hosts.length ? pick(hosts) : null;
     if (host) {
       const th = THEMES[host.theme], traps = [...(host.pits || []), ...(host.spikes || [])];
       // never under or beside anything: pillars, crates, the fountain, the chest and its coins, or a trap
@@ -903,7 +929,7 @@ function genFloorRaw(n) {
       }
     }
   }
-  return { map, start };
+  return { map, start, biome: bio };
 }
 const needsFight = r => (r.type === 'start' || r.type === 'fight' || r.type === 'stairs') && !r.cleared;
 const where = () => room ? `F${floorNum} · ${THEMES[room.theme].name}` : '';
@@ -916,6 +942,7 @@ const fxLight = new THREE.PointLight(0x9FDCFF, 0, 10, 2); fxLight.position.set(0
 
 let roomGroup = null, colliders = [], doors = [], harvestables = [], flames = [], drips = [], waterRects = [], lavaRects = [], waterMats = [], lavaMats = [];
 let roomChest = null, fountainSpot = null, trapdoor = null;
+let wallBusy = [], floorBusy = [], ceilBusy = []; // torches, pipes, crates, beams, stalactites: things a mushroom mustn't grow through
 function buildChest(open) {
   const g = new THREE.Group(), lid = new THREE.Group(), gold = M(0xD9B44A, { metalness: 0.5, roughness: 0.4 });
   const wood = M(0x8A5A30), lining = M(0x4E2E18), seam = M(0x2E1A0C), velvet = M(0x7A1E34, { roughness: 1 });
@@ -1003,8 +1030,9 @@ function buildRoom(r) {
     return parts;
   };
   waterRects = th.water || []; lavaRects = (th.lava || []).flatMap(dryDoors); doors = []; harvestables = []; flames = []; drips = []; waterMats = []; lavaMats = [];
-  roomChest = null; fountainSpot = null; trapdoor = null; xBrick = null;
+  roomChest = null; fountainSpot = null; trapdoor = null; xBrick = null; wallBusy = []; floorBusy = []; ceilBusy = [];
   // everything static goes into one vertex-coloured mesh
+  const keepRand = Math.random; if (r.dseed) Math.random = mulberry(r.dseed);
   let xCol = null;
   const pos = [], col = [], plugBricks = [], up = new THREE.BoxGeometry(1, 1, 1).toNonIndexed().attributes.position;
   const mtx = new THREE.Matrix4(), v = new THREE.Vector3(), c = new THREE.Color(), q = new THREE.Quaternion(), eu = new THREE.Euler();
@@ -1014,13 +1042,35 @@ function buildRoom(r) {
     for (let i = 0; i < up.count; i++) { v.fromBufferAttribute(up, i).applyMatrix4(mtx); pos.push(v.x, v.y, v.z); col.push(c.r, c.g, c.b); }
   };
   const addW = (dir, along, out, y, sAlong, sy, sOut, hex) => { const [x, z] = wallXZ(dir, along, out); if (dir === 'N' || dir === 'S') add(x, y, z, sAlong, sy, sOut, hex); else add(x, y, z, sOut, sy, sAlong, hex); };
+  const glow = [[], []], lumpP = (GEO.ico0.index ? GEO.ico0.toNonIndexed() : GEO.ico0).attributes.position, coneP = new THREE.ConeGeometry(1, 1, 5).toNonIndexed().attributes.position;
+  const addG = (gp, x, y, z, sx, sy, sz, hex, rx = 0, ry = 0, rz = 0, into = null) => { // ry turns it first, so on a wall rz spins it flat against the stone
+    mtx.compose(new THREE.Vector3(x, y, z), q.setFromEuler(eu.set(rx, ry, rz, 'YXZ')), new THREE.Vector3(sx, sy, sz));
+    c.set(hex).offsetHSL(0, 0, rand(-0.035, 0.035)); const P = into ? into[0] : pos, C = into ? into[1] : col;
+    for (let i = 0; i < gp.count; i++) { v.fromBufferAttribute(gp, i).applyMatrix4(mtx); P.push(v.x, v.y, v.z); C.push(c.r, c.g, c.b); }
+  };
+  const wallLen = dir => dir === 'N' || dir === 'S' ? W : D;
+  const doorish = (dir, al, pad) => (r.n[dir] && Math.abs(al) < DOOR_HALF + 0.6 + pad) || (r.shopDir === dir && Math.abs(al) < 3.6 + pad);
+  const busyCeil = (x, z, pad) => ceilBusy.some(b => x > b.x0 - pad && x < b.x1 + pad && z > b.z0 - pad && z < b.z1 + pad);
+  // a cave: heaped boulders over a dark backing. None stands proud of the wall line, so nothing on the wall sinks into them
+  const caveWall = (dir, L, gap) => {
+    const shop = dir === r.shopDir, hole = gap ? 1.8 : shop ? 3.6 : 0, top = gap ? 3.7 : shop ? 3.25 : 0, bk = shop ? 3.3 : hole;
+    const back = (a, b, y0, y1) => { if (b - a > 0.05) addW(dir, (a + b) / 2, 1.25, (y0 + y1) / 2, b - a, y1 - y0, 0.2, 0x12110D); };
+    if (hole) { back(-L - 1.2, -bk, 0, H); back(bk, L + 1.2, 0, H); back(-bk, bk, top + 0.1, H); } else back(-L - 1.2, L + 1.2, 0, H);
+    for (let y = 0.3; y < H + 0.2; y += 0.78) for (let al = -L - 0.7 + rand(0, 0.6); al < L + 0.8; al += rand(0.9, 1.3)) {
+      const sA = rand(0.5, 0.78), sY = rand(0.42, 0.6), sO = rand(0.4, 0.7), yy = y + rand(-0.12, 0.12);
+      if (hole && Math.abs(al) - sA * 0.85 < hole && yy - sY * 0.85 < top) continue;
+      const [x, z] = wallXZ(dir, al, sO + 0.04); addG(lumpP, x, yy, z, sA, sY, sO, pick(th.stone), rand(-0.1, 0.1), WALL_RY[dir], rand(0, 6.3));
+    }
+    for (let al = -L + 0.2; al < L; al += rand(1.0, 1.5)) { const [x, z] = wallXZ(dir, al, 0.15); addG(lumpP, x, H - 0.05, z, rand(0.6, 0.9), rand(0.35, 0.5), 0.5, pick(th.stone), rand(-0.2, 0.2), WALL_RY[dir], rand(0, 6.3)); } // the roof curls down into the walls
+  };
   // bricks stop inside the door posts, so their cut ends never share a face with the frame
   const CUT = DOOR_HALF + 0.3;
   const cut = (a, b) => { const o = []; if (a < -CUT) o.push([a, Math.min(b, -CUT)]); if (b > CUT) o.push([Math.max(a, CUT), b]); return o; };
   for (let x = -W + 1; x <= W - 1; x += 2) for (let z = -D + 1; z <= D - 1; z += 2) {
     if ((r.type === 'stairs' && x === STAIRS.x && z === STAIRS.z) || (r.pits && r.pits.some(p => p.x === x && p.z === z))) continue; // holes
     const isX = r.xTile && r.xTile.x === x && r.xTile.z === z, level = isX || (r.spikes && r.spikes.some(t => t.x === x && t.z === z));
-    add(x, -0.1 + (level ? 0 : rand(-0.025, 0.025)), z, 1.94, 0.2, 1.94, pick(th.floor)); // the X and spike tiles sit dead level
+    if (th.cave && !level) add(x + rand(-0.03, 0.03), -0.1 + rand(-0.035, 0.03), z + rand(-0.03, 0.03), rand(1.88, 1.96), 0.2, rand(1.88, 1.96), pick(th.floor), rand(-0.04, 0.04));
+    else add(x, -0.1 + (level ? 0 : rand(-0.025, 0.025)), z, 1.94, 0.2, 1.94, pick(th.floor)); // the X and spike tiles sit dead level
     if (isX) xCol = c.clone();
   }
   for (const dir of ['N', 'S', 'W', 'E']) {
@@ -1028,6 +1078,7 @@ function buildRoom(r) {
     for (let row = 0; row < 7; row++) {
       const y = row * 0.8 + 0.4, off = row % 2 ? 0.8 : 0;
       for (let cc = -L - 0.8 + off; cc < L + 0.9; cc += 1.6) {
+        if (th.cave && !(dir === r.shopDir && row < 4 && Math.abs(cc) < 4.2)) continue;
         const segs = gap && row < 4 ? cut(cc - 0.775, cc + 0.775) : [[cc - 0.775, cc + 0.775]];
         for (const [a, b] of segs) if (b - a > 0.04) {
           const out = 0.3 + rand(-0.07, 0.07), hex = pick(th.stone);
@@ -1036,6 +1087,7 @@ function buildRoom(r) {
         }
       }
     }
+    if (th.cave) caveWall(dir, L, gap);
     if (gap) { // door frame, then a short dark corridor beyond it. No two faces share a plane, or they flicker
       for (const s of [-1, 1]) addW(dir, s * (DOOR_HALF + 0.22), 0.1, 1.7, 0.44, 3.4, 1.2, th.trim);   // posts: out -0.5..0.7, past the bricks' back
       addW(dir, 0, 0.09, 3.42, DOOR_HALF * 2 + 1.04, 0.44, 1.3, th.trim);                             // lintel: out -0.56..0.74, wider and proud of the posts
@@ -1054,10 +1106,70 @@ function buildRoom(r) {
     addW(sd, 0, 2.6, 1.75, 6.4, 3.5, 0.2, 0x1A1418);
     if (r.shop) for (let i = 0; i < 9; i++) { const k = rand(0.22, 0.5), [x, z] = wallXZ(sd, rand(-2.5, 2.5), rand(-1.0, -0.2)); add(x, k / 2, z, k * 1.6, k, k, pick(th.stone), rand(0, Math.PI)); }
   }
-  for (let z = -D + 1.5; z < D; z += 3) add(0, H - 0.2, z, W * 2, 0.35, 0.4, th.beam);
-  for (const [px, pz] of th.pillars) { add(px, 0.2, pz, 1.7, 0.4, 1.7, th.trim); add(px, H - 0.2, pz, 1.6, 0.4, 1.6, th.trim); }
-  if (th.crates) for (const [x, z, s] of CRATES) add(x, s / 2, z, s, s, s, 0x7A5432, rand(-0.3, 0.3));
-  for (const sp of th.spots) if (sp.origin === 'drain') {
+  if (!th.cave) for (let z = -D + 1.5; z < D; z += 3) { add(0, H - 0.2, z, W * 2, 0.35, 0.4, th.beam); ceilBusy.push({ x0: -W, x1: W, z0: z - 0.2, z1: z + 0.2 }); }
+  if (!th.cave) for (const [px, pz] of th.pillars) { add(px, 0.2, pz, 1.7, 0.4, 1.7, th.trim); add(px, H - 0.2, pz, 1.6, 0.4, 1.6, th.trim); }
+  else for (const [px, pz] of th.pillars) { // a stalactite and a stalagmite that met in the middle
+    const lg = new THREE.LatheGeometry([[1.0, -0.05], [0.78, 0.45], [0.56, 1.2], [0.42, 2.1], [0.36, 2.7], [0.42, 3.3], [0.58, 4.2], [0.82, 4.95], [1.05, H + 0.05]].map(([rr, y]) => new THREE.Vector2(rr * rand(0.9, 1.08), y)), 7).toNonIndexed();
+    addG(lg.attributes.position, px, 0, pz, 1, 1, 1, th.stone[2], 0, rand(0, 6.3), 0); lg.dispose();
+    for (let i = 0; i < 3; i++) { const a = rand(0, 6.3); addG(lumpP, px + Math.cos(a) * 0.82, 0.1, pz + Math.sin(a) * 0.82, rand(0.25, 0.34), rand(0.16, 0.26), rand(0.25, 0.34), pick(th.stone), 0, a, 0); }
+  }
+  if (th.crates) for (const [x, z, s] of CRATES) { add(x, s / 2, z, s, s, s, 0x7A5432, rand(-0.3, 0.3)); floorBusy.push({ x0: x - s * 0.7, x1: x + s * 0.7, z0: z - s * 0.7, z1: z + s * 0.7 }); }
+  if (th.cave) {
+    for (let x = -W - 0.4; x < W + 0.8; x += 1.25) for (let z = -D - 0.4; z < D + 0.8; z += 1.25) // the roof is rock all over, and no lump hangs lower than a mushroom can grip
+      addG(lumpP, x + rand(-0.3, 0.3), H + 0.14, z + rand(-0.3, 0.3), rand(0.75, 1.05), rand(0.22, 0.32), rand(0.75, 1.05), pick(th.stone), 0, rand(0, 6.3), 0);
+    for (let i = 0, n = th.glow ? 16 : 10; i < n; i++) { // stalactites, each with a lump where it leaves the roof
+      const x = rand(-W + 0.8, W - 0.8), z = rand(-D + 0.8, D - 0.8), rr = rand(0.12, 0.3), len = rand(0.4, 1.3);
+      if (busyCeil(x, z, 0.5)) continue;
+      addG(coneP, x, H - len / 2 + 0.02, z, rr, len, rr, pick(th.stone), Math.PI, rand(0, 6.3), 0);
+      addG(lumpP, x, H + 0.02, z, rr * 2.2, 0.16, rr * 2.2, pick(th.stone), 0, rand(0, 6.3), 0);
+      ceilBusy.push({ x0: x - rr, x1: x + rr, z0: z - rr, z1: z + rr });
+    }
+    for (const dir of ['N', 'S', 'W', 'E']) for (let i = 0; i < 3; i++) { // stubby stalagmites along the foot of the wall
+      const L = wallLen(dir), al = rand(-L + 1, L - 1); if (doorish(dir, al, 0.6) || th.spots.some(sp => sp.wall === dir && sp.origin === 'drain' && Math.abs(sp.along - al) < 1.6)) continue;
+      const [x, z] = wallXZ(dir, al, -rand(0.3, 0.55)), rr = rand(0.12, 0.26), hh = rand(0.35, 0.85);
+      addG(coneP, x, hh / 2, z, rr, hh, rr, pick(th.stone), 0, rand(0, 6.3), 0); colliders.push({ x, z, r: rr, h: hh });
+    }
+  }
+  if (th.moss) {
+    const greens = [0x3E5A2E, 0x4A6A34, 0x35502A, 0x56763A], wallOut = th.cave ? -0.02 : -0.08;
+    for (const dir of ['N', 'S', 'W', 'E']) {
+      const L = wallLen(dir);
+      for (let i = 0, n = Math.round(5 * th.moss); i < n; i++) { // creeping up from the floor
+        const al = rand(-L + 0.4, L - 0.4), w = rand(0.5, 1.3), h = rand(0.3, 0.9); if (doorish(dir, al, w / 2)) continue;
+        const [x, z] = wallXZ(dir, al, wallOut); addG(lumpP, x, h * 0.3, z, w, h, 0.09, pick(greens), 0, WALL_RY[dir], rand(-0.25, 0.25));
+      }
+      for (let i = 0, n = Math.round(3 * th.moss); i < n; i++) { // and hanging off the top
+        const al = rand(-L + 0.4, L - 0.4), w = rand(0.6, 1.4), h = rand(0.4, 1.1);
+        const [x, z] = wallXZ(dir, al, wallOut); addG(lumpP, x, H - h * 0.3, z, w, h, 0.09, pick(greens), 0, WALL_RY[dir], rand(-0.25, 0.25));
+      }
+    }
+    const near = (list, x, z, pad) => (list || []).some(t => Math.abs(x - t.x) < 1 + pad && Math.abs(z - t.z) < 1 + pad);
+    for (let i = 0, n = Math.round(9 * th.moss); i < n; i++) { // carpets of it on the floor, mostly round the edges
+      let x = rand(-W + 1, W - 1), z = rand(-D + 1, D - 1); const sz = rand(0.45, 1.2);
+      if (Math.random() < 0.6) { if (Math.random() < 0.5) x = Math.sign(x || 1) * rand(W - 1.4, W - 0.3); else z = Math.sign(z || 1) * rand(D - 1.4, D - 0.3); }
+      if ((r.xTile && near([r.xTile], x, z, sz)) || near(r.spikes, x, z, sz) || near(r.pits, x, z, sz) || (r.type === 'stairs' && near([STAIRS], x, z, sz + 0.2))) continue;
+      if ((r.type === 'start' && floorNum === 1 && Math.abs(x) < 3 + sz && Math.abs(z - 2.4) < 1.5 + sz) || waterRects.some(rc => x > rc[0] - sz && x < rc[1] + sz && z > rc[2] - sz && z < rc[3] + sz)) continue;
+      addG(lumpP, x, 0.02, z, sz, 0.035, sz * rand(0.55, 1), pick(greens), 0, rand(0, 6.3), 0);
+    }
+  }
+  if (th.roots) { // roots that found their way through the roof
+    const rootHex = [0x5A4430, 0x6E5236, 0x4A3826];
+    const dangle = (x, y, z, len) => { const pts = [[x, y, z]]; let px = x, pz = z; for (let k = 1; k <= 3; k++) { px += rand(-0.12, 0.12); pz += rand(-0.12, 0.12); pts.push([px, y - len * k / 3, pz]); } const tg = hornGeo(pts, rand(0.03, 0.05), 0.006, 6, 4).toNonIndexed(); addG(tg.attributes.position, 0, 0, 0, 1, 1, 1, pick(rootHex)); tg.dispose(); };
+    if (th.cave) for (let i = 0; i < (th.glow ? 14 : 8); i++) { const x = rand(-W + 1, W - 1), z = rand(-D + 1, D - 1); if (busyCeil(x, z, 0.3)) continue; dangle(x, H + 0.05, z, rand(0.6, 1.8)); ceilBusy.push({ x0: x - 0.25, x1: x + 0.25, z0: z - 0.25, z1: z + 0.25 }); }
+    else for (let z = -D + 1.5; z < D; z += 3) for (let i = 0; i < 2; i++) dangle(rand(-W + 1, W - 1), H - 0.36, z + rand(-0.12, 0.12), rand(0.5, 1.5));
+  }
+  if (th.glow) { // patches of glowing moss, low on the walls and along the foot of them
+    const glows = [0x7CFFB0, 0x5FF2D6, 0xB4FF8A];
+    for (let p = 0; p < 12; p++) {
+      const dir = pick(['N', 'S', 'W', 'E']), L = wallLen(dir), al = rand(-L + 0.8, L - 0.8), onWall = Math.random() < 0.6, hex = pick(glows); if (doorish(dir, al, 0.6)) continue;
+      for (let i = 0; i < 7; i++) {
+        const a2 = al + rand(-0.5, 0.5), sz = rand(0.025, 0.06);
+        if (onWall) { const [x, z] = wallXZ(dir, a2, -0.05); addG(lumpP, x, rand(0.1, 1.0), z, sz, sz, sz, hex, 0, rand(0, 6), 0, glow); }
+        else { const [x, z] = wallXZ(dir, a2, -rand(0.15, 0.9)); addG(lumpP, x, 0.02, z, sz, sz * 0.6, sz, hex, 0, rand(0, 6), 0, glow); }
+      }
+    }
+  }
+  for (const sp of th.spots) if (sp.origin === 'drain' && !th.cave) {
     for (let i = 0; i < 5; i++) addW(sp.wall, sp.along - 0.4 + i * 0.2, -0.75, 0.015, 0.07, 0.04, 0.9, 0x1E1B22);
     addW(sp.wall, sp.along, -0.75, 0.005, 1.05, 0.02, 1.0, 0x0E0C10);
   }
@@ -1067,22 +1179,25 @@ function buildRoom(r) {
   }
   if (r.pits) for (const p of r.pits) for (const [dx, dz, sx, sz] of [[-0.97, 0, 0.06, 1.94], [0.97, 0, 0.06, 1.94], [0, -0.97, 1.88, 0.06], [0, 0.97, 1.88, 0.06]]) add(p.x + dx, -1.3, p.z + dz, sx, 2.6, sz, 0x16121A);
   if (r.spikes) for (const t of r.spikes) add(t.x, 0.009, t.z, 1.8, 0.018, 1.8, 0x1A161E); // a dark grate where the spikes come up
-  if (r.turrets) for (const t of r.turrets) addW(t.dir, t.along, -0.15, 1.45, 0.62, 0.62, 0.42, th.trim);
+  if (r.turrets) for (const t of r.turrets) { addW(t.dir, t.along, -0.15, 1.45, 0.62, 0.62, 0.42, th.trim); wallBusy.push({ dir: t.dir, a0: t.along - 0.4, a1: t.along + 0.4, y0: 1.05, y1: 1.85 }); }
   if (r.type === 'stairs') { // the pit under the trapdoor, with steps going down
     for (const [dx, dz, sx, sz] of [[-0.97, 0, 0.06, 1.94], [0.97, 0, 0.06, 1.94], [0, -0.97, 1.88, 0.06], [0, 0.97, 1.88, 0.06]]) add(STAIRS.x + dx, -1.3, STAIRS.z + dz, sx, 2.6, sz, 0x16121A); // the short walls tuck between the long ones
     for (let i = 0; i < 6; i++) add(STAIRS.x, -0.35 - i * 0.38, STAIRS.z + 0.75 - i * 0.3, 1.8, 0.12, 0.4, th.floor[1]);
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
   grp.add(meshOf(g, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.93 })));
+  Math.random = keepRand;
+  if (glow[0].length) { const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(glow[0], 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(glow[1], 3)); grp.add(meshOf(gg, new THREE.MeshBasicMaterial({ vertexColors: true }))); }
   if (r.type === 'start' && floorNum === 1 && !coarse) grp.add(chalkControls());
   if (plugBricks.length) plug = { dir: r.shopDir, meshes: plugBricks.map(b => {
     const [x, z] = wallXZ(r.shopDir, b.along, b.out), ns = r.shopDir === 'N' || r.shopDir === 'S', m = meshOf(GEO.box, M(b.hex));
     m.position.set(x, b.y, z); m.scale.set(ns ? b.len : 0.6, 0.76, ns ? 0.6 : b.len); grp.add(m); return m;
   }) };
-  const ceil = meshOf(new THREE.PlaneGeometry(W * 2 + 2, D * 2 + 2), M(th.ceil)); ceil.rotation.x = Math.PI / 2; ceil.position.y = H; grp.add(ceil);
-  for (const [px, pz] of th.pillars) grp.add(at(meshOf(new THREE.CylinderGeometry(0.55, 0.62, H, 8), M(th.stone[2])), px, H / 2, pz));
+  const ceil = meshOf(new THREE.PlaneGeometry(W * 2 + 2, D * 2 + 2), M(th.cave ? th.stone[3] : th.ceil)); // a cave's roof is the same rock as its walls ceil.rotation.x = Math.PI / 2; ceil.position.y = H; grp.add(ceil);
+  if (!th.cave) for (const [px, pz] of th.pillars) grp.add(at(meshOf(new THREE.CylinderGeometry(0.55, 0.62, H, 8), M(th.stone[2])), px, H / 2, pz));
   // four torches on the side walls, plus the room's accent light
   [['W', -3.6], ['W', 3.6], ['E', -3.6], ['E', 3.6]].forEach(([dir, along], i) => {
+    wallBusy.push({ dir, a0: along - 0.45, a1: along + 0.45, y0: th.lab ? 3.0 : 2.1, y1: th.lab ? 3.6 : 3.0 });
     if (th.lab) { // the lab gets steady strip lamps instead of fire
       const [x, z] = wallXZ(dir, along, -0.05), lamp = at(meshOf(new THREE.BoxGeometry(0.9, 0.16, 0.18), M(0xE8F4FF, { emissive: 0xCFE8FF, emissiveIntensity: 1.2 })), x, 3.3, z);
       lamp.rotation.y = WALL_RY[dir]; grp.add(lamp); const L = torchLights[i], [lx, lz] = wallXZ(dir, along, -0.6); L.color.set(th.torch); L.position.set(lx, 3.2, lz); L.intensity = 1.25; return;
@@ -1101,10 +1216,27 @@ function buildRoom(r) {
     glowcap: new THREE.MeshStandardMaterial({ color: 0x5FF2D6, emissive: 0x22C9AE, emissiveIntensity: 0.9, flatShading: true }),
     doom: new THREE.MeshStandardMaterial({ color: 0xFF6A4D, emissive: 0x8A1A10, emissiveIntensity: 0.6, flatShading: true }),
     frost: new THREE.MeshStandardMaterial({ color: 0xDFF4FF, emissive: 0x3A7AA8, emissiveIntensity: 0.7, roughness: 0.15, flatShading: true }),
+    crust: new THREE.MeshStandardMaterial({ color: 0x9CC2D4, emissive: 0x1E4A68, emissiveIntensity: 0.45, roughness: 0.6, flatShading: true, side: THREE.DoubleSide }),
+  };
+  const plateGeo = new THREE.CylinderGeometry(1, 1.06, 1, 7), needleGeo = new THREE.CylinderGeometry(1, 1, 1, 6), tipGeo = new THREE.ConeGeometry(1, 1, 6);
+  const lichen = () => { // one patch, lying in the wall's plane (+z comes out of the wall)
+    const m = new THREE.Group(), n = 5 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2 + rand(-0.4, 0.4), d = i ? rand(0.06, 0.15) : 0, rr = rand(0.06, 0.12) * (i ? 1 : 1.3);
+      const p = at(meshOf(plateGeo, i % 3 ? capMat.crust : capMat.frost), Math.cos(a) * d, Math.sin(a) * d, 0.012 + i * 0.004);
+      p.scale.set(rr, 0.022, rr * rand(0.65, 1)); p.rotation.set(Math.PI / 2 + rand(-0.3, 0.3), rand(-0.3, 0.3), 0); p.rotation.order = 'YXZ'; m.add(p); // the frilled edges curl off the stone
+    }
+    for (let i = 0, k = 2 + Math.floor(Math.random() * 2); i < k; i++) {
+      const nd = new THREE.Group(), h = rand(0.06, 0.13), rr = rand(0.012, 0.02); nd.position.set(rand(-0.1, 0.1), rand(-0.1, 0.1), 0.02); nd.rotation.set(Math.PI / 2 - rand(0.2, 0.7), 0, rand(-0.5, 0.5)); m.add(nd);
+      const nm = at(meshOf(needleGeo, capMat.frost), 0, h / 2, 0); nm.scale.set(rr, h, rr); nd.add(nm);
+      const tp = at(meshOf(tipGeo, capMat.frost), 0, h + rr * 1.2, 0); tp.scale.set(rr, rr * 2.4, rr); nd.add(tp);
+    }
+    return m;
   };
   th.spots.forEach((sp, idx) => {
     const cg = new THREE.Group(), caps = [], [x, z] = wallXZ(sp.wall, sp.along, -0.05);
     for (let i = 0; i < 3; i++) {
+      if (sp.kind === 'frost') { const m = lichen(); m.position.set((i - 1) * 0.34 + rand(-0.05, 0.05), rand(-0.22, 0.22), th.cave ? -0.03 : 0.01); m.rotation.z = rand(0, 6.3); m.visible = i < r.caps[idx]; cg.add(m); caps.push(m); continue; }
       const s = rand(0.16, 0.26), m = new THREE.Group();
       m.add(at(meshOf(new THREE.CylinderGeometry(s * 0.25, s * 0.3, s * 0.9, 5), M(0xE8DCC8)), 0, s * 0.45, 0));
       m.add(at(meshOf(new THREE.SphereGeometry(s, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2), capMat[sp.kind]), 0, s * 0.85, 0));
@@ -1113,13 +1245,16 @@ function buildRoom(r) {
     cg.position.set(x, sp.y, z); cg.rotation.y = WALL_RY[sp.wall]; grp.add(cg);
     const [hx, hz] = wallXZ(sp.wall, sp.along, -0.25);
     harvestables.push({ idx, kind: sp.kind, origin: sp.origin, caps, pos: new THREE.Vector3(hx, sp.y, hz) });
+    wallBusy.push({ dir: sp.wall, a0: sp.along - 0.6, a1: sp.along + 0.6, y0: sp.y - 0.45, y1: sp.y + 0.45 });
     if (sp.origin === 'drain') {
-      const [px, pz] = wallXZ(sp.wall, sp.along, -0.25), pipe = at(meshOf(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 6), M(0x5A5560, { metalness: 0.4, roughness: 0.5 })), px, 2.1, pz);
-      if (sp.wall === 'W' || sp.wall === 'E') pipe.rotation.z = Math.PI / 2; else pipe.rotation.x = Math.PI / 2;
-      grp.add(pipe);
+      if (!th.cave) {
+        const [px, pz] = wallXZ(sp.wall, sp.along, -0.25), pipe = at(meshOf(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 6), M(0x5A5560, { metalness: 0.4, roughness: 0.5 })), px, 2.1, pz);
+        if (sp.wall === 'W' || sp.wall === 'E') pipe.rotation.z = Math.PI / 2; else pipe.rotation.x = Math.PI / 2;
+        grp.add(pipe); wallBusy.push({ dir: sp.wall, a0: sp.along - 0.25, a1: sp.along + 0.25, y0: 1.9, y1: 2.35 });
+      }
       const [ux, uz] = wallXZ(sp.wall, sp.along, -0.9), pud = meshOf(new THREE.CircleGeometry(1.0, 10), new THREE.MeshStandardMaterial({ color: 0x2C3E44, roughness: 0.1, metalness: 0.3, transparent: true, opacity: 0.7 }));
-      pud.rotation.x = -Math.PI / 2; pud.position.set(ux, 0.02, uz); grp.add(pud);
-      const [dx, dz] = wallXZ(sp.wall, sp.along, -0.48); drips.push(new THREE.Vector3(dx, 2.0, dz));
+      pud.rotation.x = -Math.PI / 2; pud.position.set(ux, 0.02, uz); grp.add(pud); floorBusy.push({ x0: ux - 1, x1: ux + 1, z0: uz - 1, z1: uz + 1 });
+      const [dx, dz] = wallXZ(sp.wall, sp.along, th.cave ? -0.12 : -0.48); drips.push(new THREE.Vector3(dx, th.cave ? 2.6 : 2.0, dz));
     }
   });
   for (const rc of waterRects) {
@@ -1144,6 +1279,7 @@ function buildRoom(r) {
   if (th.chest) {
     roomChest = buildChest(r.chestOpen); roomChest.g.position.set(0, 0, -5.6); grp.add(roomChest.g);
     colliders.push({ x: 0, z: -5.6, r: 0.85, h: 0.9 });
+    for (const [x, z] of COIN_PILES) floorBusy.push({ x0: x - 0.4, x1: x + 0.4, z0: z - 0.4, z1: z + 0.4 });
     for (const [x, z] of COIN_PILES) for (let i = 0; i < 6; i++) grp.add(at(meshOf(new THREE.CylinderGeometry(0.09, 0.09, 0.025, 8), M(0xFFD23A, { metalness: 0.6, roughness: 0.35 })), x + rand(-0.2, 0.2), 0.02 + i * 0.026, z + rand(-0.2, 0.2)));
   }
   if (th.fountain) {
@@ -1843,7 +1979,7 @@ function markFound(b) {
 }
 
 /* ================= player + input ================= */
-const player = { moving: false, down: false, dance: -1, danceT0: 0, pos: new THREE.Vector3(0, 0, 6), y: 0, vy: 0, fall: null, yaw: 0, pitch: -0.08, bob: 0, hp: 8, maxHp: 8, grace: 0, kb: new THREE.Vector3() };
+const player = { moving: false, down: false, dance: -1, danceT0: 0, pos: new THREE.Vector3(0, 0, 6), y: 0, vy: 0, fall: null, yaw: 0, pitch: -0.08, bob: 0, hp: 8, maxHp: 8, grace: 0, kb: new THREE.Vector3(), sq: 0, sqK: 0, sqV: 0 };
 let koOpen = false;
 const keys = new Set();
 let locked = false, menuOpen = true, pendingMenu = false, lastUnlock = 0, reelOn = false, reelSkip = false;
@@ -1857,7 +1993,7 @@ const orbit = { c: new THREE.Vector3(), a: 0, r: 5, h: 2, spin: 0.25 };
 const setTS = (v, rate = 12) => { if (net.on) v = Math.max(v, 0.8); tsTarget = v; tsRate = rate; if (rate >= 100) ts = v; }; // co-op keeps one clock for everyone, so slow-mo is only a nudge
 const busy = () => menuOpen || reelOn || invOpen || koOpen || player.down || transit || cine.state !== 'idle' || !!blob || !!player.fall;
 
-function useDown() { if (busy()) return; audio(); if (tool === 'ladle') { wind.on = true; wind.power = 0; } else startFire(); }
+function useDown() { if (busy() || player.sq > 0) return; audio(); if (tool === 'ladle') { wind.on = true; wind.power = 0; } else startFire(); }
 function useUp() { if (tool === 'ladle') { if (!wind.on) return; wind.on = false; if (menuOpen || invOpen || reelOn || koOpen || transit || cine.state !== 'idle' || blob || wind.power <= 0) return; sling(Math.max(0.15, wind.power)); } else stopFire(); }
 // bandolier: flip between the brew in the ladle and the spare
 function swapBrew() {
@@ -1875,7 +2011,7 @@ function swapTool() {
 const BONK_REACH = 2.0;
 let bonkCD = 0, bonkChain = 0, bonkChainT = 0, bonkTip = false;
 function bonk() {
-  if (menuOpen || invOpen || koOpen || reelOn || transit || player.down || player.fall || cine.state !== 'idle' || bonkCD > 0) return;
+  if (menuOpen || invOpen || koOpen || reelOn || transit || player.down || player.fall || cine.state !== 'idle' || bonkCD > 0 || player.sq > 0) return;
   audio(); bonkCD = 0.48; wind.on = false; stopFire();
   vmState.bonk = 1; SFX.whiff();
   setTimeout(bonkLand, 100); // it lands partway down the swing
@@ -1890,6 +2026,7 @@ function bonkLand() {
     if ((dx * fx_ + dz * fz) / (d || 1) < 0.5 && d > body + 0.35) continue; // a wide arc in front of you
     hits.push(e);
   }
+  if (!hits.length) { const R = bonkMate(fx_, fz); if (R) { squishMate(R); return; } }
   if (!hits.length) { const s = bonkShroom(fx_, fz); if (s) { SFX.bonk(false); const sp = project(s.c); if (!sp.behind) callout('bonk', 1, { at: true, x: sp.x, y: sp.y }); shroomStruck(s); } return; }
   bonkChain = bonkChainT > 0 ? bonkChain + 1 : 1; bonkChainT = 1.3;
   const big = bonkChain >= 3; if (big) bonkChain = 0; // every third bonk in a row is a big one
@@ -1904,6 +2041,28 @@ function bonkLand() {
     const sp = project(at_); if (!sp.behind) callout(big ? 'BIG BONK' : 'bonk', big ? 2 : 1, { at: true, x: sp.x, y: sp.y });
     damage(e, big ? 2 : 1, big ? 'BIG BONK' : 'BONKED', player.pos);
   }
+}
+// a partner standing right in front of you, when there's nothing else to hit
+function bonkMate(fx_, fz) {
+  if (!net.on) return null; let best = null, bd = 1e9;
+  for (const R of net.remotes.values()) {
+    if (!R.here || R.ko || !R.A.visible) continue;
+    const dx = R.pos.x - player.pos.x, dz = R.pos.z - player.pos.z, d = Math.hypot(dx, dz);
+    if (d > BONK_REACH + 0.3 || (dx * fx_ + dz * fz) / (d || 1) < 0.6 || d >= bd) continue;
+    best = R; bd = d;
+  }
+  return best;
+}
+function squishMate(R) { // no harm done: they go flat on every screen and pop back up two seconds later
+  if ((R.sqK || 0) > 0.3 || (R.sqCD || 0) > T) { SFX.bonk(false); return; } // already a pancake, or only just got up
+  R.sqHold = 0.6; R.sqWas = true; R.sqCD = T + 3; SFX.bonk(true); SFX.squish(); shake = Math.max(shake, 0.12);
+  netEmit('phurt', { to: R.peer, n: 0, k: 'squish', x: +player.pos.x.toFixed(2), z: +player.pos.z.toFixed(2) });
+  const at_ = new THREE.Vector3(R.pos.x, 0.5, R.pos.z), sp = project(at_); if (!sp.behind) callout('SQUISH', 2, { at: true, x: sp.x, y: sp.y });
+  burst(at_, 0xFFF4C0, 12, 3.5, 0.35, 0.06, 4, true);
+}
+function squishMe() {
+  if (player.down || player.fall || player.sq > 0) return;
+  player.sq = 2; wind.on = false; stopFire(); SFX.squish(); shake = Math.max(shake, 0.25); callout('SQUISHED', 2);
 }
 function bonkHint() { if (bonkTip) return; bonkTip = true; setTimeout(() => notice(`BONK IT INSTEAD${coarse ? '' : '<kbd>RIGHT-CLICK</kbd>'}`), 900); }
 
@@ -2139,7 +2298,7 @@ function pollPad(rdt) {
 function startRun() {
   hideUI(); giveGrace(1.5);
   camMode = 'return'; setTimeout(() => { if (camMode === 'return') camMode = 'fp'; }, 650);
-  banner(`FLOOR ${floorNum}`);
+  banner(`FLOOR ${floorNum}`, floorBiome.name);
   play();
 }
 function newRun() { hideUI(); resetRun(); startRun(); }
@@ -3421,7 +3580,8 @@ function fieldSpots(n) {
     if (doorsAt.some(d => { const [dx, dz] = wallXZ(d, 0, -1); return Math.hypot(x - dx, z - dz) < 2.6; })) return false;
     if (colliders.some(c => Math.hypot(x - c.x, z - c.z) < c.r + 1.0)) return false;
     if (r.type === 'stairs' && Math.hypot(x - STAIRS.x, z - STAIRS.z) < 1.8) return false;
-    if (lavaRects.some(rc => x > rc[0] - 0.6 && x < rc[1] + 0.6 && z > rc[2] - 0.6 && z < rc[3] + 0.6)) return false;
+    if ([...lavaRects, ...waterRects].some(rc => x > rc[0] - 0.6 && x < rc[1] + 0.6 && z > rc[2] - 0.6 && z < rc[3] + 0.6)) return false;
+    if (floorBusy.some(b => x > b.x0 - 0.7 && x < b.x1 + 0.7 && z > b.z0 - 0.7 && z < b.z1 + 0.7)) return false;
     if (Math.hypot(x - player.pos.x, z - player.pos.z) < 2.4) return false;
     return !out.some(o => o.at === 'f' && Math.hypot(x - o.x, z - o.z) < 1.5);
   };
@@ -3429,33 +3589,39 @@ function fieldSpots(n) {
   for (let g = 0; g < 400 && out.filter(o => o.at.length === 1 && 'NSWE'.includes(o.at)).length < nWall; g++) {
     const d = pick(['N', 'S', 'W', 'E']), lim = d === 'N' || d === 'S' ? W : D, along = rand(-lim + 1.2, lim - 1.2), y = rand(0.9, 2.7);
     if (doorsAt.includes(d) && Math.abs(along) < DOOR_HALF + 1.0) continue;
-    const [x, z] = wallXZ(d, along, -0.02);
+    if (wallBusy.some(b => b.dir === d && along > b.a0 - 0.5 && along < b.a1 + 0.5 && y > b.y0 - 0.5 && y < b.y1 + 0.5)) continue; // never through a torch, a pipe, a turret or a cluster of caps
+    const [x, z] = wallXZ(d, along, THEMES[r.theme].cave ? -0.08 : -0.05);
     if (out.some(o => o.at === d && Math.hypot(x - o.x, z - o.z, y - o.y) < 1.4)) continue;
     if (r.theme === 'lab' && d === 'N' && Math.abs(along) < 3.2) continue; // not across the observation window
     out.push({ at: d, x, y, z });
   }
-  for (let g = 0; g < 200 && out.filter(o => o.at === 'c').length < nCeil; g++) { const x = rand(-W + 1.5, W - 1.5), z = rand(-D + 1.5, D - 1.5); if (!out.some(o => o.at === 'c' && Math.hypot(x - o.x, z - o.z) < 1.8)) out.push({ at: 'c', x, y: H - 0.02, z }); }
+  for (let g = 0; g < 200 && out.filter(o => o.at === 'c').length < nCeil; g++) {
+    const x = rand(-W + 1.5, W - 1.5), z = rand(-D + 1.5, D - 1.5);
+    if (ceilBusy.some(b => x > b.x0 - 0.55 && x < b.x1 + 0.55 && z > b.z0 - 0.55 && z < b.z1 + 0.55)) continue; // not under a beam, a stalactite or a root
+    if (!out.some(o => o.at === 'c' && Math.hypot(x - o.x, z - o.z) < 1.8)) out.push({ at: 'c', x, y: THEMES[r.theme].cave ? H - 0.15 : H - 0.02, z });
+  }
   return out;
 }
 // one mushroom, on a mound on the floor, or growing out of a mossy patch on a wall or the ceiling
 function buildShroom(s) {
   const g = new THREE.Group(); g.position.set(s.x, s.y, s.z);
-  if (s.at === 'f') s.up = mkY.clone();
-  else if (s.at === 'c') s.up = new THREE.Vector3(0, -1, 0);
-  else { const v = DIRS[s.at]; s.up = new THREE.Vector3(-v.nx * 0.83, 0.56, -v.nz * 0.83).normalize(); }
-  g.quaternion.setFromUnitVectors(mkY, s.up); s.yaw = rand(0, 6.3);
-  const inner = new THREE.Group(); inner.rotation.y = s.yaw; g.add(inner); s.inner = inner;
+  const v = DIRS[s.at], base = s.at === 'f' ? mkY.clone() : s.at === 'c' ? new THREE.Vector3(0, -1, 0) : new THREE.Vector3(-v.nx, 0, -v.nz);
+  s.up = v ? new THREE.Vector3(-v.nx * 0.83, 0.56, -v.nz * 0.83).normalize() : base.clone();
+  g.quaternion.setFromUnitVectors(mkY, base); s.yaw = rand(0, 6.3);
+  const mound = new THREE.Group(); mound.rotation.y = s.yaw; g.add(mound);
+  const stalk = new THREE.Group(); g.add(stalk); if (v) stalk.quaternion.setFromUnitVectors(mkY, s.up.clone().applyQuaternion(g.quaternion.clone().invert()));
+  const inner = new THREE.Group(); inner.rotation.y = s.yaw; stalk.add(inner); s.inner = inner;
   s.eyes = []; s.mats = [];
-  if (s.at === 'f') {
-    mkAdd(inner, mkLathe([[0.52, 0], [0.4, 0.06], [0.22, 0.1], [0, 0.11]], 9), MKM.dirt);
-    [[0.42, 0.3], [-0.36, 0.2], [0.1, -0.44]].forEach(([x, z]) => { const c = mkAdd(inner, GEO.ico0, MKM.dirt2, x, 0.05, z); c.scale.setScalar(0.07); c.rotation.set(x * 5, z * 4, 0); });
-  } else { const pad = mkAdd(inner, GEO.disc, MKM.moss, 0, 0.01, 0); pad.rotation.x = -Math.PI / 2; pad.scale.setScalar(0.42); }
+  const big = s.at === 'f' ? 1 : 0.86; // the base sinks a little into whatever it's on, so a bumpy wall can't show under the rim
+  mkAdd(mound, mkLathe([[0.52 * big, -0.05], [0.5 * big, 0], [0.4 * big, 0.06], [0.22 * big, 0.1], [0, 0.11]], 9), MKM.dirt);
+  [[0.42, 0.3], [-0.36, 0.2], [0.1, -0.44]].forEach(([x, z]) => { const c = mkAdd(mound, GEO.ico0, MKM.dirt2, x * big, 0.05, z * big); c.scale.setScalar(0.07); c.rotation.set(x * 5, z * 4, 0); });
+  if (s.at !== 'f') [[0.3, -0.3], [-0.38, -0.12]].forEach(([x, z]) => { const c = mkAdd(mound, GEO.ico0, MKM.moss, x, 0.02, z); c.scale.set(0.16, 0.05, 0.12); });
   mkAdd(inner, mkLathe([[0, 0.08], [0.17, 0.08], [0.165, 0.2], [0.145, 0.34], [0, 0.36]], 8), MKM.stem);
   const cap = mkCap(0.42, 0.3, s.kind, s.mats); cap.position.y = 0.32; inner.add(cap);
   if (s.kind === 'doom') mkSpots(cap, MK_SPOTS, s.eyes, s.real ? [1, 2] : s.lie ? [1, 2] : [], s.real ? 1 : 2);
   else if (s.real || s.lie) { // the glowcap's tell: teeth in the dirt round the stem, clenching. A liar's never move
     s.teeth = [];
-    for (let i = 0; i < (s.real ? 6 : 4); i++) { const a = i / (s.real ? 6 : 4) * Math.PI * 2 + 0.3, tg = new THREE.Group(); tg.position.set(Math.sin(a) * 0.29, 0.02, Math.cos(a) * 0.29); tg.rotation.y = a; inner.add(tg); mkAdd(tg, new THREE.ConeGeometry(0.042, 0.17, 4), MKM.tooth, 0, 0.05, 0).rotation.x = -0.35; s.teeth.push(tg); }
+    for (let i = 0; i < (s.real ? 6 : 4); i++) { const a = i / (s.real ? 6 : 4) * Math.PI * 2 + 0.3, tg = new THREE.Group(); tg.position.set(Math.sin(a) * 0.29, 0.02, Math.cos(a) * 0.29); tg.rotation.y = a; mound.add(tg); mkAdd(tg, new THREE.ConeGeometry(0.042, 0.17, 4), MKM.tooth, 0, 0.05, 0).rotation.x = -0.35; s.teeth.push(tg); }
   }
   g.scale.setScalar(0.001); s.g = g; s.c = new THREE.Vector3(s.x, s.y, s.z).addScaledVector(s.up, 0.45);
   (roomGroup || scene).add(g);
@@ -4874,7 +5040,7 @@ async function nextFloor(remote) {
     await wait(550);
     floorNum++; const f = genFloor(floorNum); floorMap = f.map;
     enterRoom(f.start, null, false);
-    banner(`FLOOR ${floorNum}`, floorNum === FINAL_FLOOR && !run.won ? 'FINAL FLOOR' : '');
+    banner(`FLOOR ${floorNum}`, floorNum === FINAL_FLOOR && !run.won ? 'FINAL FLOOR · ' + floorBiome.name : floorBiome.name);
     await wait(150);
   } catch (err) { console.error('Floor change failed:', err); }
   finally { $('#fade').classList.remove('on'); transit = false; }
@@ -5041,6 +5207,17 @@ const brewer = (() => {
     goggles() { const g = new THREE.Group(), brass = mat(0xD9A84A, { metalness: 0.5, roughness: 0.35 }), lens = mat(0x8FD3FF, { emissive: 0x2A5A7A, roughness: 0.1 }); for (const sd of [-1, 1]) { g.add(at(mesh(new THREE.TorusGeometry(0.08, 0.025, 6, 12), brass), sd * 0.11, 0, 0.02)); g.add(at(mesh(new THREE.CircleGeometry(0.075, 12), lens), sd * 0.11, 0, 0.025)); } g.add(at(mesh(new THREE.BoxGeometry(0.06, 0.03, 0.03), brass), 0, 0, 0.02)); return g; },
     cap() { const g = new THREE.Group(), leather = mat(0x5A3A26); g.add(at(mesh(new THREE.SphereGeometry(0.3, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), leather), 0, -0.06, 0)); g.add(at(mesh(new THREE.BoxGeometry(0.34, 0.03, 0.18), leather), 0, -0.04, 0.3)); return g; },
     wrench() { const g = new THREE.Group(), steel = mat(0xB9B2C2, { metalness: 0.5, roughness: 0.35 }); g.add(at(mesh(new THREE.BoxGeometry(0.05, 0.42, 0.03), steel), 0, 0.12, 0.05)); g.add(at(mesh(new THREE.TorusGeometry(0.06, 0.022, 4, 8, Math.PI * 1.4), steel), 0, 0.35, 0.05)); return g; },
+    gun() { // built pointing along +z from the grip, then tipped down so it points straight ahead when the arms come up to hold it
+      const g = new THREE.Group(), r = new THREE.Group(); r.rotation.x = 1.15; g.add(r);
+      const orange = mat(0xFF8A2A), blue = mat(0x2A9DF4), yellow = mat(0xFFD23A);
+      const grip = at(mesh(new THREE.BoxGeometry(0.07, 0.17, 0.08), blue), 0, -0.02, 0); grip.rotation.x = 0.25; r.add(grip);
+      r.add(at(mesh(new THREE.BoxGeometry(0.12, 0.13, 0.42), orange), 0, 0.1, 0.08));
+      const barrel = at(mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.28, 8), yellow), 0, 0.12, 0.42); barrel.rotation.x = Math.PI / 2; r.add(barrel);
+      const nozzle = at(mesh(new THREE.CylinderGeometry(0.04, 0.024, 0.07, 8), blue), 0, 0.12, 0.59); nozzle.rotation.x = Math.PI / 2; r.add(nozzle);
+      const pump = at(mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.16, 8), blue), 0, 0.03, 0.34); pump.rotation.x = Math.PI / 2; r.add(pump);
+      r.add(at(mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.16, 10), mat(0x8FD3FF, { emissive: 0x2A5A7A, transparent: true, opacity: 0.8 })), 0, 0.24, 0.06));
+      return g;
+    },
     pouches() { const g = new THREE.Group(), leather = mat(0x6A4A2A); for (const a of [-0.9, 0.9]) { const p = at(mesh(new THREE.BoxGeometry(0.14, 0.16, 0.1), leather), Math.sin(a) * 0.42, -0.06, Math.cos(a) * 0.42); p.rotation.y = a; g.add(p); } return g; },
     crown() { const g = new THREE.Group(), gd = gold(); g.add(at(mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.1, 12, 1, true), mat(0xFFD23A, { metalness: 0.6, roughness: 0.35, emissive: 0x3A2A04, side: THREE.DoubleSide })), 0, 0.03, 0)); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; g.add(at(mesh(new THREE.ConeGeometry(0.04, 0.12, 4), gd), Math.cos(a) * 0.21, 0.13, Math.sin(a) * 0.21)); } g.add(at(mesh(new THREE.OctahedronGeometry(0.04), mat(0xFF3B4E, { emissive: 0x6A0A14 })), 0, 0.05, 0.22)); return g; },
     cape(s) { // cut from the body's own outline so it drapes over the back, under the pot
@@ -5184,6 +5361,7 @@ const brewer = (() => {
     const pot = ACC.pot(); pot.scale.setScalar(c.S.back.userData.scale); c.S.back.add(pot);
     const kit = Object.assign(held ? { handR: 'ladle' } : {}, OUTFITS[oi][1]);
     for (const [slot, acc] of Object.entries(kit)) { const o = ACC[acc](c.S[slot]); if (!o.userData.fit) o.scale.multiplyScalar(c.S[slot].userData.scale || 1); c.S[slot].add(o); }
+    if (held) { c.inHand = [...c.S.handR.children]; c.gun = ACC.gun(); c.gun.scale.multiplyScalar(c.S.handR.userData.scale || 1); c.gun.visible = false; c.S.handR.add(c.gun); } // swapped in when they swap
     return c;
   }
   const dropChar = c => c.g.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
@@ -5209,7 +5387,7 @@ const brewer = (() => {
     if (st.dance >= 0 && st.dance < DANCES.length && !st.walk) { DANCES[st.dance].f(st.beat, P); return P; }
     const w = S(t * 9) * st.walk;
     P.lLf = 0.6 * w; P.lRf = -0.6 * w; P.aLf = -0.5 * w; P.aRf = 0.5 * w; P.py = 0.04 * abs(S(t * 9)) * st.walk;
-    if (st.gun) { P.aRf = P.aLf = 1.4; P.aLo = P.aRo = 0.05; }
+    if (st.gun || st.hold) { P.aRf = 1.15; P.aLf = 1.05; P.aRo = -0.05; P.aLo = -0.3; if (st.gun) { P.aRf += 0.04 * S(t * 70); P.bx = -0.05; } } // both hands on the soaker, shaking a little while it sprays
     if (st.wind) { P.aRf = -2.3; P.aRo = 0.5; P.bx = -0.12; }
     if (st.throwK > 0) { P.aRf = 1.8 * st.throwK; P.bx = 0.2 * st.throwK; }
     if (st.bonkK > 0) { P.aRf = -0.6 + 3.0 * st.bonkK; P.aRo = 0.2; P.bx = 0.25 * (1 - st.bonkK); }
@@ -5619,7 +5797,7 @@ const NET_ON = {
       const n = Math.min(20, +h.d || 0); if (n > 0) damage(e, n, typeof h.how === 'string' ? h.how.slice(0, 20) : 'TEAMWORK', from);
     }
   },
-  phurt(d) { if (net.on && d.run === net.run && d.to === net.me) hurtPlayer(Math.min(4, +d.n || 1), new THREE.Vector3(+d.x || 0, 0, +d.z || 0)); },
+  phurt(d) { if (!net.on || d.run !== net.run || d.to !== net.me) return; if (d.k === 'squish') { squishMe(); return; } hurtPlayer(Math.min(4, +d.n || 1), new THREE.Vector3(+d.x || 0, 0, +d.z || 0)); },
   room(d) { if (net.on && d.run === net.run && d.fl === floorNum && d.from === rkOf(room) && DIRS[d.dir]) goThrough(d.dir, true); },
   floor(d) { if (net.on && d.run === net.run && d.fl === floorNum + 1) nextFloor(true); },
   cleared(d) { if (netGuest() && d.run === net.run && d.fl === floorNum && d.rk === rkOf(room) && room.fightActive) { room.fightActive = false; roomCleared(); } },
@@ -5717,7 +5895,7 @@ function netFrame(rdt) {
   if (net.on) {
     if (net.presT <= 0) {
       net.presT = 0.066;
-      const a = (player.moving ? 1 : 0) | (wind.on ? 2 : 0) | (gun.firing ? 4 : 0) | (vmState.bonk > 0 ? 8 : 0);
+      const a = (player.moving ? 1 : 0) | (wind.on ? 2 : 0) | (gun.firing ? 4 : 0) | (vmState.bonk > 0 ? 8 : 0) | (tool === 'gun' ? 16 : 0) | (player.sq > 0 ? 32 : 0);
       net.room.presence({ st: 'run', run: net.run, x: +player.pos.x.toFixed(2), z: +player.pos.z.toFixed(2), y: +player.y.toFixed(2), yw: +player.yaw.toFixed(2), rk: rkOf(room), fl: floorNum, a, d: player.dance, ds: player.danceT0 || 0, look: lk, hp: player.hp, ko: player.down || player.hp <= 0 ? 1 : 0 }).catch(() => {});
     }
   } else {
@@ -5756,16 +5934,22 @@ function netFrame(rdt) {
     if ((R.anim & 8) && !R.bonkWas) R.bonkT = 0.3; R.bonkWas = !!(R.anim & 8);
     R.A.visible = !!R.here && !!R.c; R.tag.style.display = 'none';
     if (!R.A.visible) continue;
+    const gunOut = !!(R.anim & 16); if (R.c.gun && R.c.gun.visible !== gunOut) { R.c.gun.visible = gunOut; R.c.inHand.forEach(o => { o.visible = !gunOut; }); }
+    // flattened by somebody's ladle: down fast, then back up with a wobble
+    R.sqHold = Math.max(0, (R.sqHold || 0) - rdt); const flat = !!(R.anim & 32) || R.sqHold > 0;
+    if (flat && !R.sqWas) SFX.squish(); R.sqWas = flat;
+    R.sqV = (R.sqV || 0) + (((flat ? 1 : 0) - (R.sqK || 0)) * 260 - (R.sqV || 0) * 16) * rdt; R.sqK = (R.sqK || 0) + R.sqV * rdt;
+    const sk = Math.max(-0.4, Math.min(1.15, R.sqK)); R.A.scale.set(1 + 0.6 * sk, Math.max(0.15, 1 - 0.82 * sk), 1 + 0.6 * sk);
     const k = 1 - Math.exp(-14 * rdt), ox = R.pos.x, oz = R.pos.z; R.pos.lerp(R.to, k);
     let dy = R.toYaw - R.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); R.yaw += dy * k;
     const walking = (R.anim & 1) || Math.hypot(R.pos.x - ox, R.pos.z - oz) > rdt * 0.6; if (walking) R.walkT += rdt;
     const beat = R.ds ? (Date.now() - R.ds) / 1000 * brewer.BPM / 60 : 0;
-    const P = brewer.avatarPose({ walk: walking ? 1 : 0, wind: R.anim & 2, gun: R.anim & 4, throwK: R.throwT / 0.35, bonkK: R.bonkT / 0.3, dance: R.dance, beat }, R.walkT);
+    const P = brewer.avatarPose({ walk: walking ? 1 : 0, wind: R.anim & 2, gun: R.anim & 4, hold: R.anim & 16, throwK: R.throwT / 0.35, bonkK: R.bonkT / 0.3, dance: R.dance, beat }, R.walkT);
     brewer.applyTo(R.c, P, 0);
     R.A.position.set(R.pos.x, Math.max(0, R.pos.y), R.pos.z); R.A.rotation.set(R.ko ? -1.45 : 0, R.yaw + Math.PI, 0, 'YXZ');
     if (R.ko) R.A.position.y = 0.25;
     if (R.anim & 4 && Math.random() < rdt * 30) { const f = new THREE.Vector3(-Math.sin(R.yaw), 0, -Math.cos(R.yaw)); burst(R.pos.clone().setY(1.1).addScaledVector(f, 0.6), 0x8FD3FF, 1, 3, 0.4, 0.05, 6); }
-    const sp = project(new THREE.Vector3(R.pos.x, (R.c.top || 1.6) + 0.45 + (R.ko ? -1.2 : 0), R.pos.z));
+    const sp = project(new THREE.Vector3(R.pos.x, (R.c.top || 1.6) * R.A.scale.y + 0.45 + (R.ko ? -1.2 : 0), R.pos.z));
     if (!sp.behind && !menuOpen) {
       const html = `<b>${esc(R.name || 'PLAYER')}</b>${R.ko ? '<em>DOWN</em>' : `<span>${'<i></i>'.repeat(Math.max(0, Math.min(12, R.hp)))}</span>`}`;
       if (R.tagHtml !== html) { R.tag.innerHTML = html; R.tagHtml = html; }
@@ -5842,12 +6026,14 @@ function frame(now) {
     if (keys.has('a') || keys.has('arrowleft')) mv.sub(r);
     if (joy) { const jx = joy.dx / JOY_R, jy = joy.dy / JOY_R; if (Math.hypot(jx, jy) > 0.15) mv.addScaledVector(f, -jy).addScaledVector(r, jx); } // the stick is analog: a small push walks slowly
     player.moving = mv.lengthSq() > 0 && !player.down; if (player.moving && player.dance >= 0) player.dance = -1;
-    if (player.moving) { const amt = Math.min(1, mv.length()); mv.normalize().multiplyScalar(4.5 * rdt * amt); player.pos.add(mv); player.bob += rdt * 10 * amt; }
+    if (player.moving) { const amt = Math.min(1, mv.length()) * (player.sq > 0 ? 0.4 : 1); mv.normalize().multiplyScalar(4.5 * rdt * amt); player.pos.add(mv); player.bob += rdt * 10 * amt; }
     if (player.kb.lengthSq() > 0.01) { player.pos.addScaledVector(player.kb, rdt); player.kb.multiplyScalar(Math.exp(-9 * rdt)); }
     for (const c of colliders) { const dx = player.pos.x - c.x, dz = player.pos.z - c.z, d = Math.hypot(dx, dz), rr = c.r + 0.4; if (d < rr && d > 0.001) { player.pos.x = c.x + dx / d * rr; player.pos.z = c.z + dz / d * rr; } }
     if (!transit) doorClamp();
     if (!transit && room.pits && pitAt(player.pos.x, player.pos.z, 0.7)) startFall();
   }
+  if (player.sq > 0 && (player.sq -= rdt) <= 0) { player.sq = 0; SFX.boing(); }
+  player.sqV += (((player.sq > 0 ? 1 : 0) - player.sqK) * 260 - player.sqV * 16) * rdt; player.sqK += player.sqV * rdt; // a spring, so popping back up overshoots
   bonkCD = Math.max(0, bonkCD - rdt); bonkChainT = Math.max(0, bonkChainT - rdt); vmState.bonk = Math.max(0, vmState.bonk - rdt * 3.4);
   if (scoopT > 0) { scoopT = Math.max(0, scoopT - rdt); vmState.raise = Math.max(vmState.raise, scoopT / 0.65); }
   if (wind.on && scoopT <= 0) wind.power = Math.min(1, wind.power + rdt / 0.75);
@@ -5983,7 +6169,8 @@ function frame(now) {
   for (const f of flames) { const k = 0.85 + Math.sin(T * 13 + f.ph) * 0.08 + Math.sin(T * 29 + f.ph * 2) * 0.06; f.fl.scale.set(1, k, 1); f.core.scale.set(1, k * 1.1, 1); f.L.intensity = 1.35 * k; }
 
   // camera
-  const eye = tmpV.set(player.pos.x, (player.down ? 0.45 : 1.6) + player.y + Math.sin(player.bob) * 0.035, player.pos.z);
+  const sqk = Math.max(-0.15, Math.min(1.1, player.sqK)); vm.scale.set(1 + 0.45 * sqk, Math.max(0.25, 1 - 0.7 * sqk), 1);
+  const eye = tmpV.set(player.pos.x, (player.down ? 0.45 : 1.6 - 1.15 * sqk) + player.y + Math.sin(player.bob) * 0.035, player.pos.z);
   fpQuat.setFromEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ'));
   if (camMode === 'fp') { camera.position.copy(eye); camera.quaternion.copy(fpQuat); }
   else if (camMode === 'title') { // a slow drift around the first room behind the title
