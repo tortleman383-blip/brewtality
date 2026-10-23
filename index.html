@@ -942,7 +942,7 @@ const fxLight = new THREE.PointLight(0x9FDCFF, 0, 10, 2); fxLight.position.set(0
 
 let roomGroup = null, colliders = [], doors = [], harvestables = [], flames = [], drips = [], waterRects = [], lavaRects = [], waterMats = [], lavaMats = [];
 let roomChest = null, fountainSpot = null, trapdoor = null;
-let wallBusy = [], floorBusy = [], ceilBusy = []; // torches, pipes, crates, beams, stalactites: things a mushroom mustn't grow through
+let wallBusy = [], floorBusy = [], ceilBusy = [], caveRoof = null; // torches, pipes, crates, beams, stalactites: things a mushroom mustn't grow through
 function buildChest(open) {
   const g = new THREE.Group(), lid = new THREE.Group(), gold = M(0xD9B44A, { metalness: 0.5, roughness: 0.4 });
   const wood = M(0x8A5A30), lining = M(0x4E2E18), seam = M(0x2E1A0C), velvet = M(0x7A1E34, { roughness: 1 });
@@ -1010,6 +1010,13 @@ function chalkControls() {
   const m = meshOf(new THREE.PlaneGeometry(5.6, 2.8), new THREE.MeshBasicMaterial({ map: chalkTex, transparent: true, opacity: 0.7, depthWrite: false }));
   m.rotation.x = -Math.PI / 2; m.position.set(0, 0.03, 2.4); return m;
 }
+// the underside of a cave's roof at this spot; the flat ceiling anywhere else
+function roofAt(x, z) {
+  const R = caveRoof; if (!R) return H;
+  const fi = Math.max(0, Math.min(R.nx - 1.001, (x - R.x0) / R.step)), fj = Math.max(0, Math.min(R.nz - 1.001, (z - R.z0) / R.step)), i = Math.floor(fi), j = Math.floor(fj), fx = fi - i, fz = fj - j;
+  const hh = (a, b) => R.h[b * R.nx + a], a = hh(i, j), b = hh(i + 1, j), c = hh(i + 1, j + 1), d = hh(i, j + 1);
+  return fx >= fz ? a + (b - a) * fx + (c - b) * fz : a + (d - a) * fz + (c - d) * fx; // the same two triangles the roof is drawn with
+}
 function buildRoom(r) {
   if (roomGroup) teardownRoom();
   const th = THEMES[r.theme], grp = roomGroup = new THREE.Group(); scene.add(grp);
@@ -1030,7 +1037,7 @@ function buildRoom(r) {
     return parts;
   };
   waterRects = th.water || []; lavaRects = (th.lava || []).flatMap(dryDoors); doors = []; harvestables = []; flames = []; drips = []; waterMats = []; lavaMats = [];
-  roomChest = null; fountainSpot = null; trapdoor = null; xBrick = null; wallBusy = []; floorBusy = []; ceilBusy = [];
+  roomChest = null; fountainSpot = null; trapdoor = null; xBrick = null; wallBusy = []; floorBusy = []; ceilBusy = []; caveRoof = null;
   // everything static goes into one vertex-coloured mesh
   const keepRand = Math.random; if (r.dseed) Math.random = mulberry(r.dseed);
   let xCol = null;
@@ -1051,17 +1058,69 @@ function buildRoom(r) {
   const wallLen = dir => dir === 'N' || dir === 'S' ? W : D;
   const doorish = (dir, al, pad) => (r.n[dir] && Math.abs(al) < DOOR_HALF + 0.6 + pad) || (r.shopDir === dir && Math.abs(al) < 3.6 + pad);
   const busyCeil = (x, z, pad) => ceilBusy.some(b => x > b.x0 - pad && x < b.x1 + pad && z > b.z0 - pad && z < b.z1 + pad);
-  // a cave: heaped boulders over a dark backing. None stands proud of the wall line, so nothing on the wall sinks into them
-  const caveWall = (dir, L, gap) => {
-    const shop = dir === r.shopDir, hole = gap ? 1.8 : shop ? 3.6 : 0, top = gap ? 3.7 : shop ? 3.25 : 0, bk = shop ? 3.3 : hole;
-    const back = (a, b, y0, y1) => { if (b - a > 0.05) addW(dir, (a + b) / 2, 1.25, (y0 + y1) / 2, b - a, y1 - y0, 0.2, 0x12110D); };
-    if (hole) { back(-L - 1.2, -bk, 0, H); back(bk, L + 1.2, 0, H); back(-bk, bk, top + 0.1, H); } else back(-L - 1.2, L + 1.2, 0, H);
-    for (let y = 0.3; y < H + 0.2; y += 0.78) for (let al = -L - 0.7 + rand(0, 0.6); al < L + 0.8; al += rand(0.9, 1.3)) {
-      const sA = rand(0.5, 0.78), sY = rand(0.42, 0.6), sO = rand(0.4, 0.7), yy = y + rand(-0.12, 0.12);
-      if (hole && Math.abs(al) - sA * 0.85 < hole && yy - sY * 0.85 < top) continue;
-      const [x, z] = wallXZ(dir, al, sO + 0.04); addG(lumpP, x, yy, z, sA, sY, sO, pick(th.stone), rand(-0.1, 0.1), WALL_RY[dir], rand(0, 6.3));
+  // cave walls: one continuous skin of cobbles. Each stone runs from its outline down in the joint, up a bevel to a face on the wall line, to a low dome
+  const tc = new THREE.Color(), plugStones = []; let plugMat = null;
+  const triTo = (P, C) => (a, b, c, hex, from) => { // turned to face away from `from`
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    if (nx * (a[0] - from[0]) + ny * (a[1] - from[1]) + nz * (a[2] - from[2]) < 0) { const t = b; b = c; c = t; }
+    tc.set(hex); for (const p of [a, b, c]) { P.push(p[0], p[1], p[2]); C.push(tc.r, tc.g, tc.b); }
+  };
+  const tri = triTo(pos, col), GROOVE = 0.05;
+  const stoneTris = (poly, map, put, solid) => { // poly is the outline in wall coordinates; a solid one gets sides and a back so it can fall out
+    let cu = 0, cv = 0; for (const [u, v] of poly) { cu += u; cv += v; } cu /= poly.length; cv /= poly.length;
+    const rad = poly.reduce((t, [u, v]) => t + Math.hypot(u - cu, v - cv), 0) / poly.length, k = Math.max(0.55, Math.min(0.88, 1 - 0.07 / rad));
+    const face = -rand(0.03, 0.05), dome = face - rand(0.035, 0.065), back = map(cu, cv, 0.6), mid = map(cu, cv, 0.2), N = poly.length;
+    const ins = poly.map(([u, v]) => [cu + (u - cu) * k, cv + (v - cv) * k]), ring = []; // the face, with its real corners rounded off; a point partway along a straight joint stays one point
+    for (let n = 0; n < N; n++) {
+      const p = ins[n], a = ins[(n + N - 1) % N], b = ins[(n + 1) % N], ax = a[0] - p[0], ay = a[1] - p[1], bx = b[0] - p[0], bz = b[1] - p[1], la = Math.hypot(ax, ay) || 1, lb = Math.hypot(bx, bz) || 1;
+      if ((ax * bx + ay * bz) / (la * lb) > -0.94) { const ta = Math.min(0.32, 0.1 / la), tb = Math.min(0.32, 0.1 / lb); ring.push([[p[0] + ax * ta, p[1] + ay * ta], [p[0] + bx * tb, p[1] + bz * tb]]); }
+      else ring.push([p]);
     }
-    for (let al = -L + 0.2; al < L; al += rand(1.0, 1.5)) { const [x, z] = wallXZ(dir, al, 0.15); addG(lumpP, x, H - 0.05, z, rand(0.6, 0.9), rand(0.35, 0.5), 0.5, pick(th.stone), rand(-0.2, 0.2), WALL_RY[dir], rand(0, 6.3)); } // the roof curls down into the walls
+    const B = poly.map(([u, v]) => map(u, v, GROOVE)), R = ring.map(g => g.map(([u, v]) => map(u, v, face))), top = map(cu, cv, dome), F = R.flat();
+    tc.set(pick(th.stone)).offsetHSL(0, 0, rand(-0.04, 0.04)); const hex = tc.getHex(), dark = tc.multiplyScalar(0.7).getHex();
+    for (let n = 0; n < F.length; n++) put(F[n], F[(n + 1) % F.length], top, hex, back);
+    for (let n = 0; n < N; n++) {
+      const m = (n + 1) % N, rn = R[n], rm = R[m];
+      if (rn.length > 1) put(B[n], rn[0], rn[1], dark, back);
+      put(B[n], B[m], rm[0], dark, back); put(B[n], rm[0], rn[rn.length - 1], dark, back);
+      if (solid) { const Bn = map(poly[n][0], poly[n][1], 0.35), Bm = map(poly[m][0], poly[m][1], 0.35); put(B[n], B[m], Bm, dark, mid); put(B[n], Bm, Bn, dark, mid); put(Bn, Bm, map(cu, cv, 0.35), dark, top); }
+    }
+    return mid;
+  };
+  const cobbleWall = (dir, L, gap) => {
+    const shop = dir === r.shopDir, hole = gap ? 1.42 : shop ? 3.1 : 0, TOP = 3.42, map = (u, v, w) => { const [x, z] = wallXZ(dir, u, w); return [x, v, z]; };
+    const lo = [...Array(7)].map(() => rand(0.7, 1.3)), hi = [...Array(4)].map(() => rand(0.7, 1.3)), sl = lo.reduce((a, b) => a + b), sh = hi.reduce((a, b) => a + b), ys = [-0.12];
+    lo.forEach(k => ys.push(ys[ys.length - 1] + k / sl * (TOP + 0.12))); hi.forEach(k => ys.push(ys[ys.length - 1] + k / sh * (H + 0.15 - TOP))); // seven courses up to the top of a doorway, four above
+    const wav = ys.map((_, i) => i && i < ys.length - 1 ? [rand(0.8, 1.6), rand(0, 6.3), rand(2.2, 3.4), rand(0, 6.3)] : null);
+    const by = (i, u) => ys[i] + (wav[i] ? 0.07 * (Math.sin(u * wav[i][0] + wav[i][1]) * 0.6 + Math.sin(u * wav[i][2] + wav[i][3]) * 0.4) : 0);
+    const rows = ys.slice(1).map((_, i) => { // the joints in each course, slanting a little; a doorway's edges are joints too
+      const cutHere = hole && i < 7, js = cutHere ? [{ b: -hole, t: -hole }, { b: hole, t: hole }] : [];
+      for (let u = -L - 1.3 - rand(0, 0.5); u < L + 1.4; u += rand(0.45, 0.95)) if (!cutHere || Math.abs(Math.abs(u) - hole) > 0.32) js.push({ b: u + rand(-0.1, 0.1), t: u + rand(-0.1, 0.1) });
+      return js.sort((p, q) => p.b - q.b);
+    });
+    // every corner on a course line, from the stones on both sides of it, so neighbouring outlines match point for point
+    const bp = ys.map((_, i) => i && i < ys.length - 1 ? [...rows[i - 1].map(j => j.t), ...rows[i].map(j => j.b)].sort((p, q) => p - q) : []);
+    rows.forEach((js, i) => {
+      for (let k = 0; k + 1 < js.length; k++) {
+        const j0 = js[k], j1 = js[k + 1], opening = hole && i < 7 && Math.abs((j0.b + j1.b + j0.t + j1.t) / 4) < hole;
+        if (opening && (!shop || r.shop)) continue; // a doorway, or the goblin's wall once it's down
+        const poly = [[j0.b, by(i, j0.b)], ...bp[i].filter(u => u > j0.b + 1e-4 && u < j1.b - 1e-4).map(u => [u, by(i, u)]), [j1.b, by(i, j1.b)],
+          [j1.t, by(i + 1, j1.t)], ...bp[i + 1].filter(u => u < j1.t - 1e-4 && u > j0.t + 1e-4).reverse().map(u => [u, by(i + 1, u)]), [j0.t, by(i + 1, j0.t)]];
+        if (!opening) { stoneTris(poly, map, tri, false); continue; }
+        const P = [], C = [], at_ = stoneTris(poly, map, triTo(P, C), true); // a loose stone in the goblin's wall, its own piece so it can fall when the boss does
+        for (let n = 0; n < P.length; n += 3) { P[n] -= at_[0]; P[n + 1] -= at_[1]; P[n + 2] -= at_[2]; }
+        const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); sg.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); sg.computeVertexNormals();
+        plugMat = plugMat || new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.93 });
+        const m = meshOf(sg, plugMat); m.position.set(at_[0], at_[1], at_[2]); grp.add(m); plugStones.push(m);
+      }
+    });
+    if (shop) { // the sides and head of the goblin's doorway, so once the stones are gone you can't see behind the wall's skin
+      const edge = [[-hole, by(7, -hole)], ...bp[7].filter(u => Math.abs(u) < hole).map(u => [u, by(7, u)]), [hole, by(7, hole)]];
+      const quad = (u0, v0, u1, v1, from) => { const a = map(u0, v0, GROOVE), b = map(u1, v1, GROOVE), c2 = map(u1, v1, 0.8), d = map(u0, v0, 0.8); tri(a, b, c2, th.stone[3], from); tri(a, c2, d, th.stone[3], from); };
+      for (const sd of [-1, 1]) quad(sd * hole, -0.12, sd * hole, by(7, sd * hole), map(sd * (hole + 0.5), 1.6, 0.4));
+      for (let n = 0; n + 1 < edge.length; n++) quad(edge[n][0], edge[n][1], edge[n + 1][0], edge[n + 1][1], map((edge[n][0] + edge[n + 1][0]) / 2, edge[n][1] + 0.5, 0.4));
+    }
   };
   // bricks stop inside the door posts, so their cut ends never share a face with the frame
   const CUT = DOOR_HALF + 0.3;
@@ -1078,7 +1137,7 @@ function buildRoom(r) {
     for (let row = 0; row < 7; row++) {
       const y = row * 0.8 + 0.4, off = row % 2 ? 0.8 : 0;
       for (let cc = -L - 0.8 + off; cc < L + 0.9; cc += 1.6) {
-        if (th.cave && !(dir === r.shopDir && row < 4 && Math.abs(cc) < 4.2)) continue;
+        if (th.cave) continue;
         const segs = gap && row < 4 ? cut(cc - 0.775, cc + 0.775) : [[cc - 0.775, cc + 0.775]];
         for (const [a, b] of segs) if (b - a > 0.04) {
           const out = 0.3 + rand(-0.07, 0.07), hex = pick(th.stone);
@@ -1087,7 +1146,7 @@ function buildRoom(r) {
         }
       }
     }
-    if (th.cave) caveWall(dir, L, gap);
+    if (th.cave) cobbleWall(dir, L, gap);
     if (gap) { // door frame, then a short dark corridor beyond it. No two faces share a plane, or they flicker
       for (const s of [-1, 1]) addW(dir, s * (DOOR_HALF + 0.22), 0.1, 1.7, 0.44, 3.4, 1.2, th.trim);   // posts: out -0.5..0.7, past the bricks' back
       addW(dir, 0, 0.09, 3.42, DOOR_HALF * 2 + 1.04, 0.44, 1.3, th.trim);                             // lintel: out -0.56..0.74, wider and proud of the posts
@@ -1115,13 +1174,22 @@ function buildRoom(r) {
   }
   if (th.crates) for (const [x, z, s] of CRATES) { add(x, s / 2, z, s, s, s, 0x7A5432, rand(-0.3, 0.3)); floorBusy.push({ x0: x - s * 0.7, x1: x + s * 0.7, z0: z - s * 0.7, z1: z + s * 0.7 }); }
   if (th.cave) {
-    for (let x = -W - 0.4; x < W + 0.8; x += 1.25) for (let z = -D - 0.4; z < D + 0.8; z += 1.25) // the roof is rock all over, and no lump hangs lower than a mushroom can grip
-      addG(lumpP, x + rand(-0.3, 0.3), H + 0.14, z + rand(-0.3, 0.3), rand(0.75, 1.05), rand(0.22, 0.32), rand(0.75, 1.05), pick(th.stone), 0, rand(0, 6.3), 0);
-    for (let i = 0, n = th.glow ? 16 : 10; i < n; i++) { // stalactites, each with a lump where it leaves the roof
-      const x = rand(-W + 0.8, W - 0.8), z = rand(-D + 0.8, D - 0.8), rr = rand(0.12, 0.3), len = rand(0.4, 1.3);
+    { // the roof: one rough sheet of rock over the whole room
+      const step = 0.7, x0 = -W - 1.05, z0 = -D - 1.05, nx = Math.ceil(-2 * x0 / step) + 1, nz = Math.ceil(-2 * z0 / step) + 1, h = new Float32Array(nx * nz);
+      const bumps = [...Array(46)].map(() => [rand(x0, -x0), rand(z0, -z0), rand(0.8, 2.2), rand(0.12, 0.3)]);
+      for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+        const x = x0 + i * step, z = z0 + j * step; let d = rand(0, 0.06);
+        for (const [bx, bz, br, bh] of bumps) { const k = Math.hypot(x - bx, z - bz) / br; if (k < 1) d += bh * (1 - k * k) ** 2; }
+        h[j * nx + i] = H + 0.05 - Math.min(0.38, d);
+      }
+      caveRoof = { step, x0, z0, nx, nz, h };
+      const P = (i, j) => [x0 + i * step, h[j * nx + i], z0 + j * step];
+      for (let j = 0; j + 1 < nz; j++) for (let i = 0; i + 1 < nx; i++) { const a = P(i, j), b = P(i + 1, j), c2 = P(i + 1, j + 1), d = P(i, j + 1), above = [a[0], H + 3, a[2]]; tri(a, b, c2, pick(th.stone), above); tri(a, c2, d, pick(th.stone), above); }
+    }
+    for (let i = 0, n = th.glow ? 16 : 10; i < n; i++) { // stalactites, rooted a little way up inside the roof
+      const x = rand(-W + 0.8, W - 0.8), z = rand(-D + 0.8, D - 0.8), rr = rand(0.12, 0.3), len = rand(0.4, 1.3), top = roofAt(x, z) + 0.1;
       if (busyCeil(x, z, 0.5)) continue;
-      addG(coneP, x, H - len / 2 + 0.02, z, rr, len, rr, pick(th.stone), Math.PI, rand(0, 6.3), 0);
-      addG(lumpP, x, H + 0.02, z, rr * 2.2, 0.16, rr * 2.2, pick(th.stone), 0, rand(0, 6.3), 0);
+      addG(coneP, x, top - len / 2, z, rr, len, rr, pick(th.stone), Math.PI, rand(0, 6.3), 0);
       ceilBusy.push({ x0: x - rr, x1: x + rr, z0: z - rr, z1: z + rr });
     }
     for (const dir of ['N', 'S', 'W', 'E']) for (let i = 0; i < 3; i++) { // stubby stalagmites along the foot of the wall
@@ -1131,7 +1199,7 @@ function buildRoom(r) {
     }
   }
   if (th.moss) {
-    const greens = [0x3E5A2E, 0x4A6A34, 0x35502A, 0x56763A], wallOut = th.cave ? -0.02 : -0.08;
+    const greens = [0x3E5A2E, 0x4A6A34, 0x35502A, 0x56763A], wallOut = th.cave ? -0.07 : -0.03; // thick enough to reach back past the deepest stone or brick face
     for (const dir of ['N', 'S', 'W', 'E']) {
       const L = wallLen(dir);
       for (let i = 0, n = Math.round(5 * th.moss); i < n; i++) { // creeping up from the floor
@@ -1155,7 +1223,7 @@ function buildRoom(r) {
   if (th.roots) { // roots that found their way through the roof
     const rootHex = [0x5A4430, 0x6E5236, 0x4A3826];
     const dangle = (x, y, z, len) => { const pts = [[x, y, z]]; let px = x, pz = z; for (let k = 1; k <= 3; k++) { px += rand(-0.12, 0.12); pz += rand(-0.12, 0.12); pts.push([px, y - len * k / 3, pz]); } const tg = hornGeo(pts, rand(0.03, 0.05), 0.006, 6, 4).toNonIndexed(); addG(tg.attributes.position, 0, 0, 0, 1, 1, 1, pick(rootHex)); tg.dispose(); };
-    if (th.cave) for (let i = 0; i < (th.glow ? 14 : 8); i++) { const x = rand(-W + 1, W - 1), z = rand(-D + 1, D - 1); if (busyCeil(x, z, 0.3)) continue; dangle(x, H + 0.05, z, rand(0.6, 1.8)); ceilBusy.push({ x0: x - 0.25, x1: x + 0.25, z0: z - 0.25, z1: z + 0.25 }); }
+    if (th.cave) for (let i = 0; i < (th.glow ? 14 : 8); i++) { const x = rand(-W + 1, W - 1), z = rand(-D + 1, D - 1); if (busyCeil(x, z, 0.3)) continue; dangle(x, roofAt(x, z) + 0.08, z, rand(0.6, 1.8)); ceilBusy.push({ x0: x - 0.25, x1: x + 0.25, z0: z - 0.25, z1: z + 0.25 }); }
     else for (let z = -D + 1.5; z < D; z += 3) for (let i = 0; i < 2; i++) dangle(rand(-W + 1, W - 1), H - 0.36, z + rand(-0.12, 0.12), rand(0.5, 1.5));
   }
   if (th.glow) { // patches of glowing moss, low on the walls and along the foot of them
@@ -1164,7 +1232,7 @@ function buildRoom(r) {
       const dir = pick(['N', 'S', 'W', 'E']), L = wallLen(dir), al = rand(-L + 0.8, L - 0.8), onWall = Math.random() < 0.6, hex = pick(glows); if (doorish(dir, al, 0.6)) continue;
       for (let i = 0; i < 7; i++) {
         const a2 = al + rand(-0.5, 0.5), sz = rand(0.025, 0.06);
-        if (onWall) { const [x, z] = wallXZ(dir, a2, -0.05); addG(lumpP, x, rand(0.1, 1.0), z, sz, sz, sz, hex, 0, rand(0, 6), 0, glow); }
+        if (onWall) { const [x, z] = wallXZ(dir, a2, -0.08); addG(lumpP, x, rand(0.1, 1.0), z, sz, sz, sz, hex, 0, rand(0, 6), 0, glow); }
         else { const [x, z] = wallXZ(dir, a2, -rand(0.15, 0.9)); addG(lumpP, x, 0.02, z, sz, sz * 0.6, sz, hex, 0, rand(0, 6), 0, glow); }
       }
     }
@@ -1189,15 +1257,16 @@ function buildRoom(r) {
   Math.random = keepRand;
   if (glow[0].length) { const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(glow[0], 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(glow[1], 3)); grp.add(meshOf(gg, new THREE.MeshBasicMaterial({ vertexColors: true }))); }
   if (r.type === 'start' && floorNum === 1 && !coarse) grp.add(chalkControls());
+  if (plugStones.length) plug = { dir: r.shopDir, meshes: plugStones };
   if (plugBricks.length) plug = { dir: r.shopDir, meshes: plugBricks.map(b => {
     const [x, z] = wallXZ(r.shopDir, b.along, b.out), ns = r.shopDir === 'N' || r.shopDir === 'S', m = meshOf(GEO.box, M(b.hex));
     m.position.set(x, b.y, z); m.scale.set(ns ? b.len : 0.6, 0.76, ns ? 0.6 : b.len); grp.add(m); return m;
   }) };
-  const ceil = meshOf(new THREE.PlaneGeometry(W * 2 + 2, D * 2 + 2), M(th.cave ? th.stone[3] : th.ceil)); // a cave's roof is the same rock as its walls ceil.rotation.x = Math.PI / 2; ceil.position.y = H; grp.add(ceil);
+  const ceil = meshOf(new THREE.PlaneGeometry(W * 2 + 2, D * 2 + 2), M(th.cave ? th.stone[3] : th.ceil)); ceil.rotation.x = Math.PI / 2; ceil.position.y = H; if (!th.cave) grp.add(ceil);
   if (!th.cave) for (const [px, pz] of th.pillars) grp.add(at(meshOf(new THREE.CylinderGeometry(0.55, 0.62, H, 8), M(th.stone[2])), px, H / 2, pz));
   // four torches on the side walls, plus the room's accent light
   [['W', -3.6], ['W', 3.6], ['E', -3.6], ['E', 3.6]].forEach(([dir, along], i) => {
-    wallBusy.push({ dir, a0: along - 0.45, a1: along + 0.45, y0: th.lab ? 3.0 : 2.1, y1: th.lab ? 3.6 : 3.0 });
+    wallBusy.push({ dir, a0: along - 0.45, a1: along + 0.45, y0: th.lab ? 3.0 : 1.8, y1: th.lab ? 3.6 : 3.0 });
     if (th.lab) { // the lab gets steady strip lamps instead of fire
       const [x, z] = wallXZ(dir, along, -0.05), lamp = at(meshOf(new THREE.BoxGeometry(0.9, 0.16, 0.18), M(0xE8F4FF, { emissive: 0xCFE8FF, emissiveIntensity: 1.2 })), x, 3.3, z);
       lamp.rotation.y = WALL_RY[dir]; grp.add(lamp); const L = torchLights[i], [lx, lz] = wallXZ(dir, along, -0.6); L.color.set(th.torch); L.position.set(lx, 3.2, lz); L.intensity = 1.25; return;
@@ -1236,7 +1305,7 @@ function buildRoom(r) {
   th.spots.forEach((sp, idx) => {
     const cg = new THREE.Group(), caps = [], [x, z] = wallXZ(sp.wall, sp.along, -0.05);
     for (let i = 0; i < 3; i++) {
-      if (sp.kind === 'frost') { const m = lichen(); m.position.set((i - 1) * 0.34 + rand(-0.05, 0.05), rand(-0.22, 0.22), th.cave ? -0.03 : 0.01); m.rotation.z = rand(0, 6.3); m.visible = i < r.caps[idx]; cg.add(m); caps.push(m); continue; }
+      if (sp.kind === 'frost') { const m = lichen(); m.position.set((i - 1) * 0.34 + rand(-0.05, 0.05), rand(-0.22, 0.22), th.cave ? 0.03 : 0.01); m.rotation.z = rand(0, 6.3); m.visible = i < r.caps[idx]; cg.add(m); caps.push(m); continue; }
       const s = rand(0.16, 0.26), m = new THREE.Group();
       m.add(at(meshOf(new THREE.CylinderGeometry(s * 0.25, s * 0.3, s * 0.9, 5), M(0xE8DCC8)), 0, s * 0.45, 0));
       m.add(at(meshOf(new THREE.SphereGeometry(s, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2), capMat[sp.kind]), 0, s * 0.85, 0));
@@ -1248,7 +1317,7 @@ function buildRoom(r) {
     wallBusy.push({ dir: sp.wall, a0: sp.along - 0.6, a1: sp.along + 0.6, y0: sp.y - 0.45, y1: sp.y + 0.45 });
     if (sp.origin === 'drain') {
       if (!th.cave) {
-        const [px, pz] = wallXZ(sp.wall, sp.along, -0.25), pipe = at(meshOf(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 6), M(0x5A5560, { metalness: 0.4, roughness: 0.5 })), px, 2.1, pz);
+        const [px, pz] = wallXZ(sp.wall, sp.along, -0.12), pipe = at(meshOf(new THREE.CylinderGeometry(0.08, 0.08, 0.76, 6), M(0x5A5560, { metalness: 0.4, roughness: 0.5 })), px, 2.1, pz);
         if (sp.wall === 'W' || sp.wall === 'E') pipe.rotation.z = Math.PI / 2; else pipe.rotation.x = Math.PI / 2;
         grp.add(pipe); wallBusy.push({ dir: sp.wall, a0: sp.along - 0.25, a1: sp.along + 0.25, y0: 1.9, y1: 2.35 });
       }
@@ -3590,7 +3659,7 @@ function fieldSpots(n) {
     const d = pick(['N', 'S', 'W', 'E']), lim = d === 'N' || d === 'S' ? W : D, along = rand(-lim + 1.2, lim - 1.2), y = rand(0.9, 2.7);
     if (doorsAt.includes(d) && Math.abs(along) < DOOR_HALF + 1.0) continue;
     if (wallBusy.some(b => b.dir === d && along > b.a0 - 0.5 && along < b.a1 + 0.5 && y > b.y0 - 0.5 && y < b.y1 + 0.5)) continue; // never through a torch, a pipe, a turret or a cluster of caps
-    const [x, z] = wallXZ(d, along, THEMES[r.theme].cave ? -0.08 : -0.05);
+    const [x, z] = wallXZ(d, along, THEMES[r.theme].cave ? -0.06 : -0.05);
     if (out.some(o => o.at === d && Math.hypot(x - o.x, z - o.z, y - o.y) < 1.4)) continue;
     if (r.theme === 'lab' && d === 'N' && Math.abs(along) < 3.2) continue; // not across the observation window
     out.push({ at: d, x, y, z });
@@ -3598,7 +3667,7 @@ function fieldSpots(n) {
   for (let g = 0; g < 200 && out.filter(o => o.at === 'c').length < nCeil; g++) {
     const x = rand(-W + 1.5, W - 1.5), z = rand(-D + 1.5, D - 1.5);
     if (ceilBusy.some(b => x > b.x0 - 0.55 && x < b.x1 + 0.55 && z > b.z0 - 0.55 && z < b.z1 + 0.55)) continue; // not under a beam, a stalactite or a root
-    if (!out.some(o => o.at === 'c' && Math.hypot(x - o.x, z - o.z) < 1.8)) out.push({ at: 'c', x, y: THEMES[r.theme].cave ? H - 0.15 : H - 0.02, z });
+    if (!out.some(o => o.at === 'c' && Math.hypot(x - o.x, z - o.z) < 1.8)) out.push({ at: 'c', x, y: roofAt(x, z) - 0.02, z });
   }
   return out;
 }
@@ -3613,7 +3682,7 @@ function buildShroom(s) {
   const inner = new THREE.Group(); inner.rotation.y = s.yaw; stalk.add(inner); s.inner = inner;
   s.eyes = []; s.mats = [];
   const big = s.at === 'f' ? 1 : 0.86; // the base sinks a little into whatever it's on, so a bumpy wall can't show under the rim
-  mkAdd(mound, mkLathe([[0.52 * big, -0.05], [0.5 * big, 0], [0.4 * big, 0.06], [0.22 * big, 0.1], [0, 0.11]], 9), MKM.dirt);
+  mkAdd(mound, mkLathe([[0.47 * big, -0.22], [0.52 * big, -0.05], [0.5 * big, 0], [0.4 * big, 0.06], [0.22 * big, 0.1], [0, 0.11]], 9), MKM.dirt);
   [[0.42, 0.3], [-0.36, 0.2], [0.1, -0.44]].forEach(([x, z]) => { const c = mkAdd(mound, GEO.ico0, MKM.dirt2, x * big, 0.05, z * big); c.scale.setScalar(0.07); c.rotation.set(x * 5, z * 4, 0); });
   if (s.at !== 'f') [[0.3, -0.3], [-0.38, -0.12]].forEach(([x, z]) => { const c = mkAdd(mound, GEO.ico0, MKM.moss, x, 0.02, z); c.scale.set(0.16, 0.05, 0.12); });
   mkAdd(inner, mkLathe([[0, 0.08], [0.17, 0.08], [0.165, 0.2], [0.145, 0.34], [0, 0.36]], 8), MKM.stem);
@@ -3693,6 +3762,14 @@ function fieldTick(sdt) {
     }
   }
   if (net.on && net.host && field.lurk && !field.lurk.dead && (field.sendT -= sdt) <= 0) fieldSend();
+  // never a dead end: if the real one has gone missing, deal again; if it's the last one standing, the Lurker gives itself up
+  const lk = field.lurk; field.dealT = Math.max(0, (field.dealT || 0) - sdt);
+  if (lk && !lk.dead && lk.ph === 'hidden' && !netGuest()) {
+    const left = field.list.filter(o => o.live), real = left.find(o => o.real);
+    if (!real) { if (field.dealT <= 0) { field.dealT = 3; fieldDeal(lk, lab.on ? 10 : fieldCount(lk.tier || floorNum)); } }
+    else if (left.length > 1) field.lastT = 0;
+    else if ((field.lastT = (field.lastT || 0) + sdt) > 2.5) { field.lastT = 0; lurkerSurface(lk, real, 'NOWHERE LEFT TO HIDE'); }
+  }
 }
 // you hit a mushroom: the host sorts out what that means; a partner tells the host
 function shroomStruck(s) {
@@ -3726,13 +3803,13 @@ function fakeHit(s) {
   };
   if (s.at === 'f') go(); else s.onLand = go; // one on a wall drops off first
 }
-function lurkerSurface(e, s) {
+function lurkerSurface(e, s, msg) {
   shroomGone(s, 'real'); fieldSend([s.id, 'real']);
   const at = s.at === 'f' ? { x: s.x, z: s.z } : floorBelow(s);
   e.yaw = Math.atan2(player.pos.x - at.x, player.pos.z - at.z);
   e.pos.set(at.x - Math.sin(e.yaw) * 0.06, 0, at.z - Math.cos(e.yaw) * 0.06); e.kbv = null; e.lev = 0; e.atk = 0;
   mkSetKind(e, s.kind); mkPhase(e, 'emerge'); e.gr = mkGround(at.x, at.z); e.surfHp = e.hp; e.outT = 0; e.mk.prevY = null;
-  const sp = project(new THREE.Vector3(at.x, 1.4, at.z)); callout('FOUND IT', 2, sp.behind ? {} : { at: true, x: sp.x, y: sp.y }); SFX.rumble();
+  const sp = project(new THREE.Vector3(at.x, 1.4, at.z)); callout(msg || 'FOUND IT', 2, sp.behind ? {} : { at: true, x: sp.x, y: sp.y }); SFX.rumble();
 }
 const lurkOut = e => Math.max(4.5, 7 - 0.4 * ((e.tier || 1) - 1));
 // the beetle's hop: wing cases open (it takes double while they are), up, over, and down on you
