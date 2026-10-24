@@ -827,10 +827,11 @@ const THEMES = {
     spots: [{ kind: 'doom', origin: 'torch', wall: 'E', along: -3.6, y: 1.1 }, { kind: 'doom', origin: 'torch', wall: 'W', along: 3.6, y: 1.1 }, { kind: 'glowcap', origin: 'high', wall: 'N', along: -4.8, y: 2.6 }],
   },
   garden: {
-    name: 'Glowcap Garden', stone: [0x3E4A3C, 0x374335, 0x465444, 0x334031], floor: [0x2E3A2A, 0x2A3527, 0x334030], trim: 0x334031, beam: 0x3A2A1A, ceil: 0x121A10,
-    fog: 0x0A100A, hemi: [0x7AA878, 0x1E2A16, 0.65], torch: 0xFFC070, accent: [0x3FE6C9, 0, 1.6, -2.5], pillars: [], fountain: true, tip: 'Safe room. Harvest everything',
-    spots: [{ kind: 'glowcap', origin: 'drain', wall: 'W', along: 5.8, y: 1.25 }, { kind: 'frost', origin: 'drain', wall: 'E', along: 5.8, y: 1.25 }, { kind: 'glowcap', origin: 'high', wall: 'N', along: -4.8, y: 2.6 },
-            { kind: 'glowcap', origin: 'high', wall: 'N', along: 4.8, y: 2.6 }, { kind: 'doom', origin: 'torch', wall: 'E', along: -3.6, y: 1.1 }, { kind: 'doom', origin: 'torch', wall: 'W', along: -3.6, y: 1.1 }],
+    name: 'Glowcap Garden', stone: [0x4A5444, 0x434D3E, 0x525D4B, 0x3C4538], floor: [0x2F5224, 0x355A28, 0x2B4C21], path: [0x8A8478, 0x7E786C, 0x958F82], trim: 0x5A4A32, beam: 0x3A2A1A, ceil: 0x161E14,
+    fog: 0x0C140C, hemi: [0x9AD08E, 0x223018, 0.7], torch: 0xFFC070, accent: [0xD8F4FF, 0, 3.9, 0], accentI: 1.4, accentD: 11, pillars: [], garden: true, tip: 'Safe room. Harvest everything',
+    // the same six finds as ever: the drain-grown ones in beds by the pool, the high ones up the old glowcap's trunk, the torch ones under the torches
+    spots: [{ kind: 'glowcap', origin: 'drain', bed: 0 }, { kind: 'frost', origin: 'drain', bed: 1 }, { kind: 'glowcap', origin: 'high', trunk: 0 },
+            { kind: 'glowcap', origin: 'high', trunk: 1 }, { kind: 'doom', origin: 'torch', wall: 'E', along: -3.6, y: 1.1 }, { kind: 'doom', origin: 'torch', wall: 'W', along: -3.6, y: 1.1 }],
   },
   vault: {
     name: 'Vault', stone: [0x4E4652, 0x47404B, 0x574E5B, 0x403A45], floor: [0x3E3540, 0x39303B, 0x433A46], trim: 0x6A5A3A, beam: 0x4A3222, ceil: 0x1E1922,
@@ -904,6 +905,7 @@ function genFloorRaw(n) {
   for (const r of map.values()) {
     r.king = r.type === 'stairs' && n % FINAL_FLOOR === 0;
     r.theme = r.type === 'garden' ? 'garden' : r.type === 'treasure' ? 'vault' : r.type === 'stairs' ? pick(bio.boss) : r.type === 'start' && n === 1 ? bio.start : bio.fight[ti++ % bio.fight.length];
+    if (r.type === 'garden') r.gc = Math.floor(Math.random() * 4); // which corner the old glowcap grows in
     r.dseed = 1 + Math.floor(Math.random() * 2147483000); // the room's rocks and moss come out the same on every visit, and on every partner's screen
     r.caps = THEMES[r.theme].spots.map(() => Math.random() < (r.type === 'garden' ? 0.5 : 0.22) ? 1 : 0); r.depth = dist.get(r) || 0; // most walls are bare now; a cap is a find
     if (r.type === 'stairs') { const inDir = Object.keys(r.n).find(d => r.n[d]), free = ['N', 'S', 'W', 'E'].filter(d => !r.n[d]); r.shopDir = inDir && free.includes(DIRS[inDir].opp) ? DIRS[inDir].opp : pick(free); }
@@ -921,7 +923,7 @@ function genFloorRaw(n) {
     if (host) {
       const th = THEMES[host.theme], traps = [...(host.pits || []), ...(host.spikes || [])];
       // never under or beside anything: pillars, crates, the fountain, the chest and its coins, or a trap
-      const props = [...th.pillars.map(([px, pz]) => [px, pz, 1.9]), ...(th.crates ? CRATES.map(([cx, cz]) => [cx, cz, 1.7]) : []), ...(th.fountain ? [[0, -2.5, 2.3]] : []), ...(th.chest ? [[0, -5.6, 2.4], ...COIN_PILES.map(([cx, cz]) => [cx, cz, 1.4])] : [])];
+      const props = [...th.pillars.map(([px, pz]) => [px, pz, 1.9]), ...(th.crates ? CRATES.map(([cx, cz]) => [cx, cz, 1.7]) : []), ...(th.garden ? gardenProps(host) : []), ...(th.chest ? [[0, -5.6, 2.4], ...COIN_PILES.map(([cx, cz]) => [cx, cz, 1.4])] : [])];
       for (let g = 0; g < 60; g++) {
         const x = pick([-5, -3, -1, 1, 3, 5]), z = pick([-6, -4, -2, 0, 2, 4, 6]);
         if (props.some(([px, pz, rr]) => Math.hypot(px - x, pz - z) < rr) || traps.some(t => Math.abs(t.x - x) <= 2 && Math.abs(t.z - z) <= 2)) continue;
@@ -931,6 +933,13 @@ function genFloorRaw(n) {
   }
   return { map, start, biome: bio };
 }
+// the garden's furniture: a pool in the middle, the old glowcap in one corner, beds on the other three diagonals, a bench under the glowcap
+function gardenLayout(r) {
+  const c = r.gc | 0, sx = c & 1 ? 1 : -1, sz = c & 2 ? 1 : -1, tree = { x: sx * 5.2, z: sz * 6.2 }, toC = Math.atan2(-tree.x, -tree.z);
+  const beds = [[1, 1], [-1, 1], [-1, -1], [1, -1]].filter(([bx, bz]) => bx !== sx || bz !== sz).map(([bx, bz]) => ({ x: bx * 4.4, z: bz * 4.6, a: Math.atan2(bx * 4.4, bz * 4.6) }));
+  return { tree, beds, bench: { x: tree.x + Math.sin(toC) * 1.75, z: tree.z + Math.cos(toC) * 1.75, a: toC } };
+}
+const gardenProps = r => { const L = gardenLayout(r); return [[0, 0, 3.4], [L.tree.x, L.tree.z, 2.5], [L.bench.x, L.bench.z, 1.6], ...L.beds.map(b => [b.x, b.z, 2.2])]; };
 const needsFight = r => (r.type === 'start' || r.type === 'fight' || r.type === 'stairs') && !r.cleared;
 const where = () => room ? `F${floorNum} · ${THEMES[room.theme].name}` : '';
 
@@ -942,7 +951,8 @@ const fxLight = new THREE.PointLight(0x9FDCFF, 0, 10, 2); fxLight.position.set(0
 
 let roomGroup = null, colliders = [], doors = [], harvestables = [], flames = [], drips = [], waterRects = [], lavaRects = [], waterMats = [], lavaMats = [];
 let roomChest = null, fountainSpot = null, trapdoor = null;
-let wallBusy = [], floorBusy = [], ceilBusy = [], caveRoof = null; // torches, pipes, crates, beams, stalactites: things a mushroom mustn't grow through
+let wallBusy = [], floorBusy = [], ceilBusy = [], caveRoof = null, roomFx = [], fountainBits = null, fountainReach = 2.8;
+function fountainDry() { if (!fountainBits) return; fountainBits.flow.forEach(m => { m.visible = false; }); drips = drips.filter(d => !fountainBits.drips.includes(d)); } // drunk: the water stops // torches, pipes, crates, beams, stalactites: things a mushroom mustn't grow through
 function buildChest(open) {
   const g = new THREE.Group(), lid = new THREE.Group(), gold = M(0xD9B44A, { metalness: 0.5, roughness: 0.4 });
   const wood = M(0x8A5A30), lining = M(0x4E2E18), seam = M(0x2E1A0C), velvet = M(0x7A1E34, { roughness: 1 });
@@ -1037,7 +1047,7 @@ function buildRoom(r) {
     return parts;
   };
   waterRects = th.water || []; lavaRects = (th.lava || []).flatMap(dryDoors); doors = []; harvestables = []; flames = []; drips = []; waterMats = []; lavaMats = [];
-  roomChest = null; fountainSpot = null; trapdoor = null; xBrick = null; wallBusy = []; floorBusy = []; ceilBusy = []; caveRoof = null;
+  roomChest = null; fountainSpot = null; trapdoor = null; xBrick = null; wallBusy = []; floorBusy = []; ceilBusy = []; caveRoof = null; roomFx = []; fountainBits = null; fountainReach = 2.8;
   // everything static goes into one vertex-coloured mesh
   const keepRand = Math.random; if (r.dseed) Math.random = mulberry(r.dseed);
   let xCol = null;
@@ -1129,6 +1139,7 @@ function buildRoom(r) {
     if ((r.type === 'stairs' && x === STAIRS.x && z === STAIRS.z) || (r.pits && r.pits.some(p => p.x === x && p.z === z))) continue; // holes
     const isX = r.xTile && r.xTile.x === x && r.xTile.z === z, level = isX || (r.spikes && r.spikes.some(t => t.x === x && t.z === z));
     if (th.cave && !level) add(x + rand(-0.03, 0.03), -0.1 + rand(-0.035, 0.03), z + rand(-0.03, 0.03), rand(1.88, 1.96), 0.2, rand(1.88, 1.96), pick(th.floor), rand(-0.04, 0.04));
+    else if (th.garden) add(x, -0.1, z, isX ? 1.94 : 2.0, 0.2, isX ? 1.94 : 2.0, pick(isX ? th.path : th.floor)); // one unbroken lawn, with a paving slab for the X
     else add(x, -0.1 + (level ? 0 : rand(-0.025, 0.025)), z, 1.94, 0.2, 1.94, pick(th.floor)); // the X and spike tiles sit dead level
     if (isX) xCol = c.clone();
   }
@@ -1150,7 +1161,7 @@ function buildRoom(r) {
     if (gap) { // door frame, then a short dark corridor beyond it. No two faces share a plane, or they flicker
       for (const s of [-1, 1]) addW(dir, s * (DOOR_HALF + 0.22), 0.1, 1.7, 0.44, 3.4, 1.2, th.trim);   // posts: out -0.5..0.7, past the bricks' back
       addW(dir, 0, 0.09, 3.42, DOOR_HALF * 2 + 1.04, 0.44, 1.3, th.trim);                             // lintel: out -0.56..0.74, wider and proud of the posts
-      addW(dir, 0, 1.44, -0.1, DOOR_HALF * 2 + 0.48, 0.2, 2.92, th.floor[0]);
+      addW(dir, 0, 1.44, -0.1, DOOR_HALF * 2 + 0.48, 0.2, 2.92, th.path ? th.path[0] : th.floor[0]);
       for (const s of [-1, 1]) addW(dir, s * (DOOR_HALF + 0.24), 1.8, 1.7, 0.4, 3.4, 2.2, th.stone[0]); // corridor walls sit 4cm behind the posts
       addW(dir, 0, 1.79, 3.36, DOOR_HALF * 2 + 0.96, 0.2, 2.14, 0x0E0B10);                            // corridor ceiling sits above the lintel's underside
       addW(dir, 0, 2.9, 1.725, DOOR_HALF * 2 + 1.04, 3.55, 0.2, 0x07050A);
@@ -1165,7 +1176,7 @@ function buildRoom(r) {
     addW(sd, 0, 2.6, 1.75, 6.4, 3.5, 0.2, 0x1A1418);
     if (r.shop) for (let i = 0; i < 9; i++) { const k = rand(0.22, 0.5), [x, z] = wallXZ(sd, rand(-2.5, 2.5), rand(-1.0, -0.2)); add(x, k / 2, z, k * 1.6, k, k, pick(th.stone), rand(0, Math.PI)); }
   }
-  if (!th.cave) for (let z = -D + 1.5; z < D; z += 3) { add(0, H - 0.2, z, W * 2, 0.35, 0.4, th.beam); ceilBusy.push({ x0: -W, x1: W, z0: z - 0.2, z1: z + 0.2 }); }
+  if (!th.cave && !th.garden) for (let z = -D + 1.5; z < D; z += 3) { add(0, H - 0.2, z, W * 2, 0.35, 0.4, th.beam); ceilBusy.push({ x0: -W, x1: W, z0: z - 0.2, z1: z + 0.2 }); }
   if (!th.cave) for (const [px, pz] of th.pillars) { add(px, 0.2, pz, 1.7, 0.4, 1.7, th.trim); add(px, H - 0.2, pz, 1.6, 0.4, 1.6, th.trim); }
   else for (const [px, pz] of th.pillars) { // a stalactite and a stalagmite that met in the middle
     const lg = new THREE.LatheGeometry([[1.0, -0.05], [0.78, 0.45], [0.56, 1.2], [0.42, 2.1], [0.36, 2.7], [0.42, 3.3], [0.58, 4.2], [0.82, 4.95], [1.05, H + 0.05]].map(([rr, y]) => new THREE.Vector2(rr * rand(0.9, 1.08), y)), 7).toNonIndexed();
@@ -1237,7 +1248,7 @@ function buildRoom(r) {
       }
     }
   }
-  for (const sp of th.spots) if (sp.origin === 'drain' && !th.cave) {
+  for (const sp of th.spots) if (sp.origin === 'drain' && sp.wall && !th.cave) {
     for (let i = 0; i < 5; i++) addW(sp.wall, sp.along - 0.4 + i * 0.2, -0.75, 0.015, 0.07, 0.04, 0.9, 0x1E1B22);
     addW(sp.wall, sp.along, -0.75, 0.005, 1.05, 0.02, 1.0, 0x0E0C10);
   }
@@ -1252,6 +1263,153 @@ function buildRoom(r) {
     for (const [dx, dz, sx, sz] of [[-0.97, 0, 0.06, 1.94], [0.97, 0, 0.06, 1.94], [0, -0.97, 1.88, 0.06], [0, 0.97, 1.88, 0.06]]) add(STAIRS.x + dx, -1.3, STAIRS.z + dz, sx, 2.6, sz, 0x16121A); // the short walls tuck between the long ones
     for (let i = 0; i < 6; i++) add(STAIRS.x, -0.35 - i * 0.38, STAIRS.z + 0.75 - i * 0.3, 1.8, 0.12, 0.4, th.floor[1]);
   }
+  const GL = th.garden ? gardenLayout(r) : null;
+  if (GL) { // the garden: a lawn, a pool and fountain under a light-well, the old glowcap in a corner, raised beds, ivy up every wall
+    const leafy = [0x3E7A30, 0x4E8A3A, 0x2F6426, 0x5E9A44], blades = [0x5A9040, 0x6AA048, 0x4E8436, 0x7AB050], petals = [0xFF8AB0, 0xFFFFFF, 0xFFD23A, 0xB48AFF, 0xFF6A4D];
+    const flat = geo => (geo.index ? geo.toNonIndexed() : geo).attributes.position;
+    const cylP = flat(new THREE.CylinderGeometry(1, 1, 1, 7)), cyl10 = flat(new THREE.CylinderGeometry(1, 1, 1, 10)), discP = flat(new THREE.CircleGeometry(1, 7)), disc5 = flat(new THREE.CircleGeometry(1, 5)), ballP = flat(new THREE.SphereGeometry(1, 8, 5));
+    const lathe = (pts, x, y, z, hex, n = 10) => { const lg = new THREE.LatheGeometry(pts.map(([a, b]) => new THREE.Vector2(a, b)), n).toNonIndexed(); addG(lg.attributes.position, x, y, z, 1, 1, 1, hex, 0, rand(0, 6.3), 0); lg.dispose(); };
+    const tube = (pts, r0, r1, hex) => { const tg = hornGeo(pts, r0, r1, 8, 4).toNonIndexed(); addG(tg.attributes.position, 0, 0, 0, 1, 1, 1, hex); tg.dispose(); };
+    const two = (a, b, c, hex) => { // a triangle seen from both sides, for leaves and blades
+      const n = [(b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]), (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])];
+      const m = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
+      tri(a, b, c, hex, [m[0] - n[0], m[1] - n[1], m[2] - n[2]]); tri(a, b, c, hex, [m[0] + n[0], m[1] + n[1], m[2] + n[2]]);
+    };
+    const leaf = (a, b, w, hex) => { // a leaf folded along its midrib, from its stalk end a to its tip b
+      const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dz) || 1, sx = -dz / L * w, sz = dx / L * w, m = [a[0] + dx * 0.45, a[1] + dy * 0.45 + w * 0.35, a[2] + dz * 0.45];
+      two(a, [m[0] - sx, m[1] - w * 0.25, m[2] - sz], b, hex); two(a, b, [m[0] + sx, m[1] - w * 0.25, m[2] + sz], hex);
+    };
+    const fern = (x, y, z, s) => { for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + rand(-0.3, 0.3), L = s * rand(0.8, 1.1); leaf([x, y, z], [x + Math.sin(a) * L, y + L * 0.5, z + Math.cos(a) * L], L * 0.2, pick(leafy)); } };
+    const flower = (x, y, z, h, hex) => {
+      addG(cylP, x, y + h / 2, z, 0.012, h, 0.012, 0x3E7A30);
+      addG(discP, x, y + h, z, 0.07, 0.07, 1, hex, -Math.PI / 2, rand(0, 6.3), 0); addG(ballP, x, y + h + 0.012, z, 0.026, 0.016, 0.026, 0xFFD23A);
+    };
+    const tulip = (x, y, z, h, hex) => { addG(cylP, x, y + h / 2, z, 0.012, h, 0.012, 0x3E7A30); addG(ballP, x, y + h + 0.03, z, 0.045, 0.075, 0.045, hex); leaf([x, y, z], [x + rand(-0.12, 0.12), y + h * 0.6, z + rand(-0.12, 0.12)], 0.035, pick(leafy)); };
+    const pumpkin = (x, y, z, s) => { addG(ballP, x, y + s * 0.62, z, s, s * 0.68, s, 0xE8781E, 0, rand(0, 6.3), 0); addG(cylP, x, y + s * 1.25, z, 0.03, 0.14, 0.03, 0x5A6A2A, rand(-0.3, 0.3), 0, rand(-0.3, 0.3)); for (let k = 0; k < 2; k++) { const a = rand(0, 6.3); leaf([x, y + 0.02, z], [x + Math.sin(a) * s * 1.6, y + 0.12, z + Math.cos(a) * s * 1.6], s * 0.45, pick(leafy)); } };
+    const bw = (b, lx, lz) => [b.x + lx * Math.cos(b.a) + lz * Math.sin(b.a), b.z - lx * Math.sin(b.a) + lz * Math.cos(b.a)]; // a bed's own coordinates to the room's
+    const sx = Math.sign(GL.tree.x), sz = Math.sign(GL.tree.z);
+    const inBed = (x, z, pad) => GL.beds.some(b => { const dx = x - b.x, dz = z - b.z, lx = dx * Math.cos(b.a) - dz * Math.sin(b.a), lz = dx * Math.sin(b.a) + dz * Math.cos(b.a); return Math.abs(lx) < 1.6 + pad && Math.abs(lz) < 0.85 + pad; });
+    const onPath = (x, z, pad) => (r.n.N && Math.abs(x) < 0.6 + pad && z < -3) || (r.n.S && Math.abs(x) < 0.6 + pad && z > 3) || (r.n.W && Math.abs(z) < 0.6 + pad && x < -3) || (r.n.E && Math.abs(z) < 0.6 + pad && x > 3);
+    const taken = (x, z, pad) => Math.hypot(x, z) < 3.25 + pad || inBed(x, z, pad) || Math.hypot(x - GL.tree.x, z - GL.tree.z) < 1.25 + pad || Math.hypot(x - GL.bench.x, z - GL.bench.z) < 1.0 + pad
+      || (r.xTile && Math.abs(x - r.xTile.x) < 1.1 + pad && Math.abs(z - r.xTile.z) < 1.1 + pad) || onPath(x, z, pad) || (Math.abs(x) > 6.5 && Math.abs(z) > 7.5);
+    // stepping stones from each doorway to a ring of paving round the pool
+    for (const d of ['N', 'S', 'W', 'E']) if (r.n[d]) {
+      const v = DIRS[d], len = (d === 'N' || d === 'S' ? D : W) - 0.7;
+      for (let t = 3.35; t < len; t += 0.78) { const lat = rand(-0.14, 0.14), x = v.nx * t + (v.nz ? lat : 0), z = v.nz * t + (v.nx ? lat : 0), rr = rand(0.3, 0.4); if (r.xTile && Math.abs(x - r.xTile.x) < 1.1 && Math.abs(z - r.xTile.z) < 1.1) continue; addG(cylP, x, 0, z, rr, 0.07, rr * rand(0.8, 1), pick(th.path), 0, rand(0, 6.3), 0); }
+    }
+    for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2 + rand(-0.05, 0.05), rr = rand(0.33, 0.4); addG(cylP, Math.sin(a) * 2.85, 0, Math.cos(a) * 2.85, rr, 0.07, rr * rand(0.85, 1), pick(th.path), 0, rand(0, 6.3), 0); }
+    // the pool: a ring of kerb stones, a dark bottom, lily pads, and a fountain of two basins in the middle
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; add(Math.sin(a) * 2.3, 0.25 + (i % 2) * 0.01, Math.cos(a) * 2.3, 1.24, 0.5 + (i % 2) * 0.02, 0.42, pick(th.path), a); }
+    addG(flat(new THREE.CircleGeometry(1, 12)), 0, 0.012, 0, 2.15, 2.15, 1, 0x16302E, -Math.PI / 2, 0, 0);
+    const padP = flat(new THREE.CircleGeometry(1, 9, 0, Math.PI * 2 - 0.6));
+    for (let i = 0; i < 5; i++) {
+      const a = i / 5 * Math.PI * 2 + rand(0, 0.8), rr = rand(1.35, 1.8), x = Math.sin(a) * rr, z = Math.cos(a) * rr, s = rand(0.2, 0.3);
+      addG(padP, x, 0.352, z, s, s, 1, pick([0x4E8A3A, 0x3E7A30]), -Math.PI / 2, rand(0, 6.3), 0);
+      if (i < 2) for (let k = 0; k < 5; k++) { const pa = k / 5 * Math.PI * 2; addG(coneP, x + Math.sin(pa) * 0.04, 0.4, z + Math.cos(pa) * 0.04, 0.04, 0.11, 0.025, 0xFFA8C8, 0.5, pa, 0); } // a lotus on two of them
+    }
+    const fs = 0xA8A294;
+    lathe([[0.55, 0], [0.5, 0.15], [0.22, 0.3], [0.17, 0.95], [0.12, 1.0]], 0, 0, 0, fs);
+    lathe([[0.1, 0.98], [0.72, 1.04], [0.95, 1.24], [0.87, 1.27], [0.12, 1.13]], 0, 0, 0, fs);
+    lathe([[0.13, 1.12], [0.1, 1.4], [0.13, 1.7]], 0, 0, 0, fs);
+    lathe([[0.08, 1.68], [0.42, 1.73], [0.5, 1.86], [0.44, 1.88], [0.08, 1.81]], 0, 0, 0, fs);
+    lathe([[0.06, 1.8], [0.11, 1.95], [0.07, 2.05], [0, 2.13]], 0, 0, 0, fs);
+    { // a watering can left on the kerb
+      const a = rand(0, 6.3), x = Math.sin(a) * 2.3, z = Math.cos(a) * 2.3, ox = Math.sin(a), oz = Math.cos(a);
+      addG(cyl10, x, 0.64, z, 0.11, 0.24, 0.11, 0x4E8A6A); addG(cylP, x + ox * 0.17, 0.7, z + oz * 0.17, 0.018, 0.3, 0.018, 0x4E8A6A, 0.9, a, 0); addG(ballP, x + ox * 0.29, 0.81, z + oz * 0.29, 0.035, 0.035, 0.035, 0x3E7A5A);
+      add(x, 0.8, z, 0.03, 0.05, 0.2, 0x3E7A5A, a);
+    }
+    // the old glowcap: a fat trunk, roots into the lawn, glowing beads hanging off its rim (its cap is built after, so it can breathe)
+    const T0 = GL.tree;
+    lathe([[1.1, -0.02], [0.72, 0.24], [0.56, 0.8], [0.5, 1.8], [0.51, 2.8], [0.58, 3.4], [0.78, 3.67], [0, 3.69]], T0.x, 0, T0.z, 0xD8CCB4, 10);
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + rand(-0.3, 0.3), L = rand(1.2, 1.8); tube([[T0.x + Math.sin(a) * 0.45, 0.45, T0.z + Math.cos(a) * 0.45], [T0.x + Math.sin(a) * (0.5 + L * 0.5), 0.12, T0.z + Math.cos(a) * (0.5 + L * 0.5)], [T0.x + Math.sin(a) * (0.5 + L), -0.06, T0.z + Math.cos(a) * (0.5 + L)]], 0.16, 0.03, 0xC8B898); }
+    for (let k = 0; k < 7; k++) { const a = rand(0, 6.3); addG(lumpP, T0.x + Math.sin(a) * 0.75, 0.06, T0.z + Math.cos(a) * 0.75, rand(0.15, 0.3), 0.06, rand(0.15, 0.3), pick(leafy), 0, a, 0); }
+    for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2 + rand(-0.1, 0.1), rr = rand(2.0, 2.4), x = T0.x + Math.sin(a) * rr, z = T0.z + Math.cos(a) * rr, L = rand(0.15, 0.6); addG(cylP, x, 3.62 - L / 2, z, 0.006, L, 0.006, 0x8AE8D8, 0, 0, 0, glow); addG(lumpP, x, 3.62 - L, z, 0.035, 0.045, 0.035, 0x7CFFE8, 0, 0, 0, glow); }
+    // a bench under the old glowcap, looking at the fountain
+    { const bn = GL.bench, f = bn.a, bp = (lx, lz) => [bn.x + lx * Math.cos(f) + lz * Math.sin(f), bn.z - lx * Math.sin(f) + lz * Math.cos(f)];
+      for (const s of [-0.6, 0.6]) { const [x, z] = bp(s, 0); add(x, 0.2, z, 0.2, 0.4, 0.42, pick(th.path), f); }
+      for (const k of [-0.14, 0, 0.14]) { const [x, z] = bp(0, k); add(x, 0.43 + (k ? 0 : 0.004), z, 1.6, 0.06, 0.12, 0x7A5432, f); } }
+    // raised beds: a stone kerb, dark soil, and whatever grows round the caps
+    GL.beds.forEach((b, bi) => {
+      const L2 = 1.45, D2 = 0.68, soil = 0.34;
+      for (const s of [-1, 1]) { const [x1, z1] = bw(b, 0, s * D2); add(x1, 0.21, z1, L2 * 2 + 0.14, 0.42, 0.14, pick(th.path), b.a); const [x2, z2] = bw(b, s * L2, 0); add(x2, 0.22, z2, 0.14, 0.44, D2 * 2 - 0.14, pick(th.path), b.a); }
+      add(b.x, 0.17, b.z, L2 * 2 - 0.14, 0.34, D2 * 2 - 0.14, 0x4A3424, b.a);
+      for (let i = 0; i < 10; i++) { const [x, z] = bw(b, rand(-L2 + 0.2, L2 - 0.2), rand(-D2 + 0.15, D2 - 0.15)); addG(lumpP, x, soil, z, rand(0.05, 0.1), 0.03, rand(0.05, 0.1), 0x3A2A1C, 0, rand(0, 6), 0); }
+      for (const k of [-0.75, 0.75]) { const [cx, cz] = bw(b, k, 0); colliders.push({ x: cx, z: cz, r: 0.78, h: 0.45 }); }
+      const at2 = (lx, lz) => { const [x, z] = bw(b, lx, lz); return [x, z]; };
+      if (bi === 0) { // glowcaps by the water: ferns at the ends, blue flowers along the front
+        for (const lx of [-1.05, 1.05]) { const [x, z] = at2(lx, 0); fern(x, soil, z, 0.42); }
+        for (let i = 0; i < 6; i++) { const [x, z] = at2(-1.1 + i * 0.44, -0.45); flower(x, soil, z, rand(0.15, 0.24), 0x8AB8FF); }
+      } else if (bi === 1) { // frost lichen on a mossy stone, white flowers round it
+        const [rx, rz] = at2(0.25, 0); addG(lumpP, rx, 0.44, rz, 0.42, 0.22, 0.32, 0x7A8484, 0, b.a, 0); addG(lumpP, rx - 0.08, 0.6, rz, 0.24, 0.06, 0.2, pick(leafy), 0, b.a, 0);
+        { const [x, z] = at2(-0.95, 0); fern(x, soil, z, 0.4); }
+        for (let i = 0; i < 6; i++) { const [x, z] = at2(-0.5 + rand(-0.6, 1.6), pick([-0.48, 0.48])); flower(x, soil, z, rand(0.12, 0.2), pick([0xFFFFFF, 0xCFE8FF])); }
+      } else { // pumpkins and a row of tulips
+        { const [x, z] = at2(-0.75, 0.05); pumpkin(x, soil, z, 0.28); } { const [x, z] = at2(0.05, -0.2); pumpkin(x, soil, z, 0.2); }
+        for (let i = 0; i < 6; i++) { const [x, z] = at2(0.55 + (i % 3) * 0.3, i < 3 ? -0.28 : 0.28); tulip(x, soil, z, rand(0.2, 0.3), pick([0xFF3B4E, 0xFF8AB0, 0xFFD23A])); }
+      }
+    });
+    { // a garden gnome keeping an eye on the pumpkins
+      const b = GL.beds[2], gx = b.x + Math.sin(b.a) * 1.2, gz = b.z + Math.cos(b.a) * 1.2, f = Math.atan2(-gx, -gz), gp = (lx, ly, lz) => [gx + lx * Math.cos(f) + lz * Math.sin(f), ly, gz - lx * Math.sin(f) + lz * Math.cos(f)];
+      for (const s of [-0.06, 0.06]) { const p = gp(s, 0.03, 0.03); add(p[0], p[1], p[2], 0.08, 0.06, 0.13, 0x2A2016, f); }
+      addG(cyl10, gx, 0.2, gz, 0.13, 0.34, 0.13, 0x3A6AC8); addG(cyl10, gx, 0.24, gz, 0.136, 0.04, 0.136, 0x2A2016);
+      addG(ballP, gx, 0.45, gz, 0.11, 0.11, 0.11, 0xF2C8A0);
+      { const p = gp(0, 0.35, 0.075); addG(coneP, p[0], p[1], p[2], 0.1, 0.22, 0.06, 0xF4F0E8, Math.PI, f, 0); }
+      { const p = gp(0, 0.45, 0.11); addG(ballP, p[0], p[1], p[2], 0.035, 0.03, 0.035, 0xE89A80); }
+      for (const s of [-0.045, 0.045]) { const p = gp(s, 0.49, 0.095); addG(ballP, p[0], p[1], p[2], 0.014, 0.014, 0.014, 0x14161F); }
+      addG(coneP, gx, 0.68, gz, 0.12, 0.34, 0.12, 0xD8282E, 0, f, -0.15);
+    }
+    // pots in the corners the old glowcap doesn't have
+    for (const [cx, cz] of [[1, 1], [-1, 1], [-1, -1], [1, -1]]) if (cx !== sx || cz !== sz) {
+      const x = cx * 7.05, z = cz * 8.05;
+      lathe([[0.16, 0], [0.22, 0.04], [0.28, 0.4], [0.33, 0.42], [0.33, 0.48], [0.29, 0.48], [0.27, 0.44], [0, 0.44]], x, 0, z, 0xB8643A, 9);
+      if ((cx + cz) % 4) fern(x, 0.46, z, 0.5);
+      else for (let k = 0; k < 6; k++) { const a = rand(0, 6.3), rr = rand(0, 0.18); addG(lumpP, x + Math.sin(a) * rr, 0.58 + rand(0, 0.18), z + Math.cos(a) * rr, 0.16, 0.14, 0.16, pick(leafy), 0, a, 0); if (k < 4) addG(ballP, x + Math.sin(a) * (rr + 0.12), 0.68 + rand(0, 0.14), z + Math.cos(a) * (rr + 0.12), 0.03, 0.03, 0.03, pick(petals)); }
+    }
+    // the lawn: tufts of grass and a scatter of daisies
+    for (let i = 0; i < 170; i++) {
+      const x = rand(-W + 0.4, W - 0.4), z = rand(-D + 0.4, D - 0.4); if (taken(x, z, 0.1)) continue;
+      for (let k = 0; k < 4; k++) { const a = rand(0, 6.3), h = rand(0.12, 0.32), bx = x + rand(-0.08, 0.08), bz = z + rand(-0.08, 0.08), lx = Math.cos(a) * 0.025, lz = Math.sin(a) * 0.025; two([bx - lx, 0, bz - lz], [bx + lx, 0, bz + lz], [bx + rand(-0.06, 0.06), h, bz + rand(-0.06, 0.06)], pick(blades)); }
+    }
+    for (let i = 0; i < 28; i++) { const x = rand(-W + 0.6, W - 0.6), z = rand(-D + 0.6, D - 0.6); if (taken(x, z, 0.2)) continue; addG(discP, x, 0.03, z, 0.06, 0.06, 1, pick([0xFFFFFF, 0xFFFFFF, 0xFFD23A, 0xFF8AB0]), -Math.PI / 2, rand(0, 6.3), 0); addG(ballP, x, 0.035, z, 0.02, 0.01, 0.02, 0xFFD23A); }
+    for (let i = 0; i < 16; i++) { const x = rand(-W + 1, W - 1), z = rand(-D + 1, D - 1), s2 = rand(0.6, 1.4); if (taken(x, z, s2 * 0.5)) continue; addG(lumpP, x, 0.006, z, s2, 0.02, s2 * rand(0.5, 1), pick([0x274520, 0x3A6230, 0x2E5426]), 0, rand(0, 6.3), 0); }
+    for (const dir of ['N', 'S', 'W', 'E']) for (let i = 0; i < 4; i++) {
+      const L = wallLen(dir), al = rand(-L + 1.4, L - 1.4); if (doorish(dir, al, 0.7) || th.spots.some(sp => sp.wall === dir && Math.abs(sp.along - al) < 1.2)) continue;
+      for (let k = 0; k < 6; k++) { const [x, z] = wallXZ(dir, al + rand(-0.55, 0.55), -rand(0.2, 0.45)), s2 = rand(0.22, 0.38), y = rand(0.15, 0.45); addG(lumpP, x, y, z, s2, s2 * 0.85, s2, pick(leafy), 0, rand(0, 6.3), 0); if (k < 4) addG(ballP, x + rand(-0.1, 0.1), y + s2 * 0.7, z + rand(-0.1, 0.1), 0.035, 0.035, 0.035, pick(petals)); }
+    }
+    // ivy up the walls, clear of the doors and the caps under the torches, with a few flowers in it, and vines hanging off the top
+    for (const dir of ['N', 'S', 'W', 'E']) {
+      const L = wallLen(dir), wm = (u, v, w) => { const [x, z] = wallXZ(dir, u, w); return [x, v, z]; };
+      for (let p = 0; p < 5; p++) {
+        const a0 = rand(-L + 0.8, L - 0.8), pw = rand(1.0, 1.8), ph = rand(1.4, 3.4);
+        if (doorish(dir, a0, pw / 2) || th.spots.some(sp => sp.wall === dir && Math.abs(sp.along - a0) < 1.3)) continue;
+        for (let k = 0; k < 2; k++) { const pts = []; let u = a0 + rand(-pw / 3, pw / 3); for (let s = 0; s <= 4; s++) { pts.push(wm(u, ph * s / 4, -0.09)); u += rand(-0.15, 0.15); } tube(pts, 0.022, 0.008, 0x4A5A2A); }
+        for (let k = 0; k < 65; k++) {
+          const v = ph * Math.pow(Math.random(), 0.8), u = a0 + rand(-1, 1) * pw / 2 * (1 - 0.55 * v / ph), ang = rand(-1.0, 1.0) + (Math.random() < 0.25 ? Math.PI : 0), len = rand(0.14, 0.24), w = -rand(0.1, 0.16);
+          const du = Math.sin(ang) * len, dv = Math.cos(ang) * len, su = Math.cos(ang) * len * 0.3, sv = -Math.sin(ang) * len * 0.3, back = wm(u, v, 1);
+          const b0 = wm(u, v, w), tp = wm(u + du, v + dv, w), lf = wm(u + du * 0.45 - su, v + dv * 0.45 - sv, w + 0.03), rt = wm(u + du * 0.45 + su, v + dv * 0.45 + sv, w + 0.03);
+          const hex = pick(leafy); tri(b0, lf, tp, hex, back); tri(b0, tp, rt, hex, back);
+        }
+        for (let k = 0; k < 6; k++) { const v = rand(0.3, ph * 0.9), u = a0 + rand(-pw / 2, pw / 2) * (1 - 0.5 * v / ph), [x, z] = wallXZ(dir, u, -0.17); addG(disc5, x, v, z, 0.045, 0.045, 1, pick(petals), 0, WALL_RY[dir], rand(0, 6.3)); }
+      }
+      for (let k = 0; k < 5; k++) {
+        const u0 = rand(-L + 0.5, L - 0.5), len = rand(0.6, 1.8), pts = []; let u = u0;
+        for (let s = 0; s <= 4; s++) { pts.push(wm(u, H + 0.05 - len * s / 4, -0.12)); u += rand(-0.08, 0.08); }
+        tube(pts, 0.02, 0.006, 0x4A5A2A);
+        for (let s = 1; s < 8; s++) { const p = pts[Math.min(4, Math.round(s / 2))], q = wm(u0 + rand(-0.1, 0.1), p[1] - 0.12, -0.2); leaf(p, q, 0.05, pick(leafy)); }
+      }
+    }
+    // the light-well: an eight-sided shaft up through the roof, with a stone rim and vines trailing down it
+    for (let i = 0; i < 8; i++) {
+      const a0 = i / 8 * Math.PI * 2 + Math.PI / 8, a1 = a0 + Math.PI / 4, am = (a0 + a1) / 2, P = (a, y) => [Math.cos(a) * 1.7, y, Math.sin(a) * 1.7];
+      const out_ = [Math.cos(am) * 3, H + 0.7, Math.sin(am) * 3]; tri(P(a0, H - 0.02), P(a1, H - 0.02), P(a1, H + 1.4), 0x2A3326, out_); tri(P(a0, H - 0.02), P(a1, H + 1.4), P(a0, H + 1.4), 0x2A3326, out_);
+      add(Math.cos(am) * 1.85, H - 0.1, Math.sin(am) * 1.85, 1.42, 0.22, 0.4, pick(th.stone), -(am + Math.PI / 2));
+    }
+    for (let k = 0; k < 10; k++) {
+      const a = rand(0, 6.3), x = Math.cos(a) * 1.62, z = Math.sin(a) * 1.62, len = rand(0.5, 1.5), pts = [[x, H + 0.1, z], [x * 0.97 + rand(-0.05, 0.05), H - len * 0.5, z * 0.97 + rand(-0.05, 0.05)], [x * 0.95 + rand(-0.08, 0.08), H - len, z * 0.95 + rand(-0.08, 0.08)]];
+      tube(pts, 0.018, 0.006, 0x4A5A2A);
+      for (let s = 0; s < 4; s++) { const p = [x, H - len * (0.2 + s * 0.22), z]; leaf(p, [p[0] + rand(-0.15, 0.15), p[1] - 0.1, p[2] + rand(-0.15, 0.15)], 0.045, pick(leafy)); }
+    }
+  }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
   grp.add(meshOf(g, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.93 })));
   Math.random = keepRand;
@@ -1262,7 +1420,13 @@ function buildRoom(r) {
     const [x, z] = wallXZ(r.shopDir, b.along, b.out), ns = r.shopDir === 'N' || r.shopDir === 'S', m = meshOf(GEO.box, M(b.hex));
     m.position.set(x, b.y, z); m.scale.set(ns ? b.len : 0.6, 0.76, ns ? 0.6 : b.len); grp.add(m); return m;
   }) };
-  const ceil = meshOf(new THREE.PlaneGeometry(W * 2 + 2, D * 2 + 2), M(th.cave ? th.stone[3] : th.ceil)); ceil.rotation.x = Math.PI / 2; ceil.position.y = H; if (!th.cave) grp.add(ceil);
+  let ceilGeo = new THREE.PlaneGeometry(W * 2 + 2, D * 2 + 2);
+  if (th.garden) { // a hole in the middle for the light-well
+    const sh = new THREE.Shape(), hole = new THREE.Path(); sh.moveTo(-W - 1, -D - 1); sh.lineTo(W + 1, -D - 1); sh.lineTo(W + 1, D + 1); sh.lineTo(-W - 1, D + 1); sh.lineTo(-W - 1, -D - 1);
+    for (let i = 0; i <= 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8; if (i) hole.lineTo(Math.cos(a) * 1.7, Math.sin(a) * 1.7); else hole.moveTo(Math.cos(a) * 1.7, Math.sin(a) * 1.7); }
+    sh.holes.push(hole); ceilGeo.dispose(); ceilGeo = new THREE.ShapeGeometry(sh);
+  }
+  const ceil = meshOf(ceilGeo, M(th.cave ? th.stone[3] : th.ceil)); ceil.rotation.x = Math.PI / 2; ceil.position.y = H; if (!th.cave) grp.add(ceil);
   if (!th.cave) for (const [px, pz] of th.pillars) grp.add(at(meshOf(new THREE.CylinderGeometry(0.55, 0.62, H, 8), M(th.stone[2])), px, H / 2, pz));
   // four torches on the side walls, plus the room's accent light
   [['W', -3.6], ['W', 3.6], ['E', -3.6], ['E', 3.6]].forEach(([dir, along], i) => {
@@ -1279,7 +1443,7 @@ function buildRoom(r) {
     const L = torchLights[i], [lx, lz] = wallXZ(dir, along, -0.6); L.color.set(th.torch); L.position.set(lx, 2.9, lz);
     flames.push({ fl, core, L, ph: rand(0, 9) });
   });
-  accentLight.color.set(th.accent[0]); accentLight.intensity = 0.9; accentLight.position.set(th.accent[1], th.accent[2], th.accent[3]);
+  accentLight.color.set(th.accent[0]); accentLight.intensity = th.accentI || 0.9; accentLight.distance = th.accentD || 8; accentLight.position.set(th.accent[1], th.accent[2], th.accent[3]);
   // mushroom clusters; the "drain" ones get a grate and a dripping pipe
   const capMat = {
     glowcap: new THREE.MeshStandardMaterial({ color: 0x5FF2D6, emissive: 0x22C9AE, emissiveIntensity: 0.9, flatShading: true }),
@@ -1302,7 +1466,35 @@ function buildRoom(r) {
     }
     return m;
   };
+  const gardenSpot = (sp, idx) => {
+    const caps = [], cg = new THREE.Group(); let hp;
+    if (sp.bed !== undefined) { // in a bed: glowcaps standing up in the soil, or lichen on the bed's mossy stone
+      const b = GL.beds[sp.bed]; cg.position.set(b.x, 0.34, b.z); cg.rotation.y = b.a;
+      for (let i = 0; i < 3; i++) {
+        let m;
+        if (sp.kind === 'frost') { m = lichen(); m.rotation.x = -Math.PI / 2; m.position.set(0.25 + (i - 1) * 0.17, 0.32, rand(-0.07, 0.07)); m.scale.setScalar(0.75); }
+        else {
+          const s2 = rand(0.2, 0.28); m = new THREE.Group();
+          m.add(at(meshOf(new THREE.CylinderGeometry(s2 * 0.25, s2 * 0.3, s2 * 0.9, 5), M(0xE8DCC8)), 0, s2 * 0.45, 0)); m.add(at(meshOf(new THREE.SphereGeometry(s2, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2), capMat[sp.kind]), 0, s2 * 0.85, 0));
+          m.position.set((i - 1) * 0.42 + rand(-0.05, 0.05), 0, rand(-0.15, 0.15)); m.rotation.set(rand(-0.15, 0.15), rand(0, 6), rand(-0.15, 0.15));
+        }
+        m.visible = i < r.caps[idx]; cg.add(m); caps.push(m);
+      }
+      hp = new THREE.Vector3(b.x, 0.6, b.z);
+    } else { // shelf caps up the old glowcap's trunk, each sitting on the bark
+      const ang = Math.atan2(-GL.tree.x, -GL.tree.z) + (sp.trunk ? 0.8 : -0.8), y = sp.trunk ? 2.3 : 1.75; cg.position.set(GL.tree.x, 0, GL.tree.z);
+      for (let i = 0; i < 3; i++) {
+        const s2 = rand(0.16, 0.24), a = ang + (i - 1) * 0.5, m = new THREE.Group();
+        m.add(at(meshOf(new THREE.CylinderGeometry(s2 * 0.25, s2 * 0.3, s2 * 0.9, 5), M(0xE8DCC8)), 0, s2 * 0.45, 0)); m.add(at(meshOf(new THREE.SphereGeometry(s2, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2), capMat[sp.kind]), 0, s2 * 0.85, 0));
+        m.position.set(Math.sin(a) * 0.49, y + rand(-0.12, 0.12), Math.cos(a) * 0.49); m.rotation.set(Math.PI / 2 - 0.4, a, 0, 'YXZ');
+        m.visible = i < r.caps[idx]; cg.add(m); caps.push(m);
+      }
+      hp = new THREE.Vector3(GL.tree.x + Math.sin(ang) * 0.8, y, GL.tree.z + Math.cos(ang) * 0.8);
+    }
+    grp.add(cg); harvestables.push({ idx, kind: sp.kind, origin: sp.origin, caps, pos: hp });
+  };
   th.spots.forEach((sp, idx) => {
+    if (!sp.wall) { gardenSpot(sp, idx); return; }
     const cg = new THREE.Group(), caps = [], [x, z] = wallXZ(sp.wall, sp.along, -0.05);
     for (let i = 0; i < 3; i++) {
       if (sp.kind === 'frost') { const m = lichen(); m.position.set((i - 1) * 0.34 + rand(-0.05, 0.05), rand(-0.22, 0.22), th.cave ? 0.03 : 0.01); m.rotation.z = rand(0, 6.3); m.visible = i < r.caps[idx]; cg.add(m); caps.push(m); continue; }
@@ -1351,16 +1543,40 @@ function buildRoom(r) {
     for (const [x, z] of COIN_PILES) floorBusy.push({ x0: x - 0.4, x1: x + 0.4, z0: z - 0.4, z1: z + 0.4 });
     for (const [x, z] of COIN_PILES) for (let i = 0; i < 6; i++) grp.add(at(meshOf(new THREE.CylinderGeometry(0.09, 0.09, 0.025, 8), M(0xFFD23A, { metalness: 0.6, roughness: 0.35 })), x + rand(-0.2, 0.2), 0.02 + i * 0.026, z + rand(-0.2, 0.2)));
   }
-  if (th.fountain) {
-    const f = new THREE.Group();
-    f.add(at(meshOf(new THREE.CylinderGeometry(1.0, 1.1, 0.55, 10), M(th.trim)), 0, 0.27, 0));
-    const wm = new THREE.MeshStandardMaterial({ color: 0x3A8A9A, emissive: 0x0E3A44, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.8 }); waterMats.push(wm);
-    const wd = at(meshOf(new THREE.CircleGeometry(0.88, 10), wm), 0, 0.5, 0); wd.rotation.x = -Math.PI / 2; f.add(wd);
-    f.add(at(meshOf(new THREE.CylinderGeometry(0.14, 0.2, 1.2, 6), M(th.stone[2])), 0, 0.6, 0));
-    f.add(at(meshOf(new THREE.CylinderGeometry(0.4, 0.15, 0.2, 8), M(th.stone[2])), 0, 1.25, 0));
-    f.position.set(0, 0, -2.5); grp.add(f);
-    colliders.push({ x: 0, z: -2.5, r: 1.1, h: 0.6 }); fountainSpot = new THREE.Vector3(0, 0.6, -2.5);
-    drips.push(new THREE.Vector3(0, 1.3, -2.5));
+  if (GL) {
+    // water: the pool, the two basins, and the curtains pouring between them
+    const wm = new THREE.MeshStandardMaterial({ color: 0x3A8A9A, emissive: 0x0E3A44, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.6 }); waterMats.push(wm);
+    for (const [rr, y, n] of [[2.12, 0.34, 12], [0.86, 1.22, 10], [0.43, 1.83, 10]]) { const w2 = meshOf(new THREE.CircleGeometry(rr, n), wm); w2.rotation.x = -Math.PI / 2; w2.position.y = y; grp.add(w2); }
+    const flowMat = new THREE.MeshStandardMaterial({ color: 0xBFEFFF, emissive: 0x2A6A7A, transparent: true, opacity: 0.4, roughness: 0.1, flatShading: true, side: THREE.DoubleSide, depthWrite: false });
+    const curtain = (r0, r1, y0, y1) => {
+      const cg = new THREE.CylinderGeometry(r0, r1, y0 - y1, 12, 3, true), pa = cg.attributes.position;
+      for (let i = 0; i < pa.count; i++) { const k = 1 + Math.sin(i * 2.7) * 0.05; pa.setX(i, pa.getX(i) * k); pa.setZ(i, pa.getZ(i) * k); } // rippled, so it shimmers as it turns
+      cg.computeVertexNormals(); const m = meshOf(cg, flowMat); m.position.y = (y0 + y1) / 2; grp.add(m); return m;
+    };
+    const jet = meshOf(new THREE.ConeGeometry(0.05, 0.36, 6), flowMat); jet.position.y = 2.28; grp.add(jet);
+    const flow = [curtain(0.47, 0.6, 1.86, 1.24), curtain(0.93, 1.24, 1.27, 0.36), jet];
+    const fd = [0, 1, 2, 3, 4, 5].map(i => { const a = i / 6 * Math.PI * 2; return new THREE.Vector3(Math.sin(a) * 1.0, 1.15, Math.cos(a) * 1.0); }); drips.push(...fd);
+    fountainBits = { flow, drips: fd }; fountainSpot = new THREE.Vector3(0, 1.0, 0); fountainReach = 3.7;
+    colliders.push({ x: 0, z: 0, r: 2.5, h: 0.5 }, { x: GL.tree.x, z: GL.tree.z, r: 0.7, h: H }, { x: GL.bench.x, z: GL.bench.z, r: 0.75, h: 0.5 });
+    roomFx.push((sdt, rdt) => { flowMat.opacity = 0.34 + Math.sin(T * 7) * 0.05; flow[0].rotation.y += rdt * 1.4; flow[1].rotation.y -= rdt * 1.1; jet.scale.y = 1 + Math.sin(T * 11) * 0.15; });
+    if (r.fountainUsed) fountainDry();
+    // the light-well: sky at the top, a shaft of moonlight down onto the fountain, dust turning in it
+    const sky = meshOf(new THREE.CircleGeometry(1.72, 8, Math.PI / 8), new THREE.MeshBasicMaterial({ color: 0xCFEFFF })); sky.rotation.x = Math.PI / 2; sky.position.y = H + 1.38; grp.add(sky);
+    const beamMat = new THREE.MeshBasicMaterial({ color: 0xD8F4FF, transparent: true, opacity: 0.06, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    for (const [r0, r1] of [[1.55, 2.25], [1.15, 1.7]]) { const bm = meshOf(new THREE.CylinderGeometry(r0, r1, H + 1.4, 16, 1, true), beamMat); bm.position.y = (H + 1.4) / 2; grp.add(bm); }
+    const moteMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
+    const motes = [...Array(16)].map(() => { const m = meshOf(GEO.ico0, moteMat); m.scale.setScalar(0.018); grp.add(m); return { m, a: rand(0, 6.3), r: rand(0.2, 1.5), y: rand(0.4, H), s: rand(0.05, 0.15) }; });
+    roomFx.push(sdt => { for (const o of motes) { o.a += sdt * 0.15; o.y -= sdt * o.s; if (o.y < 0.4) o.y = H; o.m.position.set(Math.sin(o.a) * o.r, o.y, Math.cos(o.a) * o.r); } });
+    // the old glowcap's cap, breathing like the small ones, with a glow under it and a pool of its light on the lawn
+    const capMats = [], cap = mkCap(2.7, 1.3, 'glow', capMats, 12); cap.position.set(GL.tree.x, 3.6, GL.tree.z); grp.add(cap);
+    const under = meshOf(new THREE.CircleGeometry(2.42, 12), new THREE.MeshBasicMaterial({ color: 0x3FE6C9, transparent: true, opacity: 0.55 })); under.rotation.x = Math.PI / 2; under.position.set(GL.tree.x, 3.58, GL.tree.z); grp.add(under);
+    const shine = meshOf(new THREE.CircleGeometry(3.0, 16), new THREE.MeshBasicMaterial({ color: 0x3FE6C9, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false })); shine.rotation.x = -Math.PI / 2; shine.position.set(GL.tree.x, 0.02, GL.tree.z); grp.add(shine);
+    roomFx.push(() => mkMatsTick(capMats));
+    // fireflies round the beds, the old glowcap and the pool
+    const flyMat = new THREE.MeshBasicMaterial({ color: 0xE8FF7A, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+    const anchors = [GL.tree, ...GL.beds, { x: 0, z: 0 }];
+    const flies = [...Array(26)].map((_, i) => { const an = anchors[i % anchors.length], m = meshOf(GEO.ico0, flyMat); grp.add(m); return { m, x: an.x + rand(-1.5, 1.5), z: an.z + rand(-1.5, 1.5), y: rand(0.5, 2.6), p: rand(0, 6.3), f: rand(0.3, 0.7), rr: rand(0.4, 1.1) }; });
+    roomFx.push(() => { for (const o of flies) { const t = T * o.f + o.p; o.m.position.set(o.x + Math.sin(t) * o.rr, o.y + Math.sin(t * 1.7) * 0.3, o.z + Math.cos(t * 0.8) * o.rr); o.m.scale.setScalar(0.03 * (0.25 + 0.75 * Math.max(0, Math.sin(T * 2.1 + o.p * 3)))); } });
   }
   if (r.type === 'stairs') {
     const pivot = new THREE.Group(); pivot.position.set(STAIRS.x, 0.02, STAIRS.z - 0.97);
@@ -4651,7 +4867,7 @@ function findInteract() {
   const consider = (p, maxD, dot, obj) => { const to = p.clone().sub(eye), d = to.length(); if (d < maxD && to.normalize().dot(dir) > dot && d < bd) { best = obj; bd = d; } };
   harvestables.forEach((h, i) => { if (room.caps[h.idx] > 0) consider(h.pos, 2.6, 0.8, { type: 'harvest', h, key: 'h' + i }); });
   if (roomChest && !room.chestOpen) consider(roomChest.g.position.clone().setY(0.6), 2.6, 0.7, { type: 'chest', key: 'chest' });
-  if (fountainSpot) consider(fountainSpot, 2.8, 0.6, { type: 'fountain', key: 'fountain' });
+  if (fountainSpot) consider(fountainSpot, fountainReach, 0.6, { type: 'fountain', key: 'fountain' });
   if (den) {
     if (den.state === 'pick') den.cups.forEach((c, i) => consider(c.g.position.clone().setY(0.98), 3.2, 0.975, { type: 'cup', i, key: 'cup' + i }));
     else { const [cx, cz] = wallXZ(den.dir, 0, 0.8); consider(new THREE.Vector3(cx, 1.0, cz), 3.0, 0.8, { type: 'cups', key: 'cups' }); }
@@ -4676,7 +4892,7 @@ function completeInteract(t) {
   else if (t.type === 'cup') pickCup(t.i);
   else if (t.type === 'toss') armToss();
   else if (t.type === 'fountain' && !room.fountainUsed) {
-    room.fountainUsed = true;
+    room.fountainUsed = true; fountainDry();
     satchel.push(newItem('bog', 'stock'));
     SFX.glug(); burst(fountainSpot.clone().setY(1), 0x6FC0D8, 16, 3, 0.8, 0.06, 6);
     loot('bog'); heal(player.maxHp); renderSatchel(); renderInv();
@@ -6243,6 +6459,7 @@ function frame(now) {
   // fx
   const cur = fx; fx = [];
   for (const f of cur) if (f.update(sdt, rdt) !== false) fx.push(f);
+  for (const f of roomFx) f(sdt, rdt);
   for (const f of flames) { const k = 0.85 + Math.sin(T * 13 + f.ph) * 0.08 + Math.sin(T * 29 + f.ph * 2) * 0.06; f.fl.scale.set(1, k, 1); f.core.scale.set(1, k * 1.1, 1); f.L.intensity = 1.35 * k; }
 
   // camera
