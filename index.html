@@ -661,7 +661,7 @@ if (savedSettings.sound === false && savedSettings.vol === undefined) settings.v
 delete settings.sound; delete settings.reel;
 const FINAL_FLOOR = 5; // the Cyclops King waits at the bottom of floor 5; after that it's endless
 const newUse = () => ({ feather: 0, bog: 0, horn: 0, doom: 0, glowcap: 0, eye: 0, boil: 0 });
-const run = { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false };
+const run = { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false, queenTip: false, cocTip: false };
 
 /* ================= audio (all synthesised) ================= */
 let AC = null, master = null, noiseBuf = null;
@@ -712,6 +712,8 @@ const SFX = {
   thud() { if (!live()) return; osc('sine', 140, 40, AC.currentTime, 0.22, 0.5); },
   bonk(big) { if (!live()) return; const t = AC.currentTime; osc('sine', big ? 700 : 900, 160, t, big ? 0.2 : 0.13, 0.4); osc('triangle', 1900, 500, t, 0.05, 0.12); noiseBurst('lowpass', 1400, 300, 1, t, 0.06, 0.3); },
   whiff() { if (!live()) return; noiseBurst('bandpass', 1400, 500, 1.8, AC.currentTime, 0.13, 0.14); },
+  shriek() { if (!live()) return; const t = AC.currentTime; osc('sawtooth', 1800, 3200, t, 0.35, 0.07); osc('square', 2600, 1300, t + 0.05, 0.4, 0.04); noiseBurst('highpass', 3000, 8000, 2, t, 0.45, 0.22); },
+  wrap() { if (!live()) return; const t = AC.currentTime; for (let i = 0; i < 6; i++) noiseBurst('bandpass', 1300 + i * 220, 900, 4, t + i * 0.08, 0.07, 0.15); },
   squish() { if (!live()) return; const t = AC.currentTime; noiseBurst('lowpass', 1100, 140, 1.4, t, 0.24, 0.4); osc('sine', 280, 60, t, 0.28, 0.28); osc('square', 140, 70, t + 0.02, 0.1, 0.04); },
   boing() { if (!live()) return; const t = AC.currentTime; osc('sine', 170, 560, t, 0.3, 0.22); osc('sine', 340, 1100, t + 0.03, 0.2, 0.05); osc('triangle', 560, 260, t + 0.22, 0.16, 0.06); },
   ding() { if (!live()) return; const t = AC.currentTime; osc('sine', 1320, null, t, 0.18, 0.1); osc('sine', 1980, null, t + 0.03, 0.2, 0.07); },
@@ -1453,7 +1455,7 @@ function buildRoom(r) {
       // the plinth, gold-edged, and a carpet from the door up to it
       box(0, cv, 0.06, 3.4, 0.12, 2.4, kind === 'king' ? 0x3A2A3A : th.stone[3]);
       for (const s of [-1, 1]) { box(0, cv + s * 1.2, 0.125, 3.44, 0.035, 0.07, pick(gold), shiny); box(s * 1.7, cv, 0.127, 0.07, 0.035, 2.4, pick(gold), shiny); }
-      const v0 = -dp + 0.4, v1 = cv - 1.2, cloth = kind === 'king' ? 0x5A2A7A : 0x8A1E2E;
+      const v0 = -dp + 0.4, v1 = cv - 1.2, cloth = kind === 'king' ? 0x5A2A7A : kind === 'silk' ? 0x5E4E82 : 0x8A1E2E;
       box(0, (v0 + v1) / 2, 0.012, 1.5, 0.024, v1 - v0, cloth); for (const s of [-1, 1]) box(s * 0.7, (v0 + v1) / 2, 0.026, 0.1, 0.006, v1 - v0, pick(gold), shiny);
       // banners on the wall behind the chest
       const bd = VL.dir, wm = (u, y, w) => { const [x, z] = wallXZ(bd, u, w); return [x, y, z]; }, triS = triTo(shiny[0], shiny[1]);
@@ -1463,6 +1465,7 @@ function buildRoom(r) {
         const [rx, rz] = wallXZ(bd, u, -0.13); addG(cyl8, rx, top + 0.04, rz, 0.035, hw * 2 + 0.3, 0.035, pick(gold), 0, WALL_RY[bd], Math.PI / 2, shiny);
         const e = w - 0.012, g2 = pick(gold);
         if (kind === 'king') { triS(wm(u - 0.24, 3.55, e), wm(u + 0.24, 3.55, e), wm(u + 0.24, 3.7, e), g2, bk); triS(wm(u - 0.24, 3.55, e), wm(u + 0.24, 3.7, e), wm(u - 0.24, 3.7, e), g2, bk); for (const k of [-0.24, 0, 0.24]) triS(wm(u + k - 0.08, 3.7, e), wm(u + k + 0.08, 3.7, e), wm(u + k, 3.98, e), g2, bk); } // a crown
+        else if (kind === 'silk') { for (const k of [-1, 1]) { triS(wm(u, 3.9, e), wm(u + k * 0.3, 4.05, e), wm(u + k * 0.24, 3.7, e), g2, bk); triS(wm(u, 3.72, e), wm(u + k * 0.2, 3.62, e), wm(u + k * 0.1, 3.42, e), g2, bk); } triS(wm(u - 0.04, 3.98, e), wm(u + 0.04, 3.98, e), wm(u, 3.4, e), g2, bk); } // a moth
         else { triS(wm(u, 4.05, e), wm(u + 0.2, 3.75, e), wm(u, 3.45, e), g2, bk); triS(wm(u, 4.05, e), wm(u, 3.45, e), wm(u - 0.2, 3.75, e), g2, bk); } // a diamond
       }
       // braziers either side of the carpet
@@ -1517,6 +1520,20 @@ function buildRoom(r) {
         addG(cyl10, x, 1.2, z, 0.17, 0.14, 0.17, pick(gold), 0, 0, 0, shiny); for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; addG(coneP, x + Math.sin(a) * 0.15, 1.33, z + Math.cos(a) * 0.15, 0.04, 0.12, 0.04, pick(gold), 0, 0, 0, shiny); addG(gemP, x + Math.sin(a) * 0.175, 1.2, z + Math.cos(a) * 0.175, 0.03, 0.04, 0.03, pick(gems), 0, a, 0, shiny); }
         colliders.push({ x, z, r: 0.45, h: 1.3 }); glints.push(new THREE.Vector3(x, 1.35, z));
       }
+    } else if (kind === 'silk') { // the silken hoard: gold under silk, and bundles of whoever came for it first
+      for (const s of [-1, 1]) heap(s * (L - 1.7), dp - 1.5, 0.95); heap(0, dp - 0.85, 0.75);
+      for (const [u, v, s2] of [[-(L - 1.7), dp - 1.5, 0.95], [L - 1.7, dp - 1.5, 0.95], [0, dp - 0.85, 0.75]]) for (let k = 0; k < 4; k++) { // silk threads draped over each heap
+        const a = rand(0, 3.1), [x0, z0] = P(u + Math.cos(a) * s2 * 1.2, v + Math.sin(a) * s2 * 1.2), [x1, z1] = P(u - Math.cos(a) * s2 * 1.2, v - Math.sin(a) * s2 * 1.2), [xm, zm] = P(u, v);
+        for (const [a0, a1] of [[[x0, 0.02, z0], [xm, s2 * 0.47, zm]], [[xm, s2 * 0.47, zm], [x1, 0.02, z1]]]) { const d = [a1[0] - a0[0], a1[2] - a0[2]], L2 = Math.hypot(d[0], d[1]) || 1, nx = -d[1] / L2 * 0.008, nz = d[0] / L2 * 0.008; two([a0[0] - nx, a0[1], a0[2] - nz], [a1[0] - nx, a1[1], a1[2] - nz], [a1[0] + nx, a1[1], a1[2] + nz], 0xF4F0FA); two([a0[0] - nx, a0[1], a0[2] - nz], [a1[0] + nx, a1[1], a1[2] + nz], [a0[0] + nx, a0[1], a0[2] + nz], 0xF4F0FA); }
+      }
+      const bundle = (u, v, lying) => { // someone wrapped up for later
+        const [x, z] = P(u, v), lg = new THREE.LatheGeometry([[0.03, 0], [0.24, 0.15], [0.3, 0.6], [0.26, 1.15], [0.2, 1.4], [0.22, 1.55], [0.03, 1.72]].map(([a, b]) => new THREE.Vector2(a, b)), 9).toNonIndexed();
+        addG(lg.attributes.position, x, lying ? 0.28 : 0, z, 1, 1, 1, pick([0xE8E0F4, 0xF4F0FA]), lying ? Math.PI / 2 : rand(-0.12, 0.12), lying ? rand(0, 6.3) : f, 0); lg.dispose();
+        if (!lying) colliders.push({ x, z, r: 0.35, h: 1.7 });
+      };
+      if (side(-1)) { bundle(-(L - 0.55), cv - 3.2, false); bundle(-(L - 0.55), cv - 4.0, false); }
+      if (side(1)) bundle(L - 1.4, cv - 3.4, true);
+      bundle(L - 2.6, dp - 0.6, true);
     } else { // the forgotten hoard: the chest sunk in a mossy mound, roots over it, gold spilling down the way in
       for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2 + rand(-0.2, 0.2), [x, z] = P(Math.sin(a) * 1.25, cv + Math.cos(a) * 1.0); addG(lumpP, x, 0.02, z, rand(0.35, 0.5), rand(0.2, 0.32), rand(0.3, 0.45), 0x4A3626, 0, a, 0); addG(lumpP, x, 0.14, z, rand(0.3, 0.45), 0.12, rand(0.26, 0.38), pick([0x4A6A34, 0x3E5A2E, 0x56763A]), 0, a, 0); }
       for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2 + rand(-0.3, 0.3), [x0, z0] = P(Math.sin(a) * 0.8, cv + Math.cos(a) * 0.6), [x1, z1] = P(Math.sin(a) * 1.5, cv + Math.cos(a) * 1.3); tube([[x0, 0.32, z0], [(x0 + x1) / 2, 0.3, (z0 + z1) / 2], [x1, -0.05, z1]], 0.07, 0.02, 0x5A4430); }
@@ -1546,9 +1563,84 @@ function buildRoom(r) {
       }
     }
   }
+  const gauze = [[], []], candleFl = [[], []];
+  if (th.silk || th.candles) { // the Queen's floor: cobwebs in the top corners, gauze off the beams, cocoons on threads, candles in clusters
+    const pale = [0xE8E0F4, 0xD8D0E8, 0xF4F0FA], triG = triTo(gauze[0], gauze[1]);
+    const thread = (a, b, w, hex) => { // a thin strand from a to b, seen from both sides
+      const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], u = Math.abs(d[1]) > Math.hypot(d[0], d[2]) ? [1, 0, 0] : [0, 1, 0];
+      let s = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]]; const sl = Math.hypot(s[0], s[1], s[2]) || 1; s = s.map(q => q / sl * w / 2);
+      const A = [a[0] - s[0], a[1] - s[1], a[2] - s[2]], B = [b[0] - s[0], b[1] - s[1], b[2] - s[2]], C = [b[0] + s[0], b[1] + s[1], b[2] + s[2]], E = [a[0] + s[0], a[1] + s[1], a[2] + s[2]];
+      two(A, B, C, hex); two(A, C, E, hex);
+    };
+    const flatWeb = (x, z, R, y = 0.012) => { // a web lying on the floor
+      const n = 8, sp = [...Array(n)].map((_, i) => { const a = i / n * Math.PI * 2 + rand(-0.15, 0.15); return [Math.cos(a), Math.sin(a)]; });
+      for (const [cx, cz] of sp) thread([x, y, z], [x + cx * R, y, z + cz * R], 0.016, pick(pale));
+      for (const f of [0.35, 0.65, 0.9]) for (let i = 0; i < n; i++) { const a = sp[i], b = sp[(i + 1) % n]; thread([x + a[0] * R * f, y, z + a[1] * R * f], [x + b[0] * R * f, y, z + b[1] * R * f], 0.012, pick(pale)); }
+    };
+    if (th.silk) {
+      for (const [sx, sz] of [[1, 1], [-1, 1], [-1, -1], [1, -1]]) { // a web strung across each top corner
+        if (Math.random() > th.silk * 0.8 + 0.2) continue;
+        const R = rand(1.1, 1.8), C = [sx * (W - 0.12), H - 0.04, sz * (D - 0.12)], A = [C[0] - sx * R, C[1], C[2]], B = [C[0], C[1], C[2] - sz * R], V = [C[0], C[1] - R * 0.9, C[2]];
+        const O = [(A[0] + B[0] + V[0] + C[0]) / 4, (A[1] + B[1] + V[1] + C[1]) / 4, (A[2] + B[2] + V[2] + C[2]) / 4], rim = [];
+        for (const [p, q] of [[A, B], [B, V], [V, A]]) for (let i = 0; i < 4; i++) { const f = i / 4; rim.push([p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f, p[2] + (q[2] - p[2]) * f]); }
+        for (const p of rim) thread(O, p, 0.014, pick(pale));
+        for (const f of [0.3, 0.55, 0.8]) for (let i = 0; i < rim.length; i++) { const p = rim[i], q = rim[(i + 1) % rim.length], P = k => [O[0] + (k[0] - O[0]) * f, O[1] + (k[1] - O[1]) * f, O[2] + (k[2] - O[2]) * f]; thread(P(p), P(q), 0.011, pick(pale)); }
+      }
+      for (let z = -D + 1.5; z < D; z += 3) { // gauze hanging off the beams, and cocoons dangling on threads
+        if (Math.random() < th.silk * (th.hall ? 0.95 : 0.5)) {
+          const wdt = rand(2.4, th.hall ? 7 : 4.4), x0 = rand(-W + 0.6, W - 0.6 - wdt), drop = rand(0.8, th.hall ? 2.2 : 1.6), top = H - 0.37, cols = 8;
+          for (let i = 0; i < cols; i++) for (let j = 0; j < 2; j++) {
+            const P = (a, b) => { const x = x0 + wdt * a / cols, sag = Math.sin(Math.PI * a / cols); return [x, top - drop * (b / 2) * (0.55 + 0.45 * sag), z + Math.sin(x * 3 + b) * 0.07 * b]; };
+            const a = P(i, j), b = P(i + 1, j), c = P(i + 1, j + 1), d = P(i, j + 1); triG(a, b, c, pick(pale), [a[0], a[1], a[2] + 1]); triG(a, c, d, pick(pale), [a[0], a[1], a[2] + 1]);
+          }
+        }
+        for (let k = 0, n = Math.round(th.silk * 1.5); k < n; k++) {
+          if (Math.random() < 0.4) continue;
+          const x = rand(-W + 1, W - 1), L = rand(0.4, 1.1), y = H - 0.37 - L, h = rand(0.55, 0.9), r = rand(0.17, 0.25);
+          thread([x, H - 0.37, z], [x, y, z], 0.014, pale[0]);
+          lathe([[0.02, -h], [r * 0.7, -h * 0.85], [r, -h * 0.5], [r * 0.9, -h * 0.2], [0.03, 0]], x, y, z, pick(pale), 8);
+        }
+      }
+      for (let i = 0, n = Math.round(th.silk * 3); i < n; i++) { const dir = pick(['N', 'S', 'W', 'E']), L = wallLen(dir), al = rand(-L + 1.5, L - 1.5); if (doorish(dir, al, 1)) continue; const [x, z] = wallXZ(dir, al, -rand(0.8, 1.4)); flatWeb(x, z, rand(0.6, 1.0)); }
+    }
+    if (th.hall) { // the Veiled Hall: giant cocoons against the walls, and her sigil worked into the floor
+      for (let i = 0; i < 7; i++) {
+        const dir = pick(['N', 'S', 'W', 'E']), L = wallLen(dir), al = rand(-L + 1.2, L - 1.2); if (doorish(dir, al, 1) || th.spots.some(sp => sp.wall === dir && Math.abs(sp.along - al) < 1.4) || ((dir === 'W' || dir === 'E') && Math.abs(Math.abs(al) - 3.6) < 1.1)) continue;
+        const [x, z] = wallXZ(dir, al, -0.55), h = rand(1.7, 2.5), r = rand(0.48, 0.66), c = pick(pale);
+        lathe([[0.04, 0], [r * 0.8, h * 0.12], [r, h * 0.45], [r * 0.85, h * 0.8], [0.06, h]], x, 0, z, c, 9);
+        for (let k = 0; k < 4; k++) { const y = h * (0.2 + k * 0.2), rr = r * (k === 3 ? 0.8 : 1.02); addG(flat(new THREE.TorusGeometry(1, 0.03, 3, 12)), x, y, z, rr, rr, rr, 0xFFFFFF, Math.PI / 2 + rand(-0.3, 0.3), rand(0, 6.3), 0); }
+        colliders.push({ x, z, r: r * 0.9, h });
+      }
+      const sig = 0x3E3650, wingTri = (s, pts) => { const P = ([a, b]) => [s * a, 0.01, b + 3.6]; tri(P(pts[0]), P(pts[1]), P(pts[2]), sig, [0, -1, 0]); };
+      for (const s of [-1, 1]) { wingTri(s, [[0.3, 0.4], [3.2, 2.0], [2.6, -0.4]]); wingTri(s, [[0.3, 0.4], [2.6, -0.4], [0.4, -0.3]]); wingTri(s, [[0.4, -0.3], [2.2, -0.9], [1.6, -2.6]]); wingTri(s, [[0.4, -0.3], [1.6, -2.6], [0.25, -1.4]]); }
+      for (let i = 0; i < 6; i++) { const z0 = 1.0 - i * 0.55, r0 = 0.32 - Math.abs(i - 1) * 0.04; tri([-r0, 0.012, z0 + 3.6], [r0, 0.012, z0 + 3.6], [0, 0.012, z0 + 3.05], 0x463C5A, [0, -1, 0]); } // clear of the trapdoor
+    }
+    if (th.roost) { // moths roosting like bats: clustered under the beams and high up the walls
+      const moth = (p, ax, ay, sz, hex) => { const P = (u, v) => [p[0] + ax[0] * u + ay[0] * v, p[1] + ax[1] * u + ay[1] * v, p[2] + ax[2] * u + ay[2] * v]; for (const k of [-1, 1]) { two(P(0, sz * 0.3), P(k * sz * 0.9, sz * 0.1), P(k * sz * 0.55, -sz * 0.5), hex); two(P(0, sz * 0.3), P(k * sz * 0.55, -sz * 0.5), P(0, -sz * 0.35), hex); } };
+      const dusty = [0xB8A898, 0x9A8AB8, 0xC8B4E8, 0xA89880, 0xD8C8E0];
+      for (let z = -D + 1.5; z < D; z += 3) for (let c = 0; c < 3; c++) { const cx = rand(-W + 1.5, W - 1.5); for (let k = 0; k < 10; k++) { const a = rand(0, 6.3); moth([cx + rand(-1.0, 1.0), H - 0.39, z + rand(-0.15, 0.15)], [Math.cos(a), 0, Math.sin(a)], [-Math.sin(a), 0, Math.cos(a)], rand(0.17, 0.27), pick(dusty)); } }
+      for (let c = 0; c < 6; c++) { const dir = pick(['N', 'S', 'W', 'E']), L = wallLen(dir), al = rand(-L + 1, L - 1), y0 = rand(3.6, 4.8), t = DIRS[dir], tan = [-t.nz, 0, t.nx];
+        for (let k = 0; k < 10; k++) { const u = al + rand(-0.6, 0.6), [x, z] = wallXZ(dir, u, -0.09), a = rand(-0.6, 0.6); moth([x, y0 + rand(-0.4, 0.4), z], [tan[0] * Math.cos(a), Math.sin(a), tan[2] * Math.cos(a)], [-tan[0] * Math.sin(a), Math.cos(a), -tan[2] * Math.sin(a)], rand(0.17, 0.27), pick(dusty)); } }
+    }
+    if (th.roost) for (let i = 0; i < 34; i++) { // moth wings littering the floor, shed or worse
+      const x = rand(-W + 0.8, W - 0.8), z = rand(-D + 0.8, D - 0.8), a = rand(0, 6.3), s = rand(0.12, 0.22), hex = pick([0x8A7A6A, 0x6A5A8A, 0x9A86C8, 0x5A4A3A]);
+      const P = (u, v) => [x + Math.cos(a) * u - Math.sin(a) * v, 0.012, z + Math.sin(a) * u + Math.cos(a) * v]; tri(P(0, 0), P(s, s * 0.5), P(s * 0.8, -s * 0.4), hex, [x, -1, z]);
+    }
+    for (let c = 0, n = Math.round((th.candles || 0) * 8); c < n; c++) { // candles in clusters along the walls
+      const dir = pick(['N', 'S', 'W', 'E']), L = wallLen(dir), al = rand(-L + 1, L - 1); if (doorish(dir, al, 0.8) || th.spots.some(sp => sp.wall === dir && sp.origin === 'drain' && Math.abs(sp.along - al) < 1.4)) continue;
+      const [cx, cz] = wallXZ(dir, al, -rand(0.35, 0.7));
+      for (let k = 0, m = 3 + Math.floor(Math.random() * 4); k < m; k++) {
+        const x = cx + rand(-0.3, 0.3), z = cz + rand(-0.3, 0.3), r = rand(0.035, 0.06), h = rand(0.12, 0.42);
+        addG(cylP, x, h / 2, z, r, h, r, pick([0xF0E6D0, 0xE8DCC0, 0xD8CCE0])); addG(discP, x, 0.008, z, r * 2.2, r * 2.2, 1, 0xE8DCC0, -Math.PI / 2, rand(0, 6), 0);
+        addG(coneP, x, h + 0.05, z, 0.022, 0.08, 0.022, 0xFFD27A, 0, 0, 0, candleFl); addG(coneP, x, h + 0.04, z, 0.012, 0.045, 0.012, 0xFFF4C8, 0, 0, 0, candleFl);
+      }
+    }
+  }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
   grp.add(meshOf(g, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.93 })));
   Math.random = keepRand;
+  if (gauze[0].length) { const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(gauze[0], 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(gauze[1], 3)); gg.computeVertexNormals(); grp.add(meshOf(gg, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false, emissive: 0x2A2238 }))); }
+  if (candleFl[0].length) { const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(candleFl[0], 3)); cg.setAttribute('color', new THREE.Float32BufferAttribute(candleFl[1], 3)); candleMesh = meshOf(cg, new THREE.MeshBasicMaterial({ vertexColors: true })); grp.add(candleMesh); }
   if (shiny[0].length) { const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(shiny[0], 3)); sg.setAttribute('color', new THREE.Float32BufferAttribute(shiny[1], 3)); sg.computeVertexNormals(); grp.add(meshOf(sg, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0.45, roughness: 0.38, emissive: 0x3A2808 }))); }
   if (glow[0].length) { const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(glow[0], 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(glow[1], 3)); grp.add(meshOf(gg, new THREE.MeshBasicMaterial({ vertexColors: true }))); }
   if (r.type === 'start' && floorNum === 1 && !coarse) grp.add(chalkControls());
@@ -1752,13 +1844,14 @@ function buildRoom(r) {
   buildTraps(r);
   if (r.den) spawnDen(r);
   if (th.lab) buildLab(grp);
+  lightBase();
 }
 function setDoors(open, quiet) {
   doors.forEach(d => { d.open = open; d.runeMat.color.set(open ? 0x5FF29A : 0xFF3B30); });
   if (!quiet && doors.length) SFX.clang();
 }
 function teardownRoom() {
-  enemies.forEach(e => { endSlam(e); scene.remove(e.root); scene.remove(e.shadow); disposeTree(e.root); e.label.remove(); }); enemies = []; fieldReset();
+  enemies.forEach(e => { endSlam(e); scene.remove(e.root); scene.remove(e.shadow); disposeTree(e.root); e.label.remove(); }); enemies = []; fieldReset(); queenReset();
   pickups.forEach(p => { scene.remove(p.g); disposeTree(p.g); satchel.push(newItem(p.kind, p.origin)); loot(p.kind); }); pickups.length = 0;
   drops.forEach(d => scene.remove(d.m)); drops.length = 0; clearGoos();
   if (coins.length) { coins.forEach(c => scene.remove(c.g)); gainCoins(coins.length, true); coins.length = 0; }
@@ -1946,7 +2039,7 @@ shadowGeo.userData.shared = shadowMat.userData.shared = starGeo.userData.shared 
 let enemies = [], eidSeq = 0;
 let adaptedNow = null;
 function spawnEnemy(type, x, z, opt = {}) {
-  const T = TYPES[type], m = T.mimic ? MK_BUILD[type](opt.kind || 'doom') : T.hops ? buildSlime(T.base, T.core, T.emis) : type === 'king' ? buildCyclops(2.35, true, T.base) : type === 'chief' ? buildCyclops(1.9, true, T.base) : type === 'stump' ? buildStump(T.base) : type === 'moth' ? buildMoth(T.base) : type === 'knight' ? buildKnight(T.base) : buildCyclops();
+  const T = TYPES[type], m = T.queen || T.decoy ? buildQueen(!!T.decoy) : T.mimic ? MK_BUILD[type](opt.kind || 'doom') : T.hops ? buildSlime(T.base, T.core, T.emis) : type === 'king' ? buildCyclops(2.35, true, T.base) : type === 'chief' ? buildCyclops(1.9, true, T.base) : type === 'stump' ? buildStump(T.base) : type === 'moth' ? buildMoth(T.base) : type === 'knight' ? buildKnight(T.base) : buildCyclops();
   const hpS = Math.round(T.hp * (1 + 0.3 * (floorNum - 1))); // +30% health per floor down
   const e = {
     id: ++eidSeq, type, T, ...m, hp: hpS, maxHp: hpS, pos: new THREE.Vector3(x, 7, z), fallV: 0,
@@ -1958,6 +2051,7 @@ function spawnEnemy(type, x, z, opt = {}) {
   e.shadow = meshOf(shadowGeo, shadowMat); e.shadow.rotation.x = -Math.PI / 2; scene.add(e.shadow);
   e.stars = new THREE.Group(); for (let i = 0; i < 3; i++) e.stars.add(meshOf(starGeo, starMat)); e.stars.position.y = e.h + 0.25; e.stars.visible = false; e.root.add(e.stars);
   if (T.boss) { e.tier = floorNum; e.moves = bossMoves(type, floorNum); }
+  if (T.queen || T.decoy) { e.qs = 'intro'; e.qt = 0; e.fired = new Set(); e.pos.y = 2.2; e.darkCD = 0; }
   if (T.mimic) { e.kind = opt.kind || 'doom'; e.ph = type === 'lurker' ? 'hidden' : 'live'; e.lt = 0; e.fired = new Set(); e.pos.y = 0; e.open = 0; }
   e.root.traverse(o => { o.userData.enemy = e; });
   scene.add(e.root);
@@ -2317,6 +2411,7 @@ function pull(e, to) {
 let slingKills = [], dmgSrc = 'ladle';
 function damage(e, n, how, from, launch = 1) {
   if (e.dead || e.hidden) return;
+  if (e.T.queen && e.qs === 'cocoon') { if (e.pup) { const q = netQ(e); q.d = (q.d || 0) + n; q.how = how; } else cocoonHit(e, how === 'BURNED' ? n * 2 : n); return; } // hits go into the cocoon
   if (e.pup) { const q = netQ(e); q.d = (q.d || 0) + n; q.how = how; e.dmgT = playT; } // the host applies the real hit
   if (e.open > 0.5) n *= 2; if (e.T.hover && e.stun > 0) n += 1;
   if (e.glow > 0) n += 1;
@@ -2325,6 +2420,7 @@ function damage(e, n, how, from, launch = 1) {
   if (e.hp <= 0) kill(e, how, from, launch);
 }
 function kill(e, how, from, launch = 1) {
+  if (e.T.decoy) { e.dead = true; e.hp = 0; if (e.pup) net.deadIds.add(e.netId); e.vel = new THREE.Vector3(); e.spin = 0; e.deadT = 0.01; e.label.remove(); puff(centerOf(e), 0xE8D8FF, 10, 1, 0.5, 1, 0.16, 0.6); return; } // a false veil was never there
   e.dead = true; e.hp = 0; if (e.pup) net.deadIds.add(e.netId);
   const away = e.pos.clone().sub(from || player.pos); away.y = 0; if (away.lengthSq() < 0.01) away.set(rand(-1, 1), 0, -1); away.normalize();
   e.vel = away.multiplyScalar(rand(3, 5.5) * launch); e.vel.y = rand(5, 7.5) * launch; e.spin = rand(-10, 10); e.deadT = 3.2;
@@ -2336,6 +2432,7 @@ function kill(e, how, from, launch = 1) {
   run.kills++; slingKills.push(e); xp(100, how); feed(e.T.name, how, dmgSrc);
   e.label.remove(); endSlam(e);
   if (e.type === 'lurker' && field.lurk === e) fieldClear(); // the lure goes, and so does the rest of the patch
+  if (e.T.queen) queenDied(e);
 }
 function applyBeat(b, point, targets) {
   const tg = (b.targets || targets).filter(e => !e.dead), open = tg.filter(e => !(b.resisted || []).includes(e)), c = groupCenter(tg.length ? tg : targets);
@@ -2425,7 +2522,7 @@ function markFound(b) {
 }
 
 /* ================= player + input ================= */
-const player = { moving: false, down: false, dance: -1, danceT0: 0, pos: new THREE.Vector3(0, 0, 6), y: 0, vy: 0, fall: null, yaw: 0, pitch: -0.08, bob: 0, hp: 8, maxHp: 8, grace: 0, kb: new THREE.Vector3(), sq: 0, sqK: 0, sqV: 0 };
+const player = { moving: false, down: false, dance: -1, danceT0: 0, pos: new THREE.Vector3(0, 0, 6), y: 0, vy: 0, fall: null, yaw: 0, pitch: -0.08, bob: 0, hp: 8, maxHp: 8, grace: 0, kb: new THREE.Vector3(), sq: 0, sqK: 0, sqV: 0, slowT: 0 };
 let koOpen = false;
 const keys = new Set();
 let locked = false, menuOpen = true, pendingMenu = false, lastUnlock = 0, reelOn = false, reelSkip = false;
@@ -2468,7 +2565,7 @@ function bonkLand() {
   for (const e of alive()) {
     if (e.hidden) continue;
     const dx = e.pos.x - player.pos.x, dz = e.pos.z - player.pos.z, d = Math.hypot(dx, dz), body = e.r * e.scale;
-    if (d > BONK_REACH + body || (e.pos.y > 2.4 && !e.T.flying)) continue;
+    if (d > BONK_REACH + body || (e.pos.y > 2.4 && !e.T.flying) || (e.T.queen && e.pos.y > 1.4)) continue;
     if ((dx * fx_ + dz * fz) / (d || 1) < 0.5 && d > body + 0.35) continue; // a wide arc in front of you
     hits.push(e);
   }
@@ -3303,12 +3400,12 @@ const LAB_MOVES = [
   { id: 'burrow', name: 'BURROW', ok: e => e.type === 'lurker', run: e => { if (e.ph === 'out') mkPhase(e, 'hide'); } },
   { id: 'wrong', name: 'WRONG GUESS', ok: e => e.type === 'lurker', run: () => { const f = field.list.filter(s => s.live && !s.real); if (f.length) shroomHit(pick(f)); } },
   { id: 'hop', name: 'HOP', ok: e => e.type === 'beetle', run: e => { if (e.ph === 'live') startHop(e, player.pos); } },
-  { id: 'swing', name: 'SWING', ok: e => !e.T.ranged, run: e => { e.atk = e.T.windup; } },
-  { id: 'slam', name: 'GROUND SLAM', ok: e => e.T.boss && !e.T.mimic, run: e => startSlam(e) },
-  { id: 'toss', name: 'ROCK TOSS', ok: e => e.T.boss && !e.T.mimic, run: e => throwRock(e, player.pos) },
-  { id: 'charge', name: 'CHARGE', ok: e => e.T.boss && !e.T.mimic, run: e => startCharge(e, player.pos) },
-  { id: 'quake', name: 'AFTERSHOCKS', ok: e => e.T.boss, run: e => aftershocks(e) },
-  { id: 'enrage', name: 'RAGE', ok: e => e.T.boss && !e.T.mimic, run: e => { if (!e.enraged) enrage(e); } },
+  { id: 'swing', name: 'SWING', ok: e => !e.T.ranged && !e.T.queen, run: e => { e.atk = e.T.windup; } },
+  { id: 'slam', name: 'GROUND SLAM', ok: e => e.T.boss && !e.T.mimic && !e.T.queen, run: e => startSlam(e) },
+  { id: 'toss', name: 'ROCK TOSS', ok: e => e.T.boss && !e.T.mimic && !e.T.queen, run: e => throwRock(e, player.pos) },
+  { id: 'charge', name: 'CHARGE', ok: e => e.T.boss && !e.T.mimic && !e.T.queen, run: e => startCharge(e, player.pos) },
+  { id: 'quake', name: 'AFTERSHOCKS', ok: e => e.T.boss && !e.T.queen, run: e => aftershocks(e) },
+  { id: 'enrage', name: 'RAGE', ok: e => e.T.boss && !e.T.mimic && !e.T.queen, run: e => { if (!e.enraged) enrage(e); } },
   { id: 'spread', name: 'SPREAD LOB', ok: e => e.T.king, run: e => [-1.8, 0, 1.8].forEach((l, i) => setTimeout(() => { if (!e.dead) spitGoo(e, l, player.pos); }, i * 140)) },
   { id: 'summon', name: 'SUMMON', ok: e => e.T.king, run: e => kingSummon(e) },
   { id: 'spit', name: 'SPIT', ok: e => e.T.ranged, run: e => spitGoo(e, 0, player.pos) },
@@ -3447,6 +3544,7 @@ function bossIntro(r) {
   const learned = Object.keys(moves).filter(k => moves[k] === floorNum), known = [...bossMoves(type, floorNum)];
   let sub = r.king && !run.won ? 'FINAL BOSS' : '';
   if (!sub && known.length) sub = !run.bossMet.has(type) ? 'KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : learned.length ? 'LEARNED ' + learned.map(k => MOVE_NAME[k]).join(' · ') : '';
+  if (type === 'queen' && !run.bossMet.has(type)) sub = 'SHE PUTS THE LIGHTS OUT' + (known.length ? ' · KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : '');
   if (type === 'lurker' && !run.bossMet.has(type)) sub = 'FIND THE REAL ONE' + (known.length ? ' · KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : '');
   run.bossMet.add(type);
   banner(r.king ? 'THE ' + name : name, sub, 'boss');
@@ -4261,6 +4359,305 @@ const mkFacing = e => { let d = Math.atan2(player.pos.x - e.pos.x, player.pos.z 
 // clear the chamber's field out completely
 function fieldWipe() { for (const s of [...field.list, ...field.gone]) dropShroomMesh(s); for (const g of field.grounds) { if (g.grp.parent) g.grp.parent.remove(g.grp); disposeTree(g.grp); } fieldReset(); }
 
+/* ================= THE VEILED QUEEN: the Gloom Moths' mother ================= */
+Object.assign(TYPES, {
+  queen: { name: 'Veiled Queen', hp: 15, speed: 2.0, base: 0xB8A0E0, boss: true, queen: true, flying: true, immune: ['feather'], immTxt: 'WIND DOES NOTHING', reach: 1.2, dmg: 1, windup: 0.6, cooldown: 2.0 },
+  veil: { name: 'False Veil', hp: 1, speed: 2.0, base: 0xB8A0E0, flying: true, decoy: true, reach: 0, dmg: 0, windup: 9, cooldown: 99 },
+});
+BOSS_POOL.push({ id: 'queen', from: 2 });
+BOSS_MOVES.queen = { snare: 2, veils: 3, hatch: 4 };
+Object.assign(MOVE_NAME, { snare: 'WEB SNARES', veils: 'FALSE VEILS', hatch: 'HATCHERY' });
+
+/* ---------- the dark: she snuffs the torches, and they flicker back a while later ---------- */
+let roomDark = 0, darkGoal = 0, darkT = 0, hemiBase = 0.6, torchBase = [], accentBase = null, candleMesh = null;
+const fogBase = new THREE.Color(), darkTint = new THREE.Color(0xA8B4FF), accentCol = new THREE.Color();
+function lightBase() { // the room's own lighting, so the dark can come and go without losing it
+  hemiBase = hemi.intensity; fogBase.copy(scene.background); torchBase = torchLights.map(L => L.intensity);
+  accentBase = { pos: accentLight.position.clone(), col: accentLight.color.clone(), i: accentLight.intensity, d: accentLight.distance };
+}
+function darkTick(rdt) {
+  roomDark += (darkGoal - roomDark) * (1 - Math.exp(-(darkGoal > roomDark ? 7 : 1.4) * rdt));
+  if (darkGoal === 0 && roomDark < 0.003) roomDark = 0;
+  const k = roomDark;
+  hemi.intensity = hemiBase * (1 - 0.86 * k);
+  scene.background.copy(fogBase).multiplyScalar(1 - 0.7 * k); scene.fog.color.copy(scene.background);
+  torchLights.forEach((L, i) => { if (!flames.some(f => f.L === L)) L.intensity = (torchBase[i] || 0) * (1 - k); }); // the lab's lamps go too
+  if (accentBase) { // your own little glow follows you round when it's dark
+    accentLight.position.copy(accentBase.pos).lerp(tmpV.set(camera.position.x, camera.position.y + 0.3, camera.position.z), k);
+    accentLight.color.copy(accentBase.col).lerp(darkTint, k); accentLight.intensity = accentBase.i * (1 - k) + 0.8 * k; accentLight.distance = accentBase.d * (1 - k) + 7 * k;
+  }
+  if (candleMesh) candleMesh.visible = k < 0.5;
+  if (k > 0) for (const o of enemies) if (o.type === 'moth' && o.wings && !o.dead) o.wings[0].p.children[0].material.emissiveIntensity = 0.6 + 0.9 * k; // her brood glow in the dark
+}
+function queenReset() { darkGoal = 0; darkT = 0; roomDark = 0; webs.forEach(w => { if (w.g.parent) w.g.parent.remove(w.g); disposeTree(w.g); }); webs = []; player.slowT = 0; candleMesh = null; }
+
+/* ---------- her model: the mockup's Veiled Queen, built at game size ---------- */
+const vqOn = (cup, x, y, lift = 0.006) => [x, -cup * x * x + lift, y];
+function vqWingGeo(pts, cup) {
+  const sh = new THREE.Shape(); pts.forEach(([x, y], i) => (i ? sh.lineTo(x, y) : sh.moveTo(x, y)));
+  const g = new THREE.ShapeGeometry(sh); g.rotateX(Math.PI / 2);
+  const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i); p.setY(i, -cup * x * x); }
+  g.computeVertexNormals(); return g;
+}
+function vqFlat(parent, geo, mat, p, s) { const m = mkAdd(parent, geo, mat, p[0], p[1], p[2]); m.rotation.x = -Math.PI / 2; m.scale.setScalar(s); return m; }
+function vqStrip(parent, cup, a, b, w, mat, lift = 0.008) { // a thin band painted on a wing from a to b
+  const [ax, ay] = a, [bx, by] = b, dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1, nx = -dy / L * w / 2, ny = dx / L * w / 2, pos = [];
+  for (let i = 0; i < 5; i++) {
+    const P = (t, s) => vqOn(cup, ax + dx * t + nx * s, ay + dy * t + ny * s, lift), t0 = i / 5, t1 = (i + 1) / 5;
+    pos.push(...P(t0, -1), ...P(t1, -1), ...P(t1, 1), ...P(t0, -1), ...P(t1, 1), ...P(t0, 1));
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  return mkAdd(parent, g, mat);
+}
+function vqWing(body, sd, root, pts, mat, cup, paint) {
+  const pivot = new THREE.Group(); pivot.position.set(sd * root[0], root[1], root[2]); body.add(pivot);
+  const inner = new THREE.Group(); inner.scale.x = sd; pivot.add(inner);
+  mkAdd(inner, vqWingGeo(pts, cup), mat); if (paint) paint(inner, cup);
+  return { pivot, sd };
+}
+function vqAntenna(body, sd, base, len, feather, mat) {
+  const pts = [base, [base[0] + sd * len * 0.25, base[1] + len * 0.45, base[2] + len * 0.35], [base[0] + sd * len * 0.55, base[1] + len * 0.75, base[2] + len * 0.45], [base[0] + sd * len * 0.85, base[1] + len * 0.8, base[2] + len * 0.3]];
+  const tg = hornGeo(pts, 0.022, 0.01, 10, 4); mkAdd(body, tg, mat);
+  for (let i = 1; i < 9; i++) { // the barbs that make it a feather
+    const t = i / 9, p = tg.userData.path.getPointAt(t), tan = tg.userData.path.getTangentAt(t), w = feather * Math.sin(Math.PI * t);
+    for (const k of [-1, 1]) { const b = mkAdd(body, GEO.box, mat, p.x, p.y, p.z); b.scale.set(0.012, w, 0.01); b.lookAt(p.x + tan.x, p.y + tan.y, p.z + tan.z); b.rotateZ(k * 0.9); b.translateY(w / 2); }
+  }
+}
+function vqFuzz(parent, r, sx, sy, sz, mat, tufts) { // a furry lump: a ball with a scatter of tufts
+  mkAdd(parent, GEO.ico1, mat).scale.set(r * sx, r * sy, r * sz);
+  for (let i = 0; i < tufts; i++) { const a = i / tufts * Math.PI * 2, e = (i % 3 - 1) * 0.5, t = mkAdd(parent, GEO.ico0, mat, Math.cos(a) * r * sx * 0.9, Math.sin(e) * r * sy * 0.7 + r * sy * 0.2, Math.sin(a) * r * sz * 0.9); t.scale.setScalar(r * 0.32); t.rotation.set(a, e, 0); }
+}
+function buildQueen(decoy) {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body); body.position.y = 0.5;
+  const S = new THREE.Group(); S.scale.setScalar(1.2); body.add(S);
+  const skin = new THREE.MeshStandardMaterial({ color: 0xB8A0E0, flatShading: true, roughness: 1, transparent: true, opacity: 1 });
+  const lace = new THREE.MeshStandardMaterial({ color: decoy ? 0xC890D8 : 0x9A78E0, emissive: decoy ? 0x4A2A48 : 0x3A2A62, emissiveIntensity: 0.8, flatShading: true, side: THREE.DoubleSide, transparent: true, opacity: 0.8, roughness: 0.6, depthWrite: false }); // lit a little from within, since you always see her from below
+  const vein = new THREE.MeshStandardMaterial({ color: decoy ? 0xFFB0D8 : 0xD8C8FF, emissive: decoy ? 0xFF4A9A : 0x9A6AFF, emissiveIntensity: 0.9, flatShading: true, side: THREE.DoubleSide }); // a decoy's lace glows the wrong colour
+  const crown = new THREE.MeshStandardMaterial({ color: 0xFFE8B0, emissive: 0xA88A40, emissiveIntensity: 0.5, flatShading: true });
+  const silk = new THREE.MeshStandardMaterial({ color: 0xF4F0FA, emissive: 0x8A7AA8, emissiveIntensity: 0.25, flatShading: true, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+  const eye = M(0x1A1420, { roughness: 0.15, metalness: 0.3 }), ruff = M(0xFFFFFF, { roughness: 1 }), legM = M(0x8A7AA8), belly = M(0xA890D0);
+  vqFuzz(S, 0.28, 1, 0.95, 1.15, skin, 10);
+  for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2, t = mkAdd(S, GEO.ico0, ruff, Math.cos(a) * 0.26, 0.04 + Math.sin(a * 3) * 0.02, 0.2 + Math.sin(a) * 0.12); t.scale.set(0.09, 0.07, 0.09); } // the ruff
+  mkAdd(S, GEO.sphere, skin, 0, 0.06, 0.4).scale.set(0.15, 0.135, 0.13);
+  for (const sd of [-1, 1]) { mkAdd(S, GEO.sphere, eye, sd * 0.105, 0.075, 0.45).scale.setScalar(0.083); mkAdd(S, GEO.sphere, MKM.glint, sd * 0.12, 0.11, 0.51).scale.setScalar(0.018); }
+  for (let i = 0; i < 5; i++) { const t = i / 4, r = 0.18 + (0.08 - 0.18) * t; mkAdd(S, GEO.ico1, i % 2 ? belly : skin, 0, -0.02 - t * 0.08, -0.28 - t * 0.6).scale.set(r, r * 0.9, 0.11); }
+  const gown = mkAdd(S, mkLathe([[0.01, 0.03], [0.2, 0.0], [0.3, -0.2], [0.34, -0.5], [0.3, -0.8], [0.12, -0.98], [0.01, -1.02]], 12), silk, 0, 0, -0.18); gown.rotation.x = 1.35; // a silk gown draped back over her
+  for (const sd of [-1, 1]) vqAntenna(S, sd, [sd * 0.05, 0.16, 0.46], 0.55, 0.1, crown);
+  const fore = [[0.05, 0.12], [0.55, 0.45], [1.1, 0.55], [1.4, 0.35], [1.35, 0.0], [1.0, -0.3], [0.5, -0.32], [0.08, -0.12]];
+  const hind = [[0.05, -0.05], [0.6, -0.15], [0.95, -0.4], [0.85, -0.6], [0.95, -0.75], [0.6, -0.85], [0.5, -0.7], [0.3, -0.75], [0.1, -0.35]];
+  const wings = [], ring = new THREE.RingGeometry(0.75, 1, 8);
+  for (const sd of [-1, 1]) {
+    wings.push(vqWing(S, sd, [0.12, 0.08, 0.06], fore, lace, 0.05, (w, cup) => { for (const lift of [0.008, -0.008]) { for (const [x, y] of [[1.35, 0.4], [1.38, 0.05], [1.05, -0.28], [0.6, -0.3], [0.9, 0.52]]) vqStrip(w, cup, [0.06, 0], [x * 0.95, y * 0.95], 0.03, vein, lift); for (const [x, y] of [[0.75, 0.3], [0.95, 0.05], [0.7, -0.15]]) vqFlat(w, ring, vein, vqOn(cup, x, y, lift * 0.75), 0.09); } })); // the lace on both faces
+    wings.push(vqWing(S, sd, [0.1, 0.04, -0.12], hind, lace, 0.04, (w, cup) => { for (const lift of [0.008, -0.008]) for (const [x, y] of [[0.9, -0.42], [0.88, -0.74], [0.5, -0.8], [0.2, -0.5]]) vqStrip(w, cup, [0.06, -0.06], [x * 0.95, y * 0.95], 0.026, vein, lift); }));
+  }
+  const legs = [];
+  for (let i = 0; i < 3; i++) for (const sd of [-1, 1]) { const pv = new THREE.Group(); pv.position.set(sd * 0.12, -0.12, 0.1 - i * 0.12); S.add(pv); mkAdd(pv, hornGeo([[0, 0, 0], [sd * 0.15, -0.12, (1 - i) * 0.08], [sd * 0.22, -0.32, (1 - i) * 0.14]], 0.022, 0.012, 6, 4), legM); legs.push({ pv, sd, i }); }
+  const cocoon = new THREE.Group(); cocoon.position.y = 0.78; cocoon.visible = false; root.add(cocoon);
+  const shell = mkAdd(cocoon, mkLathe([[0.02, -0.75], [0.32, -0.6], [0.48, -0.2], [0.5, 0.2], [0.36, 0.6], [0.04, 0.78]], 12), silk); shell.scale.setScalar(1.15);
+  for (let i = 0; i < 6; i++) { const r = mkAdd(cocoon, new THREE.TorusGeometry(0.54 - Math.abs(i - 2.5) * 0.07, 0.014, 3, 16), M(0xFFFFFF), 0, -0.55 + i * 0.23, 0); r.rotation.x = Math.PI / 2 + (i % 2 ? 0.25 : -0.25); } // silk wound round it
+  return { root, body, skin, legs: [], h: 1.0, r: 0.95, baseEmissive: 0x000000, baseOpacity: 1, look: queenLook, qm: { S, wings, legs, cocoon, vein, crown, silk, decoy } };
+}
+
+/* ---------- how she moves and looks, frame to frame ---------- */
+const vqChar = new THREE.Color(0x8A6A5A);
+const QS = ['intro', 'fly', 'shriek', 'spit', 'swoop', 'brood', 'cocoon', 'dazed'];
+function queenGo(e, st) { e.qs = st; e.qt = 0; e.fired = new Set(); if (st !== 'swoop') e.sw = null; }
+function queenLook(e, sdt) {
+  const q = e.qm, st = e.qs, t = e.qt || 0, frozen = e.frozen > 0;
+  e.tiltV += (-60 * e.tilt - 7 * e.tiltV) * sdt; e.tilt += e.tiltV * sdt;
+  e.root.position.copy(e.pos); e.root.rotation.y = e.yaw; e.root.scale.setScalar(e.scale);
+  let amp = 0.38, spd = 2.6, off = 0.08, fold = 0, pitch = e.tilt * 0.1, flip = 0, rollIn = 0;
+  if (st === 'shriek') { amp = 0.12; spd = 22; off = 0.55; pitch -= 0.3 * Math.min(1, t / 0.4); }
+  else if (st === 'spit') { pitch += t < 0.55 ? -0.3 * (t / 0.55) : 0.35 * Math.max(0, 1 - (t - 0.55) / 0.3); amp = 0.5; spd = 4; }
+  else if (st === 'swoop') { if (t < 0.6) { off = 0.6; amp = 0.15; spd = 6; pitch -= 0.25; } else { amp = 0.1; spd = 8; fold = 1; pitch += 0.3; rollIn = Math.sin(t * 3) * 0.3; } }
+  else if (st === 'brood') { amp = 0.7; spd = 5; }
+  else if (st === 'dazed') { flip = 1; amp = 0; }
+  if (frozen) { amp = 0; flip = e.pos.y < 0.3 ? 1 : 0; }
+  const cocoonOn = st === 'cocoon', wrap = cocoonOn ? Math.min(1, t / 1.0) : 0;
+  q.cocoon.visible = cocoonOn; if (cocoonOn) { const s = MK.back(wrap); q.cocoon.scale.set(s, 0.3 + s * 0.7, s); q.cocoon.rotation.y += sdt * 0.4; q.cocoon.rotation.z = Math.sin(T * 5) * 0.03 + e.tilt * 0.05; const cf = e.cocMax ? Math.max(0, e.cocHp / e.cocMax) : 1; q.silk.color.setHex(e.fire > 0 ? 0xC8A890 : 0xF4F0FA).lerp(vqChar, (1 - cf) * 0.5); } else q.silk.color.setHex(0xF4F0FA); // the cocoon browns as it's torn and burnt
+  e.body.visible = !(cocoonOn && wrap > 0.9);
+  e.body.scale.setScalar(cocoonOn ? 1 - wrap * 0.8 : 1);
+  e.body.rotation.set(pitch * (1 - flip), 0, rollIn * (1 - flip) + flip * Math.PI + (flip && e.stun > 0 ? Math.sin(T * 9) * 0.08 : 0), 'YXZ');
+  e.body.position.y = 0.5 + (flip ? -0.2 : Math.sin(T * 1.6 + e.id) * 0.06);
+  q.wings.forEach((w, j) => { const ph = j % 2 ? -0.35 : 0; w.pivot.rotation.z = w.sd * ((Math.sin(T * spd + ph + e.id) * amp + off) * (1 - flip) - 0.12 * flip); w.pivot.rotation.y = w.sd * ((j % 2 ? 0.25 : -0.05) * (1 - flip) + (j % 2 ? 0.4 : -0.1) * flip + fold * (j % 2 ? 0.9 : 0.7)); });
+  for (const l of q.legs) l.pv.rotation.set(flip ? Math.sin(T * 10 + l.i * 2 + l.sd) * 0.5 : 0.3, 0, l.sd * (0.2 + flip * 0.3));
+  const glowK = 1 + roomDark * 1.6; q.vein.emissiveIntensity = 0.9 * glowK * (q.decoy ? 0.85 + Math.sin(T * 7 + e.id) * 0.15 : 1); q.crown.emissiveIntensity = 0.5 * glowK;
+  e.stars.visible = e.stun > 0 && !cocoonOn; if (e.stars.visible) e.stars.children.forEach((s, i) => { const a = T * 5 + i * 2.1; s.position.set(Math.cos(a) * 0.45, Math.sin(T * 7 + i) * 0.05 + (flip ? -0.5 : 0.3), Math.sin(a) * 0.45); });
+  e.shadow.visible = true; e.shadow.position.set(e.pos.x, 0.015, e.pos.z); e.shadow.scale.setScalar(1.3 / (1 + e.pos.y * 0.4));
+}
+const roomClamp = p => { p.x = Math.max(-W + 1.4, Math.min(W - 1.4, p.x)); p.z = Math.max(-D + 1.4, Math.min(D - 1.4, p.z)); return p; };
+function queenStep(e, sdt) {
+  if (e.T.decoy) return veilStep(e, sdt);
+  e.qt += sdt; e.cd = Math.max(0, e.cd - sdt); if (!darkGoal) e.darkCD = (e.darkCD || 0) - sdt;
+  const t = e.qt, tg = netTarget(e), tp = tg.pos, held = !!e.labHold, frozen = e.frozen > 0;
+  const canHit = cine.state === 'idle' && !transit && (tg.local ? player.hp > 0 && !player.fall && !player.down : !tg.ko);
+  let goalY = (e.glow > 0 ? 0.5 : 2.1 + Math.sin(T * 1.3 + e.id) * 0.25), lerpY = 3, faceT = true; // glowcap on her and she can't stay up
+  const speed = e.T.speed * (e.wet > 0 ? 0.65 : 1) * (e.chill > 0 ? 0.5 : 1) * (1 + 0.04 * ((e.tier || 1) - 1));
+  if (!held && !['cocoon', 'dazed', 'swoop'].includes(e.qs)) for (const [k, f] of [['coc1', 0.66], ['coc2', 0.33]]) if (!e[k] && e.hp <= e.maxHp * f) { e[k] = true; queenCocoon(e); break; }
+  if (frozen && e.qs !== 'cocoon') { e.pos.y = Math.max(0, e.pos.y - sdt * 7); e.atk = 0; queenLook(e, sdt); return true; } // frozen solid, she drops like a stone
+  switch (e.qs) {
+    case 'intro': if (t > 1.6) { queenGo(e, 'fly'); e.cd = 0.3; e.wantShriek = true; } break;
+    case 'fly': {
+      e.ang = (e.ang || 0) + sdt * 0.35;
+      const goal = roomClamp(new THREE.Vector3(tp.x + Math.sin(e.ang) * 4.6, 0, tp.z + Math.cos(e.ang) * 4.6)), dx = goal.x - e.pos.x, dz = goal.z - e.pos.z, d = Math.hypot(dx, dz);
+      if (d > 0.2 && e.stun <= 0) { const s = Math.min(d, speed * sdt); e.pos.x += dx / d * s; e.pos.z += dz / d * s; }
+      if (!held && e.cd <= 0 && canHit && e.stun <= 0) queenPick(e, tp);
+      break;
+    }
+    case 'shriek': goalY += 0.3; if (t > 0.5 && !e.fired.has('s')) { e.fired.add('s'); queenDark(e, 12); } if (t > 1.1) { queenGo(e, 'fly'); e.cd = 0.8; } break;
+    case 'spit': e.atk = t < 0.55 ? 0.55 - t : 0; if (t > 0.55 && !e.fired.has('s')) { e.fired.add('s'); silkSpit(e, tp); } if (t > 0.9) { queenGo(e, 'fly'); e.cd = rand(1.2, 1.9) * bossCd(e); } break;
+    case 'brood': if (t > 0.5 && !e.fired.has('b')) { e.fired.add('b'); queenBrood(e); } if (t > 1.0) { queenGo(e, 'fly'); e.cd = 1.3 * bossCd(e); } break;
+    case 'swoop': {
+      if (t < 0.6) { e.atk = 0.6 - t; goalY += 0.35; break; } // lines up, wings up: here she comes
+      e.atk = 0; faceT = false;
+      if (!e.sw) { const a = e.pos.clone(), b = new THREE.Vector3(tp.x, 0.2, tp.z), dir = b.clone().sub(a).setY(0); if (dir.lengthSq() < 0.01) dir.set(0, 0, 1); dir.normalize(); const c = roomClamp(b.clone().addScaledVector(dir, 3.5)); c.y = a.y; e.sw = { p: [a, b.clone().multiplyScalar(2).sub(a.clone().add(c).multiplyScalar(0.5)), c], hit: new Set() }; SFX.whoosh(); }
+      const u = Math.min(1, (t - 0.6) / 1.3), [a, ctl, c] = e.sw.p, ou = 1 - u, px = e.pos.x, pz = e.pos.z;
+      e.pos.set(ou * ou * a.x + 2 * ou * u * ctl.x + u * u * c.x, Math.max(0.15, ou * ou * a.y + 2 * ou * u * ctl.y + u * u * c.y), ou * ou * a.z + 2 * ou * u * ctl.z + u * u * c.z);
+      if (Math.hypot(e.pos.x - px, e.pos.z - pz) > 0.001) e.yaw = Math.atan2(e.pos.x - px, e.pos.z - pz);
+      if (Math.random() < sdt * 40) burst(centerOf(e), pick([0xE8D8FF, 0xB48AFF, 0xFFFFFF]), 1, 0.6, 0.9, 0.05, 0.5, true); // glittering scales behind her
+      if (u > 0.2 && u < 0.85 && e.pos.y < 1.3) {
+        if (!e.sw.hit.has('me') && !player.down && !player.fall && cine.state === 'idle' && Math.hypot(e.pos.x - player.pos.x, e.pos.z - player.pos.z) < 1.15) { e.sw.hit.add('me'); hurtPlayer(1, e.pos); }
+        if (net.on && net.host) for (const R of net.remotes.values()) if (R.here && !e.sw.hit.has(R.peer) && Math.hypot(e.pos.x - R.pos.x, e.pos.z - R.pos.z) < 1.15) { e.sw.hit.add(R.peer); netHurt(R, 1, e.pos); }
+      }
+      if (u >= 1) { queenGo(e, 'fly'); e.cd = rand(1.0, 1.6) * bossCd(e); }
+      queenLook(e, sdt); return true;
+    }
+    case 'cocoon': {
+      e.atk = 0; e.pos.y = Math.max(0, e.pos.y - sdt * 4); faceT = false;
+      if (t > 1.0) {
+        if (e.hp < e.maxHp && e.healed < 8 && (e.healAcc = (e.healAcc || 0) + sdt) >= 1) { e.healAcc = 0; e.hp = Math.min(e.maxHp, e.hp + 1); e.healed++; puff(centerOf(e).add(new THREE.Vector3(0, 0.5, 0)), 0xC8F25A, 3, 0.5, 0.6, 1, 0.1, 0.7); }
+        if (e.fire > 0) { e.cocHp -= sdt * 2.5; if (Math.random() < sdt * 12) burst(centerOf(e).add(new THREE.Vector3(rand(-0.4, 0.4), rand(0, 0.6), rand(-0.4, 0.4))), pick([0xFF8A2A, 0xFFD23A]), 1, 1, 0.5, 0.06, -3, true); } // silk goes up fast
+        if (e.moves && e.moves.has('hatch') && e.eggs < 2 && t > 2.2 + e.eggs * 2.6) { e.eggs++; queenEgg(e); }
+        if (e.cocHp <= 0) { cocoonBreak(e); break; }
+        if (t > 9) { queenGo(e, 'fly'); e.wantShriek = true; SFX.pop(); burst(centerOf(e), 0xF4F0FA, 18, 3, 0.8, 0.07, 3); const sp = project(centerOf(e)); if (!sp.behind) callout('HEALED', 2, { at: true, x: sp.x, y: sp.y }); }
+      }
+      queenLook(e, sdt); return true;
+    }
+    case 'dazed': e.pos.y = Math.max(0, e.pos.y - sdt * 5); faceT = false; if (t > 3.5) { e.open = 0; queenGo(e, 'fly'); e.cd = 0.6; if (!darkGoal) e.wantShriek = true; } queenLook(e, sdt); return true;
+  }
+  e.pos.y += (goalY - e.pos.y) * (1 - Math.exp(-lerpY * sdt));
+  roomClamp(e.pos);
+  if (faceT) { const ty = Math.atan2(tp.x - e.pos.x, tp.z - e.pos.z); let dy = ty - e.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); e.yaw += dy * (1 - Math.exp(-5 * sdt)); }
+  queenLook(e, sdt); return true;
+}
+function queenPick(e, tp) {
+  if (e.wantShriek || (!darkGoal && e.darkCD <= 0)) { e.wantShriek = false; queenGo(e, 'shriek'); return; }
+  const d = Math.hypot(tp.x - e.pos.x, tp.z - e.pos.z), moths = enemies.filter(o => o.type === 'moth' && !o.dead).length, r = Math.random();
+  if (moths < 1 + Math.min(3, e.tier || 1) && r < 0.22) queenGo(e, 'brood');
+  else if (r < 0.55 && d < 11) queenGo(e, 'swoop');
+  else queenGo(e, 'spit');
+}
+function queenDark(e, dur) { // the shriek: every torch in the room goes out
+  darkGoal = 1; darkT = dur; SFX.shriek(); shake = Math.max(shake, 0.2);
+  floorRing(e.pos.clone().setY(0), 0xB48AFF, 4, 0.6);
+  const sp = project(centerOf(e)); callout('LIGHTS OUT', 2, sp.behind ? {} : { at: true, x: sp.x, y: sp.y });
+  if (e.moves && e.moves.has('veils')) queenVeils(e);
+  if (!lab.on && !run.queenTip) { run.queenTip = true; setTimeout(() => notice('GLOWCAP LIGHTS HER UP<em>A LIT QUEEN CAN\'T STAY UP</em>'), 1600); }
+}
+function queenCocoon(e) {
+  queenGo(e, 'cocoon'); e.cocHp = e.cocMax = Math.round(4 + (e.tier || 1) * 1.5); e.healed = 0; e.healAcc = 0; e.eggs = 0; e.sw = null; SFX.wrap();
+  const sp = project(centerOf(e)); callout('COCOONED', 2, sp.behind ? {} : { at: true, x: sp.x, y: sp.y });
+  if (!lab.on && !run.cocTip) { run.cocTip = true; setTimeout(() => notice('BREAK THE COCOON<em>OR SHE COMES BACK HEALED · FIRE BURNS IT FAST</em>'), 900); }
+}
+function cocoonHit(e, n) { e.cocHp -= n; e.tiltV -= 10; hitmarker(e); burst(centerOf(e).add(new THREE.Vector3(0, 0.3, 0)), 0xF4F0FA, 5, 2, 0.4, 0.06, 4); if (e.cocHp <= 0 && e.qt > 0.3) cocoonBreak(e); }
+function cocoonBreak(e) { // torn open: she tumbles out dazed, and takes double while she's down
+  queenGo(e, 'dazed'); e.stun = 3.5; e.open = 1; SFX.pop(); SFX.thud(); shake = Math.max(shake, 0.25);
+  burst(centerOf(e).add(new THREE.Vector3(0, 0.4, 0)), 0xF4F0FA, 24, 4, 0.9, 0.08, 4);
+  const sp = project(centerOf(e)); callout('CRACKED', 2, sp.behind ? {} : { at: true, x: sp.x, y: sp.y });
+}
+function silkSpit(e, tp) {
+  const from = centerOf(e).add(new THREE.Vector3(Math.sin(e.yaw) * 0.6, -0.1, Math.cos(e.yaw) * 0.6)), to = new THREE.Vector3(tp.x + rand(-0.5, 0.5), 0, tp.z + rand(-0.5, 0.5)), web = !!(e.moves && e.moves.has('snare'));
+  launchGoo(from, to, false, 'silk', web);
+  if (net.on && net.host) netEmit('goo', { k: 'silk', rk: rkOf(room), f: [+from.x.toFixed(2), +from.y.toFixed(2), +from.z.toFixed(2)], t: [+to.x.toFixed(2), 0, +to.z.toFixed(2)], w: web ? 1 : 0 });
+}
+function queenBrood(e) {
+  const n = 2; SFX.flutter(); puff(centerOf(e), 0xB8A0F0, 10, 1.2, 0.6, 1.2, 0.18, 0.7);
+  for (let i = 0; i < n; i++) { const a = rand(0, 6.3), m = spawnEnemy('moth', e.pos.x + Math.sin(a) * 1.2, e.pos.z + Math.cos(a) * 1.2); m.pos.y = Math.max(0.5, e.pos.y); }
+}
+function queenEgg(e) { // a glowing egg in the silk beside her, and out comes a moth
+  const a = rand(0, 6.3), x = e.pos.x + Math.sin(a) * 1.4, z = e.pos.z + Math.cos(a) * 1.4;
+  burst(new THREE.Vector3(x, 0.3, z), 0xE8FF7A, 10, 2, 0.6, 0.06, 3, true); SFX.pop(); spawnEnemy('moth', x, z).pos.y = 0.2;
+}
+function queenVeils(e) { // two false queens in the dark, mirrored across the room; only the real one's lace is the right colour
+  for (const side of ['x', 'z']) { const v = spawnEnemy('veil', side === 'x' ? -e.pos.x : e.pos.x, side === 'z' ? -e.pos.z : e.pos.z); v.vside = side; v.pos.y = e.pos.y; v.qs = 'fly'; v.qt = 0; }
+}
+function veilStep(e, sdt) {
+  const q = enemies.find(o => o.T.queen && !o.dead);
+  if (!q || (!darkGoal && !lab.on) || e.glow > 0) { kill(e, 'DISPELLED'); return true; } // gone when the lights come back, or glowcap shows it up
+  e.qt = (e.qt || 0) + sdt;
+  const gx = e.vside === 'x' ? -q.pos.x : q.pos.x, gz = e.vside === 'z' ? -q.pos.z : q.pos.z, k = 1 - Math.exp(-3 * sdt);
+  e.pos.x += (gx - e.pos.x) * k; e.pos.z += (gz - e.pos.z) * k; e.pos.y += (Math.max(1.2, q.pos.y) - e.pos.y) * k;
+  e.yaw = e.vside === 'x' ? -q.yaw : Math.PI - q.yaw;
+  queenLook(e, sdt); return true;
+}
+function queenDied(e) { darkGoal = 0; darkT = 0; for (const o of enemies) if (o.T.decoy && !o.dead) kill(o, 'DISPELLED'); }
+const queenNet = e => [Math.max(0, QS.indexOf(e.qs)), +(e.qt || 0).toFixed(2), darkGoal, e.qs === 'cocoon' && e.cocMax ? +(e.cocHp / e.cocMax).toFixed(2) : 0];
+function queenFromNet(e, mk) {
+  const st = QS[mk[0]] || 'fly'; if (st !== e.qs) { e.qs = st; e.qt = +mk[1] || 0; }
+  darkGoal = mk[2] ? 1 : 0; e.cocMax = 1; e.cocHp = +mk[3] || 0; e.open = st === 'dazed' ? 1 : 0;
+}
+
+/* ---------- silk on the floor: her spit leaves sticky webs once she knows how ---------- */
+let webs = [];
+const webMat = new THREE.MeshBasicMaterial({ color: 0xD8D0EC, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false }); webMat.userData.shared = true;
+function webPatch(p) {
+  const g = new THREE.Group(), pos = [], seg = (a, b, w) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = -dz / L * w, nz = dx / L * w; pos.push(a[0] - nx, 0, a[1] - nz, b[0] - nx, 0, b[1] - nz, b[0] + nx, 0, b[1] + nz, a[0] - nx, 0, a[1] - nz, b[0] + nx, 0, b[1] + nz, a[0] + nx, 0, a[1] + nz); };
+  const n = 9, R = 1.1, spokes = [...Array(n)].map((_, i) => { const a = i / n * Math.PI * 2 + rand(-0.15, 0.15); return [Math.cos(a), Math.sin(a)]; });
+  for (const [cx, cz] of spokes) seg([0, 0], [cx * R, cz * R], 0.012);
+  for (const f of [0.3, 0.55, 0.8]) for (let i = 0; i < n; i++) { const a = spokes[i], b = spokes[(i + 1) % n]; seg([a[0] * R * f, a[1] * R * f], [b[0] * R * f, b[1] * R * f], 0.01); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.add(meshOf(geo, webMat)); g.position.set(p.x, 0.035, p.z); g.rotation.y = rand(0, 6.3); (roomGroup || scene).add(g);
+  webs.push({ g, x: p.x, z: p.z, t: 9 });
+}
+function webbed(dur) { if (!(player.slowT > 0.5)) callout('webbed', 1); player.slowT = Math.max(player.slowT || 0, dur); }
+function silkHurtRemotes(p) { if (net.on && net.host) for (const R of net.remotes.values()) if (R.here && !R.ko && R.grace <= 0 && Math.hypot(p.x - R.pos.x, p.z - R.pos.z) < 1.3) { R.grace = 1.0; netEmit('phurt', { to: R.peer, n: 1, k: 'silk', x: +p.x.toFixed(2), z: +p.z.toFixed(2) }); } }
+function queenTick(sdt) {
+  if (player.slowT > 0) player.slowT = Math.max(0, player.slowT - sdt);
+  for (let i = webs.length - 1; i >= 0; i--) {
+    const w = webs[i]; w.t -= sdt; w.g.scale.setScalar(Math.min(1, w.t));
+    if (!player.down && Math.hypot(player.pos.x - w.x, player.pos.z - w.z) < 1.05) player.slowT = Math.max(player.slowT || 0, 0.25);
+    if (w.t <= 0) { if (w.g.parent) w.g.parent.remove(w.g); disposeTree(w.g); webs.splice(i, 1); }
+  }
+  if (darkGoal && !netGuest() && (darkT -= sdt) <= 0) { // the torches flicker back on
+    darkGoal = 0; const q = enemies.find(o => o.T.queen && !o.dead); if (q) q.darkCD = rand(8, 11);
+  }
+}
+
+/* ---------- her floor: silk cellars and moth roosts, a veiled hall, a silken hoard ---------- */
+Object.assign(THEMES, {
+  silk: {
+    name: 'Silk Cellars', stone: [0x4A4456, 0x433E4F, 0x524B5E, 0x3C3747], floor: [0x332E3C, 0x2E2937, 0x383241], trim: 0x3A3442, beam: 0x3A2E2A, ceil: 0x15121A,
+    fog: 0x0C0A10, hemi: [0x9A8CC8, 0x201828, 0.6], torch: 0xFFC89A, accent: [0xB48AFF, -W + 1, 1.4, 5.8], pillars: [[-4.6, -2.6], [4.6, -2.6]], silk: 1, candles: 0.6,
+    spots: [{ kind: 'glowcap', origin: 'drain', wall: 'W', along: 5.8, y: 1.25 }, { kind: 'frost', origin: 'high', wall: 'N', along: 4.8, y: 2.6 }, { kind: 'doom', origin: 'torch', wall: 'E', along: -3.6, y: 1.1 }],
+  },
+  roost: {
+    name: 'Moth Roost', stone: [0x463E4A, 0x403844, 0x4E4552, 0x38323C], floor: [0x2E2830, 0x29242B, 0x332C35], trim: 0x4A3A2A, beam: 0x3A2A1E, ceil: 0x120E14,
+    fog: 0x0A080C, hemi: [0xA890B8, 0x221A20, 0.56], torch: 0xFFB070, accent: [0xFFC070, 0, 1.2, -1], pillars: [[-4, -4], [4, -4], [-4, 3], [4, 3]], silk: 0.4, candles: 1.4, roost: true,
+    spots: [{ kind: 'glowcap', origin: 'high', wall: 'S', along: -4.8, y: 2.6 }, { kind: 'doom', origin: 'torch', wall: 'W', along: 3.6, y: 1.1 }, { kind: 'frost', origin: 'drain', wall: 'E', along: 5.8, y: 1.25 }],
+  },
+  veilhall: {
+    name: 'The Veiled Hall', stone: [0x4C4458, 0x453E51, 0x554C62, 0x3E3849], floor: [0x2F2A38, 0x2A2533, 0x342E3E], trim: 0x5A4A6A, beam: 0x3A2E2A, ceil: 0x120F17,
+    fog: 0x0B0910, hemi: [0xA898D8, 0x201828, 0.62], torch: 0xFFC89A, accent: [0xB48AFF, 0, 4.4, 0], pillars: [], silk: 1.4, candles: 1, hall: true,
+    spots: [{ kind: 'frost', origin: 'high', wall: 'N', along: -4.8, y: 2.6 }, { kind: 'doom', origin: 'torch', wall: 'E', along: -3.6, y: 1.1 }],
+  },
+  vaultSilk: {
+    name: 'Silken Hoard', stone: [0x4E4658, 0x474051, 0x574E62, 0x403A4A], floor: [0x3A3442, 0x352F3D, 0x3F3848], trim: 0x6A5A7A, beam: 0x3A2E2A, ceil: 0x161219,
+    fog: 0x0E0B12, hemi: [0xA898D0, 0x241C2A, 0.6], torch: 0xFFC89A, accent: [0xFFD27A, 0, 2.6, -5], pillars: [], chest: true, vault: 'silk', silk: 0.8, candles: 0.8, tip: 'A chest. Walk up and hold E to open it',
+    spots: [{ kind: 'doom', origin: 'torch', wall: 'E', along: -3.6, y: 1.1 }],
+  },
+});
+BIOMES.queen = { name: 'THE SILK HALLS', fight: ['silk', 'roost', 'silk', 'roost'], start: 'silk', boss: ['veilhall'], vault: 'vaultSilk' };
+LAB_SUBJECTS.splice(LAB_SUBJECTS.indexOf('lurker') + 1, 0, 'queen');
+LAB_NOTES.queen = ['KETER', 'Airborne. Snuffs the lights, spits silk, and seals herself in a cocoon to heal. Glowcap grounds her.'];
+LAB_MOVES.unshift(
+  { id: 'shriek', name: 'SHRIEK', ok: e => !!e.T.queen, run: e => queenGo(e, 'shriek') },
+  { id: 'silk', name: 'SILK SPIT', ok: e => !!e.T.queen, run: e => queenGo(e, 'spit') },
+  { id: 'swoop', name: 'VEIL SWOOP', ok: e => !!e.T.queen, run: e => queenGo(e, 'swoop') },
+  { id: 'brood', name: 'BROOD', ok: e => !!e.T.queen, run: e => queenGo(e, 'brood') },
+  { id: 'cocoon', name: 'COCOON', ok: e => !!e.T.queen, run: e => queenCocoon(e) },
+  { id: 'veils', name: 'FALSE VEILS', ok: e => !!e.T.queen, run: e => { if (!darkGoal) queenDark(e, 12); queenVeils(e); } },
+);
+
 /* ================= spitter goo ================= */
 // lobbed in an arc at where you're standing, with a pulsing ring on the floor where it'll land: move and it misses
 const goos = [];
@@ -4275,11 +4672,13 @@ function spitGoo(e, lat = 0, at = player.pos) { // lat: how far to the side of i
 }
 const rockMat = new THREE.MeshStandardMaterial({ color: 0x6E6276, roughness: 0.9, flatShading: true }), rockMarkMat = new THREE.MeshBasicMaterial({ color: 0xFFB547, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide });
 rockMat.userData.shared = rockMarkMat.userData.shared = true;
-function launchGoo(from, to, fake, kind = 'goo') { // fake: a partner's copy of the host's, which only the host scores; kind 'rock' is a boss's boulder
+const silkGooMat = new THREE.MeshStandardMaterial({ color: 0xF4F0FA, emissive: 0x9A8AC8, emissiveIntensity: 0.8, flatShading: true }), silkMarkMat = new THREE.MeshBasicMaterial({ color: 0xE8E0FF, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }); // glows a little, so you can see it coming in the dark
+silkGooMat.userData.shared = silkMarkMat.userData.shared = true;
+function launchGoo(from, to, fake, kind = 'goo', web = false) { // fake: a partner's copy of the host's, which only the host scores; kind 'rock' is a boss's boulder
   const rock = kind === 'rock', T = rock ? 1.35 : 1.2, g = 12, vel = new THREE.Vector3((to.x - from.x) / T, (to.y - from.y + 0.5 * g * T * T) / T, (to.z - from.z) / T);
-  const m = meshOf(rock ? GEO.ico0 : GEO.ico1, rock ? rockMat : gooMat); m.scale.setScalar(rock ? 0.3 : 0.2); m.position.copy(from); scene.add(m);
-  const mark = meshOf(GEO.ring, rock ? rockMarkMat : gooMarkMat); mark.rotation.x = -Math.PI / 2; mark.position.set(to.x, 0.04, to.z); scene.add(mark);
-  goos.push({ m, mark, pos: from.clone(), vel, t: 0, fake, rock }); if (rock) SFX.whoosh(); else SFX.spit();
+  const silk = kind === 'silk', m = meshOf(rock ? GEO.ico0 : GEO.ico1, rock ? rockMat : silk ? silkGooMat : gooMat); m.scale.setScalar(rock ? 0.3 : 0.2); m.position.copy(from); scene.add(m);
+  const mark = meshOf(GEO.ring, rock ? rockMarkMat : silk ? silkMarkMat : gooMarkMat); mark.rotation.x = -Math.PI / 2; mark.position.set(to.x, 0.04, to.z); scene.add(mark);
+  goos.push({ m, mark, pos: from.clone(), vel, t: 0, fake, rock, silk, web }); if (rock) SFX.whoosh(); else if (silk) SFX.thwip(); else SFX.spit();
 }
 function updateGoos(sdt) {
   for (let i = goos.length - 1; i >= 0; i--) {
@@ -4288,9 +4687,10 @@ function updateGoos(sdt) {
     if (g.pos.y <= 0.08 || g.t > 3) {
       scene.remove(g.m); scene.remove(g.mark); goos.splice(i, 1);
       if (g.rock) { burst(g.pos.clone().setY(0.2), 0x8A7A6A, 16, 4, 0.7, 0.1); floorRing(g.pos, 0xFFB547, 1.3, 0.35); SFX.thud(); shake = Math.max(shake, 0.2); }
+      else if (g.silk) { burst(g.pos.clone().setY(0.2), 0xF4F0FA, 12, 3, 0.6, 0.07); floorRing(g.pos, 0xE8E0FF, 1.2, 0.4); if (g.web) webPatch(g.pos); SFX.thwip(); }
       else { burst(g.pos.clone().setY(0.2), 0xB06BE0, 12, 3, 0.6, 0.08); puddle(g.pos, 0x7A3AA0, 0.6); SFX.splash(false); }
-      if (!g.fake && !player.down && Math.hypot(g.pos.x - player.pos.x, g.pos.z - player.pos.z) < 1.3 && cine.state === 'idle') hurtPlayer(1, g.pos);
-      if (!g.fake) hurtRemotesNear(g.pos, 1.3, 1);
+      if (!g.fake && !player.down && Math.hypot(g.pos.x - player.pos.x, g.pos.z - player.pos.z) < 1.3 && cine.state === 'idle') { hurtPlayer(1, g.pos); if (g.silk) webbed(2.2); }
+      if (!g.fake) { if (g.silk) silkHurtRemotes(g.pos); else hurtRemotesNear(g.pos, 1.3, 1); }
     }
   }
 }
@@ -5393,7 +5793,7 @@ function knockedOut(final) {
 }
 function resetRun() {
   clearLoose(); satchel = []; potPending = []; strains = {}; seenTraits.clear(); reserve = null;
-  Object.assign(run, { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false });
+  Object.assign(run, { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false, queenTip: false, cocTip: false });
   player.maxHp = 8; $('#coinNum').textContent = '0';
   { const effs = shuffle(Object.keys(EXTRAS)); ['cyclops', 'drain', 'torch', 'high'].forEach((o, i) => { originEff[o] = effs[i]; }); }
   stockUp(); hasGun = false; tool = 'ladle'; score = 0; shownScore = 0; $('#scoreNum').textContent = '0';
@@ -5413,6 +5813,7 @@ const seenTraits = new Set();
 const POOL = n => n === 1 ? ['slime', 'slime', 'cyclops', 'moth'] : n === 2 ? ['slime', 'cyclops', 'spitter', 'moth', 'stump'] : ['slime', 'cyclops', 'spitter', 'moth', 'stump', 'knight'];
 function rosterFor(r) {
   if (r.type === 'stairs' && !r.king && r.boss === 'lurker') return adaptRoster(floorNum >= 3 ? ['lurker', pick(POOL(floorNum))] : ['lurker']); // the bugs come out of the mushrooms instead
+  if (r.type === 'stairs' && !r.king && r.boss === 'queen') return adaptRoster(floorNum >= 3 ? ['queen', pick(POOL(floorNum))] : ['queen']); // she brings her own brood
   if (r.king) return ['king', 'slime', floorNum >= 2 ? 'spitter' : 'slime'];
   let list;
   if (r.type === 'stairs') { const b = r.boss || 'chief'; list = floorNum === 1 ? [b, 'slime'] : [b, pick(POOL(floorNum)), pick(POOL(floorNum))]; }
@@ -6251,7 +6652,7 @@ const NET_ON = {
       const n = Math.min(20, +h.d || 0); if (n > 0) damage(e, n, typeof h.how === 'string' ? h.how.slice(0, 20) : 'TEAMWORK', from);
     }
   },
-  phurt(d) { if (!net.on || d.run !== net.run || d.to !== net.me) return; if (d.k === 'squish') { squishMe(); return; } hurtPlayer(Math.min(4, +d.n || 1), new THREE.Vector3(+d.x || 0, 0, +d.z || 0)); },
+  phurt(d) { if (!net.on || d.run !== net.run || d.to !== net.me) return; if (d.k === 'squish') { squishMe(); return; } if (d.k === 'silk') { hurtPlayer(1, new THREE.Vector3(+d.x || 0, 0, +d.z || 0)); webbed(2.2); return; } hurtPlayer(Math.min(4, +d.n || 1), new THREE.Vector3(+d.x || 0, 0, +d.z || 0)); },
   room(d) { if (net.on && d.run === net.run && d.fl === floorNum && d.from === rkOf(room) && DIRS[d.dir]) goThrough(d.dir, true); },
   floor(d) { if (net.on && d.run === net.run && d.fl === floorNum + 1) nextFloor(true); },
   cleared(d) { if (netGuest() && d.run === net.run && d.fl === floorNum && d.rk === rkOf(room) && room.fightActive) { room.fightActive = false; roomCleared(); } },
@@ -6265,7 +6666,7 @@ const NET_ON = {
     const f = new THREE.Vector3(...d.f.map(Number)), t = new THREE.Vector3(...d.t.map(Number));
     if (d.k === 'quake') quakeAt(f.x, f.z, Math.min(2, Math.max(0, t.x)), true);
     else if (d.k === 'lane') { const lane = chargeLane(f, t.normalize()); setTimeout(() => scene.remove(lane), 800); }
-    else launchGoo(f, t, true, d.k === 'rock' ? 'rock' : 'goo');
+    else launchGoo(f, t, true, d.k === 'rock' ? 'rock' : d.k === 'silk' ? 'silk' : 'goo', !!d.w);
   },
   xpress(d) { if (net.on && d.run === net.run && d.rk === rkOf(room) && xBrick && !room.xPressed) pressX(true); },
   over(d) { if (net.on && d.run === net.run && !koOpen) { player.down = false; knockedOut(true); } },
@@ -6299,12 +6700,15 @@ function pupDie(e) {
   e.dead = true; e.hp = 0; const a = rand(0, Math.PI * 2);
   e.vel = new THREE.Vector3(Math.cos(a) * 4, rand(5, 7), Math.sin(a) * 4); e.spin = rand(-10, 10); e.deadT = 2.6;
   e.label.remove(); endSlam(e); net.deadIds.add(e.netId);
+  if (e.T.decoy) { e.deadT = 0.01; puff(centerOf(e), 0xE8D8FF, 10, 1, 0.5, 1, 0.16, 0.6); }
+  if (e.T.queen) darkGoal = 0;
 }
 function pupStep(e, sdt) {
   for (const k of NBITS) if (e[k] > 0) e[k] = Math.max(0, e[k] - sdt);
   const n = e.np, k = 1 - Math.exp(-12 * sdt), ox = e.pos.x, oz = e.pos.z;
   if (n && n.x !== undefined) { e.pos.x += (n.x - e.pos.x) * k; e.pos.y += (n.y - e.pos.y) * k; e.pos.z += (n.z - e.pos.z) * k; let dy = n.yaw - e.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); e.yaw += dy * k; }
   if (e.T.mimic && (e.ph === 'emerge' || e.ph === 'hide')) e.lt += sdt;
+  if (e.T.queen || e.T.decoy) e.qt = (e.qt || 0) + sdt;
   enemyLook(e, sdt, Math.hypot(e.pos.x - ox, e.pos.z - oz) > sdt * 0.4);
 }
 function netPre(rdt) {
@@ -6335,6 +6739,7 @@ function netPre(rdt) {
       e.atk = atk ? (e.atk > 0 ? e.atk : e.T.windup) : 0;
       if (slam && !e.slam) startSlam(e); else if (!slam && e.slam) endSlam(e);
       if (Array.isArray(mk) && e.T.mimic) mkFromNet(e, mk);
+      else if (Array.isArray(mk) && e.T.queen) queenFromNet(e, mk);
     }
     for (const [id, e] of net.pups) if (!seen.has(id) && !e.dead) pupDie(e);
   }
@@ -6416,7 +6821,7 @@ function netFrame(rdt) {
     if (net.snapT <= 0) {
       net.snapT = 0.125;
       const list = enemies.filter(e => !e.dead).slice(0, 24).map(e => [e.id, e.type, +e.pos.x.toFixed(2), +e.pos.y.toFixed(2), +e.pos.z.toFixed(2), +e.yaw.toFixed(2), e.hp, e.maxHp,
-        NBITS.reduce((b, k, i) => b | (e[k] > 0 ? 1 << i : 0), 0) | (e.glass ? 128 : 0) | (e.shrunk ? 256 : 0), e.atk > 0 ? 1 : 0, e.slam ? 1 : 0, e.T.mimic ? [e.kind === 'glow' ? 1 : 0, MK_PH[e.ph] || 0, +(e.lt || 0).toFixed(2), e.open > 0.5 ? 1 : 0] : 0]);
+        NBITS.reduce((b, k, i) => b | (e[k] > 0 ? 1 << i : 0), 0) | (e.glass ? 128 : 0) | (e.shrunk ? 256 : 0), e.atk > 0 ? 1 : 0, e.slam ? 1 : 0, e.T.mimic ? [e.kind === 'glow' ? 1 : 0, MK_PH[e.ph] || 0, +(e.lt || 0).toFixed(2), e.open > 0.5 ? 1 : 0] : e.T.queen || e.T.decoy ? queenNet(e) : 0]);
       netEmit('snap', { rk: rkOf(room), fl: floorNum, e: list });
     }
     const meDown = player.down || player.hp <= 0, rs = [...net.remotes.values()];
@@ -6480,7 +6885,7 @@ function frame(now) {
     if (keys.has('a') || keys.has('arrowleft')) mv.sub(r);
     if (joy) { const jx = joy.dx / JOY_R, jy = joy.dy / JOY_R; if (Math.hypot(jx, jy) > 0.15) mv.addScaledVector(f, -jy).addScaledVector(r, jx); } // the stick is analog: a small push walks slowly
     player.moving = mv.lengthSq() > 0 && !player.down; if (player.moving && player.dance >= 0) player.dance = -1;
-    if (player.moving) { const amt = Math.min(1, mv.length()) * (player.sq > 0 ? 0.4 : 1); mv.normalize().multiplyScalar(4.5 * rdt * amt); player.pos.add(mv); player.bob += rdt * 10 * amt; }
+    if (player.moving) { const amt = Math.min(1, mv.length()) * (player.sq > 0 ? 0.4 : 1) * (player.slowT > 0 ? 0.5 : 1); mv.normalize().multiplyScalar(4.5 * rdt * amt); player.pos.add(mv); player.bob += rdt * 10 * amt; }
     if (player.kb.lengthSq() > 0.01) { player.pos.addScaledVector(player.kb, rdt); player.kb.multiplyScalar(Math.exp(-9 * rdt)); }
     for (const c of colliders) { const dx = player.pos.x - c.x, dz = player.pos.z - c.z, d = Math.hypot(dx, dz), rr = c.r + 0.4; if (d < rr && d > 0.001) { player.pos.x = c.x + dx / d * rr; player.pos.z = c.z + dz / d * rr; } }
     if (!transit) doorClamp();
@@ -6533,6 +6938,7 @@ function frame(now) {
       e.kbv.multiplyScalar(Math.exp(-3 * sdt)); if (sp < 0.3) e.kbv = null;
       if (e.dead) continue;
     }
+    if (e.T.queen || e.T.decoy) { queenStep(e, sdt); continue; } // she flies her own way
     if (e.pos.y < 0.1 && !e.T.hover) {
       const inR = rc => e.pos.x > rc[0] && e.pos.x < rc[1] && e.pos.z > rc[2] && e.pos.z < rc[3];
       if (waterRects.some(inR) && !imm(e, 'bog')) { if (e.wet < 1.2) e.wet = 1.2; if (Math.random() < sdt * 1.2) floorRing(e.pos, 0x8FD3FF, 0.9, 0.7); }
@@ -6591,7 +6997,7 @@ function frame(now) {
   // projectile (sub-stepped so slow-mo and fast frames agree)
   if (blob) { let rem = sdt; while (rem > 0 && blob) { const st = Math.min(rem, 1 / 120); rem -= st; stepBlob(st); } }
   updateGun(paused ? 0 : rdt, sdt);
-  updatePickups(sdt); updateGoos(sdt); fieldTick(sdt); updateCoins(sdt); updateShop(sdt); updateXBrick(); updateTraps(sdt); updateDen(sdt);
+  updatePickups(sdt); updateGoos(sdt); fieldTick(sdt); queenTick(sdt); updateCoins(sdt); updateShop(sdt); updateXBrick(); updateTraps(sdt); updateDen(sdt);
   for (const e of enemies) if (e.slamRing) { e.slamRing.scale.setScalar(SLAM_R * (0.92 + 0.08 * Math.sin(T * 14))); e.slamRing.material.opacity = 0.5 + 0.4 * (1 - e.atk / 1.7); }
   if (!paused) updateInteract(rdt); else { $('#prompt').hidden = true; $('#actBtn').hidden = true; }
 
@@ -6621,7 +7027,8 @@ function frame(now) {
   const cur = fx; fx = [];
   for (const f of cur) if (f.update(sdt, rdt) !== false) fx.push(f);
   for (const f of roomFx) f(sdt, rdt);
-  for (const f of flames) { const k = 0.85 + Math.sin(T * 13 + f.ph) * 0.08 + Math.sin(T * 29 + f.ph * 2) * 0.06; f.fl.scale.set(1, k, 1); f.core.scale.set(1, k * 1.1, 1); f.L.intensity = 1.35 * k; }
+  for (const f of flames) { const k = 0.85 + Math.sin(T * 13 + f.ph) * 0.08 + Math.sin(T * 29 + f.ph * 2) * 0.06, dim = 1 - roomDark * 0.88; f.fl.scale.set(dim, k * dim, dim); f.core.scale.set(dim, k * 1.1 * dim, dim); f.L.intensity = 1.35 * k * (1 - roomDark); } // snuffed to embers in the dark
+  darkTick(rdt);
 
   // camera
   const sqk = Math.max(-0.15, Math.min(1.1, player.sqK)); vm.scale.set(1 + 0.45 * sqk, Math.max(0.25, 1 - 0.7 * sqk), 1);

@@ -26,6 +26,8 @@ Each floor's stairs are guarded by a boss picked at random, and bosses learn new
 
 The **Lurker** hides as one mushroom in a room full of them, on the floor, the walls and the ceiling. Hit the real one and it bursts out of the floor and chases you for a few seconds before burrowing and reshuffling the lot. Hit a wrong one and a bug comes out instead: Rootskitters from floor 1, Capbeetles from floor 2, Mantishrooms from floor 3 and Lampcaps from floor 4. The real one's tell is two spots that blink like clockwork on a doom shroom, or a ring of teeth clenching in the dirt round a glowcap.
 
+The **Veiled Queen** is the Gloom Moths' mother, from floor 2. She shrieks the torches out, so the fight swings between light and dark, and in the dark you're aiming at the glow of her lace. She spits silk that slows you, swoops low through the room (that's your chance to bonk her), calls in her brood, and twice in the fight seals herself in a cocoon to heal: break it open, or burn it, and she tumbles out dazed. Wind does nothing to her, and glowcap drags her out of the air. Deeper down she learns web snares, false veils (decoys in the dark whose lace is the wrong colour) and a hatchery.
+
 ## Test lab
 
 **TEST LAB** on the title screen opens a containment chamber for watching any creature's attacks. Esc opens the console: pick the subject, the floor it's from (bosses learn moves the deeper they are), hold its AI, toggle god mode, and run any attack. In the chamber, the number keys fire attacks and 0 brings in a fresh subject.
