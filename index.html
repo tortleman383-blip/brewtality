@@ -834,8 +834,18 @@ const THEMES = {
             { kind: 'glowcap', origin: 'high', trunk: 1 }, { kind: 'doom', origin: 'torch', wall: 'E', along: -3.6, y: 1.1 }, { kind: 'doom', origin: 'torch', wall: 'W', along: -3.6, y: 1.1 }],
   },
   vault: {
-    name: 'Vault', stone: [0x4E4652, 0x47404B, 0x574E5B, 0x403A45], floor: [0x3E3540, 0x39303B, 0x433A46], trim: 0x6A5A3A, beam: 0x4A3222, ceil: 0x1E1922,
-    fog: 0x0F0B10, hemi: [0x8A7898, 0x2A1E16, 0.6], torch: 0xFFB050, accent: [0xFFD27A, 0, 2.2, -5], pillars: [[-4.6, -2.6], [4.6, -2.6]], crates: true, chest: true, tip: 'A chest. Walk up and hold E to open it',
+    name: 'Treasury', stone: [0x4E4652, 0x47404B, 0x574E5B, 0x403A45], floor: [0x3E3540, 0x39303B, 0x433A46], trim: 0x6A5A3A, beam: 0x4A3222, ceil: 0x1E1922,
+    fog: 0x0F0B10, hemi: [0x8A7898, 0x2A1E16, 0.6], torch: 0xFFB050, accent: [0xFFD27A, 0, 2.2, -5], pillars: [], chest: true, vault: 'dungeon', tip: 'A chest. Walk up and hold E to open it',
+    spots: [{ kind: 'doom', origin: 'torch', wall: 'E', along: -3.6, y: 1.1 }],
+  },
+  vaultKing: {
+    name: 'Royal Treasury', stone: [0x5A4436, 0x523E31, 0x634B3C, 0x4A382C], floor: [0x3A2C26, 0x342722, 0x40312A], trim: 0x8A6A2A, beam: 0x3A2214, ceil: 0x1A100C,
+    fog: 0x140C08, hemi: [0xC89A68, 0x2A1A0C, 0.62], torch: 0xFFA040, accent: [0xFFD27A, 0, 2.6, -5], pillars: [], chest: true, vault: 'king', tip: 'A chest. Walk up and hold E to open it',
+    spots: [{ kind: 'doom', origin: 'torch', wall: 'E', along: -3.6, y: 1.1 }],
+  },
+  vaultMoss: {
+    name: 'Forgotten Hoard', stone: [0x434A3C, 0x3C4336, 0x4B5344, 0x363D31], floor: [0x32372B, 0x2D3226, 0x373D2F], trim: 0x4E3822, beam: 0x3A2A1A, ceil: 0x11160E,
+    fog: 0x080D08, hemi: [0x8AB894, 0x1E2618, 0.62], torch: 0xFFB060, accent: [0xFFD27A, 0, 2.6, -5], pillars: [], chest: true, vault: 'moss', cave: true, moss: 1, roots: true, glow: true, tip: 'A chest. Walk up and hold E to open it',
     spots: [{ kind: 'doom', origin: 'torch', wall: 'E', along: -3.6, y: 1.1 }],
   },
   secret: {
@@ -867,12 +877,12 @@ const THEMES = {
     fog: 0x0C0E08, hemi: [0xC8B878, 0x1E2410, 0.65], torch: 0xFFB050, accent: [0x9AFFB0, 0, 2.4, 0], pillars: [], spots: [],
   },
 };
-const CRATES = [[-6.8, 7.6, 1], [-5.8, 7.9, 0.75], [6.9, -7.8, 1.1], [6.95, -6.6, 0.8]], COIN_PILES = [[-1.3, -5.9], [1.4, -5.7], [-0.9, -4.7]];
+const CRATES = [[-6.8, 7.6, 1], [-5.8, 7.9, 0.75], [6.9, -7.8, 1.1], [6.95, -6.6, 0.8]];
 // each floor takes its look from the boss waiting at the bottom of it
 const BIOMES = {
-  chief: { name: 'THE OLD DUNGEON', fight: ['crypt', 'cistern', 'forge'], start: 'crypt', boss: ['crypt', 'forge'] },
-  king: { name: 'THE KING\'S FORGE', fight: ['forge', 'crypt', 'forge', 'cistern'], start: 'crypt', boss: ['forge'] },
-  lurker: { name: 'THE MOSSY HOLLOWS', fight: ['mossy', 'grotto', 'mossy', 'grotto'], start: 'mossy', boss: ['hollow'] },
+  chief: { name: 'THE OLD DUNGEON', fight: ['crypt', 'cistern', 'forge'], start: 'crypt', boss: ['crypt', 'forge'], vault: 'vault' },
+  king: { name: 'THE KING\'S FORGE', fight: ['forge', 'crypt', 'forge', 'cistern'], start: 'crypt', boss: ['forge'], vault: 'vaultKing' },
+  lurker: { name: 'THE MOSSY HOLLOWS', fight: ['mossy', 'grotto', 'mossy', 'grotto'], start: 'mossy', boss: ['hollow'], vault: 'vaultMoss' },
 };
 let floorBiome = BIOMES.chief;
 const keyXY = (x, y) => x + ',' + y;
@@ -904,7 +914,7 @@ function genFloorRaw(n) {
   let ti = Math.floor(Math.random() * bio.fight.length);
   for (const r of map.values()) {
     r.king = r.type === 'stairs' && n % FINAL_FLOOR === 0;
-    r.theme = r.type === 'garden' ? 'garden' : r.type === 'treasure' ? 'vault' : r.type === 'stairs' ? pick(bio.boss) : r.type === 'start' && n === 1 ? bio.start : bio.fight[ti++ % bio.fight.length];
+    r.theme = r.type === 'garden' ? 'garden' : r.type === 'treasure' ? bio.vault || 'vault' : r.type === 'stairs' ? pick(bio.boss) : r.type === 'start' && n === 1 ? bio.start : bio.fight[ti++ % bio.fight.length];
     if (r.type === 'garden') r.gc = Math.floor(Math.random() * 4); // which corner the old glowcap grows in
     r.dseed = 1 + Math.floor(Math.random() * 2147483000); // the room's rocks and moss come out the same on every visit, and on every partner's screen
     r.caps = THEMES[r.theme].spots.map(() => Math.random() < (r.type === 'garden' ? 0.5 : 0.22) ? 1 : 0); r.depth = dist.get(r) || 0; // most walls are bare now; a cap is a find
@@ -923,7 +933,7 @@ function genFloorRaw(n) {
     if (host) {
       const th = THEMES[host.theme], traps = [...(host.pits || []), ...(host.spikes || [])];
       // never under or beside anything: pillars, crates, the fountain, the chest and its coins, or a trap
-      const props = [...th.pillars.map(([px, pz]) => [px, pz, 1.9]), ...(th.crates ? CRATES.map(([cx, cz]) => [cx, cz, 1.7]) : []), ...(th.garden ? gardenProps(host) : []), ...(th.chest ? [[0, -5.6, 2.4], ...COIN_PILES.map(([cx, cz]) => [cx, cz, 1.4])] : [])];
+      const props = [...th.pillars.map(([px, pz]) => [px, pz, 1.9]), ...(th.crates ? CRATES.map(([cx, cz]) => [cx, cz, 1.7]) : []), ...(th.garden ? gardenProps(host) : []), ...(th.vault ? vaultLayout(host).props : [])];
       for (let g = 0; g < 60; g++) {
         const x = pick([-5, -3, -1, 1, 3, 5]), z = pick([-6, -4, -2, 0, 2, 4, 6]);
         if (props.some(([px, pz, rr]) => Math.hypot(px - x, pz - z) < rr) || traps.some(t => Math.abs(t.x - x) <= 2 && Math.abs(t.z - z) <= 2)) continue;
@@ -940,6 +950,17 @@ function gardenLayout(r) {
   return { tree, beds, bench: { x: tree.x + Math.sin(toC) * 1.75, z: tree.z + Math.cos(toC) * 1.75, a: toC } };
 }
 const gardenProps = r => { const L = gardenLayout(r); return [[0, 0, 3.4], [L.tree.x, L.tree.z, 2.5], [L.bench.x, L.bench.z, 1.6], ...L.beds.map(b => [b.x, b.z, 2.2])]; };
+// a treasure room faces its way in: the chest sits on its plinth near the far wall, looking at the door. u runs along that wall, v toward it
+function vaultLayout(r) {
+  const first = ['S', 'N', 'E', 'W'].find(d => r.n[d]), free = ['N', 'S', 'W', 'E'].filter(d => !r.n[d]);
+  const dir = first && !r.n[DIRS[first].opp] ? DIRS[first].opp : free[0] || 'N', back = DIRS[dir], L = back.nx ? D : W, depth = back.nx ? W : D, cv = depth - 3.4;
+  const map = (u, v) => [-back.nz * u + back.nx * v, back.nx * u + back.nz * v], tu = [-back.nz, back.nx];
+  const sideOf = s => Object.keys(DIRS).find(k => DIRS[k].nx === s * tu[0] && DIRS[k].nz === s * tu[1]);
+  const props = [[0, cv, 2.5], [-2.75, cv - 0.2, 1.4], [2.75, cv - 0.2, 1.4], [-1.6, cv - 2.1, 1.0], [1.6, cv - 2.1, 1.0], [-(L - 1.7), depth - 1.5, 1.6], [L - 1.7, depth - 1.5, 1.6],
+    [-(L - 1.3), cv - 3.1, 1.3], [L - 1.3, cv - 3.2, 1.3], [-(L - 1.0), cv - 4.6, 1.2], [L - 1.0, cv - 4.6, 1.2], [0, depth - 0.9, 1.2]];
+  for (let v = -depth + 1; v < cv - 1.2; v += 1.4) props.push([0, v, 1.1]); // the carpet, or the trail of coins
+  return { dir, back, L, depth, cv, map, face: Math.atan2(-back.nx, -back.nz), faceU: Math.atan2(tu[0], tu[1]), side: { [-1]: sideOf(-1), 1: sideOf(1) }, props: props.map(([u, v, rr]) => [...map(u, v), rr]) };
+}
 const needsFight = r => (r.type === 'start' || r.type === 'fight' || r.type === 'stairs') && !r.cleared;
 const where = () => room ? `F${floorNum} · ${THEMES[room.theme].name}` : '';
 
@@ -1059,7 +1080,7 @@ function buildRoom(r) {
     for (let i = 0; i < up.count; i++) { v.fromBufferAttribute(up, i).applyMatrix4(mtx); pos.push(v.x, v.y, v.z); col.push(c.r, c.g, c.b); }
   };
   const addW = (dir, along, out, y, sAlong, sy, sOut, hex) => { const [x, z] = wallXZ(dir, along, out); if (dir === 'N' || dir === 'S') add(x, y, z, sAlong, sy, sOut, hex); else add(x, y, z, sOut, sy, sAlong, hex); };
-  const glow = [[], []], lumpP = (GEO.ico0.index ? GEO.ico0.toNonIndexed() : GEO.ico0).attributes.position, coneP = new THREE.ConeGeometry(1, 1, 5).toNonIndexed().attributes.position;
+  const glow = [[], []], shiny = [[], []], lumpP = (GEO.ico0.index ? GEO.ico0.toNonIndexed() : GEO.ico0).attributes.position, coneP = new THREE.ConeGeometry(1, 1, 5).toNonIndexed().attributes.position;
   const addG = (gp, x, y, z, sx, sy, sz, hex, rx = 0, ry = 0, rz = 0, into = null) => { // ry turns it first, so on a wall rz spins it flat against the stone
     mtx.compose(new THREE.Vector3(x, y, z), q.setFromEuler(eu.set(rx, ry, rz, 'YXZ')), new THREE.Vector3(sx, sy, sz));
     c.set(hex).offsetHSL(0, 0, rand(-0.035, 0.035)); const P = into ? into[0] : pos, C = into ? into[1] : col;
@@ -1263,22 +1284,24 @@ function buildRoom(r) {
     for (const [dx, dz, sx, sz] of [[-0.97, 0, 0.06, 1.94], [0.97, 0, 0.06, 1.94], [0, -0.97, 1.88, 0.06], [0, 0.97, 1.88, 0.06]]) add(STAIRS.x + dx, -1.3, STAIRS.z + dz, sx, 2.6, sz, 0x16121A); // the short walls tuck between the long ones
     for (let i = 0; i < 6; i++) add(STAIRS.x, -0.35 - i * 0.38, STAIRS.z + 0.75 - i * 0.3, 1.8, 0.12, 0.4, th.floor[1]);
   }
+  // shapes the garden and the treasure rooms build from
+  const leafy = [0x3E7A30, 0x4E8A3A, 0x2F6426, 0x5E9A44], petals = [0xFF8AB0, 0xFFFFFF, 0xFFD23A, 0xB48AFF, 0xFF6A4D];
+  const flat = geo => (geo.index ? geo.toNonIndexed() : geo).attributes.position;
+  const cylP = flat(new THREE.CylinderGeometry(1, 1, 1, 7)), cyl10 = flat(new THREE.CylinderGeometry(1, 1, 1, 10)), discP = flat(new THREE.CircleGeometry(1, 7)), disc5 = flat(new THREE.CircleGeometry(1, 5)), ballP = flat(new THREE.SphereGeometry(1, 8, 5));
+  const lathe = (pts, x, y, z, hex, n = 10, into = null) => { const lg = new THREE.LatheGeometry(pts.map(([a, b]) => new THREE.Vector2(a, b)), n).toNonIndexed(); addG(lg.attributes.position, x, y, z, 1, 1, 1, hex, 0, rand(0, 6.3), 0, into); lg.dispose(); };
+  const tube = (pts, r0, r1, hex) => { const tg = hornGeo(pts, r0, r1, 8, 4).toNonIndexed(); addG(tg.attributes.position, 0, 0, 0, 1, 1, 1, hex); tg.dispose(); };
+  const two = (a, b, c, hex) => { // a triangle seen from both sides, for leaves and blades
+    const n = [(b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]), (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])];
+    const m = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
+    tri(a, b, c, hex, [m[0] - n[0], m[1] - n[1], m[2] - n[2]]); tri(a, b, c, hex, [m[0] + n[0], m[1] + n[1], m[2] + n[2]]);
+  };
+  const leaf = (a, b, w, hex) => { // a leaf folded along its midrib, from its stalk end a to its tip b
+    const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dz) || 1, sx = -dz / L * w, sz = dx / L * w, m = [a[0] + dx * 0.45, a[1] + dy * 0.45 + w * 0.35, a[2] + dz * 0.45];
+    two(a, [m[0] - sx, m[1] - w * 0.25, m[2] - sz], b, hex); two(a, b, [m[0] + sx, m[1] - w * 0.25, m[2] + sz], hex);
+  };
   const GL = th.garden ? gardenLayout(r) : null;
   if (GL) { // the garden: a lawn, a pool and fountain under a light-well, the old glowcap in a corner, raised beds, ivy up every wall
-    const leafy = [0x3E7A30, 0x4E8A3A, 0x2F6426, 0x5E9A44], blades = [0x5A9040, 0x6AA048, 0x4E8436, 0x7AB050], petals = [0xFF8AB0, 0xFFFFFF, 0xFFD23A, 0xB48AFF, 0xFF6A4D];
-    const flat = geo => (geo.index ? geo.toNonIndexed() : geo).attributes.position;
-    const cylP = flat(new THREE.CylinderGeometry(1, 1, 1, 7)), cyl10 = flat(new THREE.CylinderGeometry(1, 1, 1, 10)), discP = flat(new THREE.CircleGeometry(1, 7)), disc5 = flat(new THREE.CircleGeometry(1, 5)), ballP = flat(new THREE.SphereGeometry(1, 8, 5));
-    const lathe = (pts, x, y, z, hex, n = 10) => { const lg = new THREE.LatheGeometry(pts.map(([a, b]) => new THREE.Vector2(a, b)), n).toNonIndexed(); addG(lg.attributes.position, x, y, z, 1, 1, 1, hex, 0, rand(0, 6.3), 0); lg.dispose(); };
-    const tube = (pts, r0, r1, hex) => { const tg = hornGeo(pts, r0, r1, 8, 4).toNonIndexed(); addG(tg.attributes.position, 0, 0, 0, 1, 1, 1, hex); tg.dispose(); };
-    const two = (a, b, c, hex) => { // a triangle seen from both sides, for leaves and blades
-      const n = [(b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]), (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])];
-      const m = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
-      tri(a, b, c, hex, [m[0] - n[0], m[1] - n[1], m[2] - n[2]]); tri(a, b, c, hex, [m[0] + n[0], m[1] + n[1], m[2] + n[2]]);
-    };
-    const leaf = (a, b, w, hex) => { // a leaf folded along its midrib, from its stalk end a to its tip b
-      const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dz) || 1, sx = -dz / L * w, sz = dx / L * w, m = [a[0] + dx * 0.45, a[1] + dy * 0.45 + w * 0.35, a[2] + dz * 0.45];
-      two(a, [m[0] - sx, m[1] - w * 0.25, m[2] - sz], b, hex); two(a, b, [m[0] + sx, m[1] - w * 0.25, m[2] + sz], hex);
-    };
+    const blades = [0x5A9040, 0x6AA048, 0x4E8436, 0x7AB050];
     const fern = (x, y, z, s) => { for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + rand(-0.3, 0.3), L = s * rand(0.8, 1.1); leaf([x, y, z], [x + Math.sin(a) * L, y + L * 0.5, z + Math.cos(a) * L], L * 0.2, pick(leafy)); } };
     const flower = (x, y, z, h, hex) => {
       addG(cylP, x, y + h / 2, z, 0.012, h, 0.012, 0x3E7A30);
@@ -1410,9 +1433,123 @@ function buildRoom(r) {
       for (let s = 0; s < 4; s++) { const p = [x, H - len * (0.2 + s * 0.22), z]; leaf(p, [p[0] + rand(-0.15, 0.15), p[1] - 0.1, p[2] + rand(-0.15, 0.15)], 0.045, pick(leafy)); }
     }
   }
+  const VL = th.vault ? vaultLayout(r) : null, glints = [], flamePts = [], moltenPts = [];
+  if (VL) { // a treasure room: the chest on a plinth near the far wall, facing the door, and the floor's own idea of riches round it
+    const kind = th.vault, f = VL.face, fu = VL.faceU, cv = VL.cv, L = VL.L, dp = VL.depth, P = VL.map, gold = [0xE8B84A, 0xF2C85A, 0xD9A83A, 0xFFD870], gems = [0xE8283A, 0x2AD86A, 0x3A6AFF, 0xB04AFF];
+    const coinP = flat(new THREE.CylinderGeometry(1, 1, 1, 8)), gemP = flat(new THREE.OctahedronGeometry(1, 0)), cyl8 = flat(new THREE.CylinderGeometry(1, 1, 1, 8)), ico1 = flat(new THREE.IcosahedronGeometry(1, 1));
+    const box = (u, v, y, su, sy, sv, hex, into = null) => { const [x, z] = P(u, v); addG(up, x, y, z, su, sy, sv, hex, 0, f, 0, into); }; // a box squared to the room's layout
+    const side = s => !r.n[VL.side[s]]; // nothing goes against a side wall that has a door in it
+    const coins = (u, v, n, spread, y0 = 0) => { for (let i = 0; i < n; i++) { const a = rand(0, 6.3), d = rand(0, spread), [x, z] = P(u + Math.sin(a) * d, v + Math.cos(a) * d); addG(coinP, x, y0 + 0.008, z, 0.065, 0.014, 0.065, pick(gold), rand(-0.15, 0.15), rand(0, 6.3), rand(-0.15, 0.15), shiny); } };
+    const heap = (u, v, s, y0 = 0, mossy = false) => { // a mound of gold with coins tumbled over it, and a gem or two in it
+      const [x, z] = P(u, v); addG(lumpP, x, y0, z, s, s * 0.45, s * rand(0.8, 1.05), pick(gold), 0, rand(0, 6.3), 0, shiny);
+      for (let i = 0; i < 6 + s * 16; i++) { const a = rand(0, 6.3), d = rand(0, s * 1.15), hgt = y0 + s * 0.45 * Math.max(0.05, 1 - (d / (s * 1.15)) ** 2); addG(coinP, x + Math.sin(a) * d, hgt, z + Math.cos(a) * d, 0.065, 0.014, 0.065, pick(gold), rand(-0.6, 0.6), rand(0, 6.3), rand(-0.6, 0.6), shiny); }
+      for (let i = 0; i < 1 + (s > 0.6); i++) { const a = rand(0, 6.3), d = s * 0.45; addG(gemP, x + Math.sin(a) * d, y0 + s * 0.32, z + Math.cos(a) * d, 0.07, 0.1, 0.07, pick(gems), rand(0, 1), rand(0, 6.3), 0, shiny); }
+      if (mossy) for (let i = 0; i < 3; i++) { const a = rand(0, 6.3); addG(lumpP, x + Math.sin(a) * s * 0.5, y0 + s * 0.3, z + Math.cos(a) * s * 0.5, s * 0.45, 0.06, s * 0.35, pick([0x4A6A34, 0x3E5A2E]), 0, a, 0); }
+      for (let i = 0; i < 3; i++) { const a = rand(0, 6.3), d = rand(0, s * 0.7); glints.push(new THREE.Vector3(x + Math.sin(a) * d, y0 + s * 0.42, z + Math.cos(a) * d)); }
+    };
+    const goblet = (u, v, y0, s = 1) => { const [x, z] = P(u, v); lathe([[0.07 * s, 0], [0.02 * s, 0.03 * s], [0.015 * s, 0.12 * s], [0.06 * s, 0.16 * s], [0.07 * s, 0.24 * s], [0.06 * s, 0.24 * s], [0, 0.18 * s]], x, y0, z, pick(gold), 8, shiny); };
+    const plinthTop = kind === 'moss' ? 0.04 : 0.12;
+    if (kind !== 'moss') {
+      // the plinth, gold-edged, and a carpet from the door up to it
+      box(0, cv, 0.06, 3.4, 0.12, 2.4, kind === 'king' ? 0x3A2A3A : th.stone[3]);
+      for (const s of [-1, 1]) { box(0, cv + s * 1.2, 0.125, 3.44, 0.035, 0.07, pick(gold), shiny); box(s * 1.7, cv, 0.127, 0.07, 0.035, 2.4, pick(gold), shiny); }
+      const v0 = -dp + 0.4, v1 = cv - 1.2, cloth = kind === 'king' ? 0x5A2A7A : 0x8A1E2E;
+      box(0, (v0 + v1) / 2, 0.012, 1.5, 0.024, v1 - v0, cloth); for (const s of [-1, 1]) box(s * 0.7, (v0 + v1) / 2, 0.026, 0.1, 0.006, v1 - v0, pick(gold), shiny);
+      // banners on the wall behind the chest
+      const bd = VL.dir, wm = (u, y, w) => { const [x, z] = wallXZ(bd, u, w); return [x, y, z]; }, triS = triTo(shiny[0], shiny[1]);
+      for (const s of [-1, 1]) {
+        const u = s * 1.5, top = 4.7, bot = 2.6, hw = 0.45, w = -0.1, bk = wm(u, 3.5, 1);
+        tri(wm(u - hw, top, w), wm(u + hw, top, w), wm(u + hw, bot, w), cloth, bk); tri(wm(u - hw, top, w), wm(u + hw, bot, w), wm(u, bot + 0.3, w), cloth, bk); tri(wm(u - hw, top, w), wm(u, bot + 0.3, w), wm(u - hw, bot, w), cloth, bk);
+        const [rx, rz] = wallXZ(bd, u, -0.13); addG(cyl8, rx, top + 0.04, rz, 0.035, hw * 2 + 0.3, 0.035, pick(gold), 0, WALL_RY[bd], Math.PI / 2, shiny);
+        const e = w - 0.012, g2 = pick(gold);
+        if (kind === 'king') { triS(wm(u - 0.24, 3.55, e), wm(u + 0.24, 3.55, e), wm(u + 0.24, 3.7, e), g2, bk); triS(wm(u - 0.24, 3.55, e), wm(u + 0.24, 3.7, e), wm(u - 0.24, 3.7, e), g2, bk); for (const k of [-0.24, 0, 0.24]) triS(wm(u + k - 0.08, 3.7, e), wm(u + k + 0.08, 3.7, e), wm(u + k, 3.98, e), g2, bk); } // a crown
+        else { triS(wm(u, 4.05, e), wm(u + 0.2, 3.75, e), wm(u, 3.45, e), g2, bk); triS(wm(u, 4.05, e), wm(u, 3.45, e), wm(u - 0.2, 3.75, e), g2, bk); } // a diamond
+      }
+      // braziers either side of the carpet
+      for (const s of [-1, 1]) {
+        const [x, z] = P(s * 1.6, cv - 2.1), iron = kind === 'king' ? pick(gold) : 0x2A2830, into = kind === 'king' ? shiny : null;
+        for (let k = 0; k < 3; k++) { const a = k / 3 * Math.PI * 2; addG(cylP, x + Math.sin(a) * 0.17, 0.42, z + Math.cos(a) * 0.17, 0.025, 0.86, 0.025, iron, -0.22, a, 0, into); }
+        lathe([[0.08, 0.8], [0.3, 0.85], [0.36, 0.99], [0.32, 1.01], [0.08, 0.92]], x, 0, z, iron, 9, into);
+        addG(lumpP, x, 0.96, z, 0.24, 0.06, 0.24, 0xFF6A1A, 0, 0, 0, glow); flamePts.push([x, z]); colliders.push({ x, z, r: 0.42, h: 1.0 });
+      }
+      heap(-1.05, cv + 0.25, 0.46, plinthTop); heap(1.05, cv + 0.25, 0.42, plinthTop); goblet(-1.35, cv - 0.55, plinthTop, 1.1); goblet(1.3, cv - 0.6, plinthTop);
+    }
+    if (kind === 'dungeon') {
+      for (const s of [-1, 1]) { // stone columns with gold bands either side of the plinth
+        const [x, z] = P(s * 2.75, cv - 0.2);
+        addG(cyl8, x, H / 2, z, 0.5, H, 0.5, th.stone[2], 0, 0.4, 0); add(x, 0.2, z, 1.3, 0.4, 1.3, th.stone[3], f); add(x, H - 0.2, z, 1.2, 0.4, 1.2, th.stone[3], f);
+        for (const y of [1.0, 3.6]) addG(cyl8, x, y, z, 0.53, 0.12, 0.53, pick(gold), 0, 0.4, 0, shiny);
+        colliders.push({ x, z, r: 0.62, h: H });
+      }
+      for (const s of [-1, 1]) heap(s * (L - 1.7), dp - 1.5, 1.0);
+      if (side(1)) heap(L - 1.3, cv - 3.2, 0.65);
+      for (const [u, v] of [[-(L - 1.3), cv - 3.0], [L - 2.9, dp - 0.9]]) { // open sacks spilling coins
+        const [x, z] = P(u, v); addG(ballP, x, 0.32, z, 0.3, 0.36, 0.3, 0x8A6A44, 0, rand(0, 6.3), 0); addG(cylP, x, 0.7, z, 0.12, 0.12, 0.12, 0x7A5A38); addG(coinP, x, 0.77, z, 0.12, 0.02, 0.12, pick(gold), 0, 0, 0, shiny);
+        coins(u + 0.45, v, 14, 0.4);
+      }
+      if (side(-1)) { // a rack of swords and a shield against one side wall
+        const u0 = -L + 0.28, v0 = cv - 3.6, steel = 0xC8CCD8;
+        box(u0, v0, 0.04, 0.35, 0.08, 1.6, 0x5A3A22); box(u0 - 0.05, v0, 1.12, 0.08, 0.06, 1.6, 0x5A3A22); for (const k of [-0.75, 0.75]) box(u0 - 0.05, v0 + k, 0.58, 0.08, 1.16, 0.08, 0x5A3A22);
+        for (const k of [-0.45, 0, 0.45]) { box(u0 + 0.05, v0 + k, 0.78, 0.012, 0.92, 0.07, steel, shiny); box(u0 + 0.05, v0 + k, 0.3, 0.04, 0.04, 0.22, pick(gold), shiny); box(u0 + 0.05, v0 + k, 0.19, 0.03, 0.18, 0.035, 0x3A2418); }
+        const [sx2, sz2] = P(u0 + 0.06, v0 + 1.25); addG(cyl10, sx2, 0.8, sz2, 0.38, 0.05, 0.38, 0x8A1E2E, 0, f, Math.PI / 2); const [bx2, bz2] = P(u0 + 0.1, v0 + 1.25); addG(ballP, bx2, 0.8, bz2, 0.08, 0.08, 0.08, pick(gold), 0, 0, 0, shiny);
+      }
+    } else if (kind === 'king') {
+      for (const s of [-1, 1]) { // the King in gold, either side of the plinth, a ruby for his eye
+        const [x, z] = P(s * 2.75, cv - 0.2), g2 = pick(gold), sp = (lx, ly, lz) => [x + lx * Math.cos(f) + lz * Math.sin(f), ly, z - lx * Math.sin(f) + lz * Math.cos(f)];
+        add(x, 0.3, z, 1.1, 0.6, 1.1, th.stone[3], f);
+        for (const k of [-0.22, 0.22]) { const p = sp(k, 0.95, 0); addG(cyl8, p[0], p[1], p[2], 0.15, 0.7, 0.15, g2, 0, 0, 0, shiny); }
+        lathe([[0.36, 1.25], [0.46, 1.6], [0.4, 2.05], [0.2, 2.2]], x, 0, z, g2, 8, shiny);
+        for (const k of [-1, 1]) { const p = sp(k * 0.5, 1.72, 0.06); addG(cyl8, p[0], p[1], p[2], 0.1, 0.72, 0.1, g2, 0, f, -k * 0.35, shiny); }
+        addG(ico1, x, 2.55, z, 0.42, 0.42, 0.42, g2, 0, 0, 0, shiny);
+        { const p = sp(0, 2.6, 0.36); addG(ballP, p[0], p[1], p[2], 0.17, 0.17, 0.09, 0xF4F0E8, 0, f, 0); const q = sp(0, 2.6, 0.44); addG(ballP, q[0], q[1], q[2], 0.08, 0.08, 0.04, 0xE8283A, 0, f, 0, shiny); }
+        addG(cyl8, x, 2.9, z, 0.32, 0.12, 0.32, g2, 0, 0, 0, shiny); for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; addG(coneP, x + Math.sin(a) * 0.28, 3.06, z + Math.cos(a) * 0.28, 0.06, 0.22, 0.06, g2, 0, 0, 0, shiny); }
+        { const p = sp(s * 0.62, 1.6, 0.25); addG(cylP, p[0], p[1], p[2], 0.025, 1.3, 0.025, g2, 0, 0, 0, shiny); addG(gemP, p[0], p[1] + 0.72, p[2], 0.08, 0.12, 0.08, pick(gems), 0, 0, 0, shiny); } // a sceptre
+        colliders.push({ x, z, r: 0.65, h: 3.2 });
+      }
+      for (const s of [-1, 1]) { // molten gold pouring from the back wall into a stone basin in each corner
+        const u = s * (L - 1.6), v = dp - 0.65, [x, z] = P(u, v);
+        lathe([[0.62, 0], [0.66, 0.4], [0.6, 0.44], [0.55, 0.38], [0, 0.36]], x, 0, z, th.stone[2], 10); colliders.push({ x, z, r: 0.7, h: 0.45 });
+        box(u, dp - 0.3, 2.3, 0.4, 0.32, 0.72, pick(gold), shiny); moltenPts.push([x, z]);
+      }
+      heap(0, dp - 0.85, 0.85); for (const s of [-1, 1]) if (side(s)) heap(s * (L - 1.5), cv - 2.8, 1.0);
+      for (const s of [-1, 1]) if (side(s)) { // a crown on a cushion on a pedestal
+        const [x, z] = P(s * (L - 1.0), cv - 4.6); add(x, 0.5, z, 0.6, 1.0, 0.6, th.stone[2], f); add(x, 1.06, z, 0.5, 0.12, 0.5, 0x5A2A7A, f);
+        addG(cyl10, x, 1.2, z, 0.17, 0.14, 0.17, pick(gold), 0, 0, 0, shiny); for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; addG(coneP, x + Math.sin(a) * 0.15, 1.33, z + Math.cos(a) * 0.15, 0.04, 0.12, 0.04, pick(gold), 0, 0, 0, shiny); addG(gemP, x + Math.sin(a) * 0.175, 1.2, z + Math.cos(a) * 0.175, 0.03, 0.04, 0.03, pick(gems), 0, a, 0, shiny); }
+        colliders.push({ x, z, r: 0.45, h: 1.3 }); glints.push(new THREE.Vector3(x, 1.35, z));
+      }
+    } else { // the forgotten hoard: the chest sunk in a mossy mound, roots over it, gold spilling down the way in
+      for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2 + rand(-0.2, 0.2), [x, z] = P(Math.sin(a) * 1.25, cv + Math.cos(a) * 1.0); addG(lumpP, x, 0.02, z, rand(0.35, 0.5), rand(0.2, 0.32), rand(0.3, 0.45), 0x4A3626, 0, a, 0); addG(lumpP, x, 0.14, z, rand(0.3, 0.45), 0.12, rand(0.26, 0.38), pick([0x4A6A34, 0x3E5A2E, 0x56763A]), 0, a, 0); }
+      for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2 + rand(-0.3, 0.3), [x0, z0] = P(Math.sin(a) * 0.8, cv + Math.cos(a) * 0.6), [x1, z1] = P(Math.sin(a) * 1.5, cv + Math.cos(a) * 1.3); tube([[x0, 0.32, z0], [(x0 + x1) / 2, 0.3, (z0 + z1) / 2], [x1, -0.05, z1]], 0.07, 0.02, 0x5A4430); }
+      for (const s of [-1, 1]) { // a stalactite and stalagmite grown together either side of it
+        const [x, z] = P(s * 2.75, cv - 0.2), lg = new THREE.LatheGeometry([[0.9, -0.05], [0.7, 0.45], [0.5, 1.2], [0.38, 2.1], [0.32, 2.7], [0.38, 3.3], [0.52, 4.2], [0.76, 4.95], [0.98, H + 0.3]].map(([a, b]) => new THREE.Vector2(a * rand(0.9, 1.08), b)), 7).toNonIndexed();
+        addG(lg.attributes.position, x, 0, z, 1, 1, 1, th.stone[2], 0, rand(0, 6.3), 0); lg.dispose(); colliders.push({ x, z, r: 0.62, h: H });
+      }
+      for (let t = 0; t < 1; t += 0.09) coins(Math.sin(t * 7) * 0.45, -dp + 1.4 + (cv - 1.4 + dp - 1.4) * t, 3, 0.25);
+      heap(L - 1.8, dp - 1.6, 0.9, 0, true); heap(-0.9, dp - 0.9, 0.6, 0, true); if (side(-1)) heap(-(L - 1.4), cv - 3.2, 0.55, 0, true);
+      { // an old chest that gave up, lid in the moss, coins pouring out
+        const u = -(L - 1.7), v = dp - 1.5, [x, z] = P(u, v); add(x, 0.25, z, 1.0, 0.5, 0.65, 0x5A3E26, f + 0.3); add(x, 0.51, z, 0.94, 0.02, 0.6, 0x3A2616, f + 0.3);
+        const [lx, lz] = P(u + 0.9, v - 0.3); add(lx, 0.06, lz, 1.0, 0.1, 0.62, 0x5A3E26, f - 0.5); heap(u + 0.15, v - 0.75, 0.42, 0, false); coins(u + 0.3, v - 1.2, 12, 0.45);
+      }
+      if (side(1)) { // someone who got here first, slumped against the wall with a lantern still burning
+        const u0 = L - 0.42, v0 = cv - 3.6, bone = 0xE8E0C8, B = (du, y, dv) => { const [x, z] = P(u0 - du, v0 + dv); return [x, y, z]; };
+        let p = B(0.15, 0.14, 0); addG(ballP, p[0], p[1], p[2], 0.17, 0.09, 0.14, bone, 0, f, 0);
+        p = B(0.08, 0.45, 0); addG(cylP, p[0], p[1], p[2], 0.035, 0.6, 0.035, bone, 0.3, fu, 0);
+        for (let k = 0; k < 4; k++) { p = B(0.1 - k * 0.02, 0.38 + k * 0.1, 0); addG(cyl10, p[0], p[1], p[2], 0.15 - k * 0.012, 0.025, 0.11, bone, 0.3, fu, 0); }
+        p = B(0.02, 0.86, 0.02); addG(ico1, p[0], p[1], p[2], 0.13, 0.14, 0.12, bone, 0.4, fu + 0.4, 0);
+        for (const k of [-1, 1]) { p = B(0.06, 0.12, k * 0.12); const q = B(0.6, 0.08, k * 0.16); tube([p, [(p[0] + q[0]) / 2, 0.12, (p[2] + q[2]) / 2], q], 0.035, 0.03, bone); p = B(0.1, 0.62, k * 0.17); const q2 = B(0.28, 0.12, k * 0.3); tube([p, [(p[0] + q2[0]) / 2, 0.35, (p[2] + q2[2]) / 2], q2], 0.03, 0.025, bone); }
+        p = B(0.42, 0, 0.45); add(p[0], 0.015, p[2], 0.2, 0.03, 0.2, 0x2A2830, f); add(p[0], 0.31, p[2], 0.22, 0.03, 0.22, 0x2A2830, f); for (const [a2, b2] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) { const q = B(0.42 + a2 * 0.085, 0, 0.45 + b2 * 0.085); add(q[0], 0.16, q[2], 0.025, 0.3, 0.025, 0x2A2830, f); } addG(ballP, p[0], 0.15, p[2], 0.065, 0.1, 0.065, 0xFFD27A, 0, 0, 0, glow); p = [p[0], 0.1, p[2]]; // a lantern you can see the flame through
+        glints.push(new THREE.Vector3(p[0], p[1] + 0.05, p[2]));
+      }
+      for (const [u, v] of [[-(L - 0.7), -dp + 1.6], [L - 0.8, -dp + 2.2], [-(L - 0.9), cv - 1.0]]) { // glowing crystals pushing up through the floor
+        const [x, z] = P(u, v), hex = pick([0xB48AFF, 0x7CE8FF, 0xFF8AE0]); addG(lumpP, x, 0.05, z, 0.42, 0.18, 0.36, th.stone[1], 0, rand(0, 6.3), 0);
+        for (let k = 0; k < 6; k++) { const a = rand(0, 6.3), tilt = rand(0.1, 0.55), h = rand(0.3, 0.85), rr = rand(0.05, 0.11), d = rand(0, 0.2); addG(cylP, x + Math.sin(a) * d, 0.12 + h / 2, z + Math.cos(a) * d, rr, h, rr, hex, tilt, a, 0, glow); const reach = h / 2 + rr * 1.2; addG(coneP, x + Math.sin(a) * (d + Math.sin(tilt) * reach), 0.12 + h / 2 + Math.cos(tilt) * reach, z + Math.cos(a) * (d + Math.sin(tilt) * reach), rr, rr * 2.4, rr, hex, tilt, a, 0, glow); }
+      }
+    }
+  }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
   grp.add(meshOf(g, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.93 })));
   Math.random = keepRand;
+  if (shiny[0].length) { const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(shiny[0], 3)); sg.setAttribute('color', new THREE.Float32BufferAttribute(shiny[1], 3)); sg.computeVertexNormals(); grp.add(meshOf(sg, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0.45, roughness: 0.38, emissive: 0x3A2808 }))); }
   if (glow[0].length) { const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(glow[0], 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(glow[1], 3)); grp.add(meshOf(gg, new THREE.MeshBasicMaterial({ vertexColors: true }))); }
   if (r.type === 'start' && floorNum === 1 && !coarse) grp.add(chalkControls());
   if (plugStones.length) plug = { dir: r.shopDir, meshes: plugStones };
@@ -1538,10 +1675,34 @@ function buildRoom(r) {
     doors.push({ dir, bars, runeMat, open: true, y: 3.15 });
   }
   if (th.chest) {
-    roomChest = buildChest(r.chestOpen); roomChest.g.position.set(0, 0, -5.6); grp.add(roomChest.g);
-    colliders.push({ x: 0, z: -5.6, r: 0.85, h: 0.9 });
-    for (const [x, z] of COIN_PILES) floorBusy.push({ x0: x - 0.4, x1: x + 0.4, z0: z - 0.4, z1: z + 0.4 });
-    for (const [x, z] of COIN_PILES) for (let i = 0; i < 6; i++) grp.add(at(meshOf(new THREE.CylinderGeometry(0.09, 0.09, 0.025, 8), M(0xFFD23A, { metalness: 0.6, roughness: 0.35 })), x + rand(-0.2, 0.2), 0.02 + i * 0.026, z + rand(-0.2, 0.2)));
+    roomChest = buildChest(r.chestOpen); const [chx, chz] = VL ? VL.map(0, VL.cv) : [0, -5.6];
+    roomChest.g.position.set(chx, VL && th.vault !== 'moss' ? 0.12 : 0.04, chz); if (VL) roomChest.g.rotation.y = VL.face; grp.add(roomChest.g);
+    colliders.push({ x: chx, z: chz, r: 0.85, h: 0.9 });
+  }
+  if (VL) {
+    const [cx, cz] = VL.map(0, VL.cv); accentLight.color.set(0xFFD27A); accentLight.position.set(cx, 2.7, cz); accentLight.intensity = 1.5; accentLight.distance = 10; // a warm light over the chest
+    if (flamePts.length) {
+      const fm = new THREE.MeshBasicMaterial({ color: th.torch }), cm = new THREE.MeshBasicMaterial({ color: 0xFFF1B0 });
+      const fl = flamePts.map(([x, z]) => { const a = at(meshOf(new THREE.ConeGeometry(0.2, 0.55, 6), fm), x, 1.24, z), b = at(meshOf(new THREE.ConeGeometry(0.11, 0.32, 6), cm), x, 1.14, z); grp.add(a); grp.add(b); return { a, b, ph: rand(0, 9) }; });
+      roomFx.push(() => { for (const o of fl) { const k = 0.85 + Math.sin(T * 12 + o.ph) * 0.1 + Math.sin(T * 27 + o.ph) * 0.06; o.a.scale.set(1, k, 1); o.b.scale.set(1, k * 1.1, 1); } });
+    }
+    for (const [x, z] of moltenPts) { // molten gold: a glowing pool in the basin, and a stream wobbling down into it
+      const mg = new THREE.MeshStandardMaterial({ color: 0xFFB030, emissive: 0xFF7A10, emissiveIntensity: 1.1, flatShading: true }); lavaMats.push(mg);
+      const pool = meshOf(new THREE.CircleGeometry(0.56, 10), mg); pool.rotation.x = -Math.PI / 2; pool.position.set(x, 0.39, z); grp.add(pool);
+      const st = meshOf(new THREE.CylinderGeometry(0.1, 0.13, 1.8, 6, 1, true), new THREE.MeshBasicMaterial({ color: 0xFFC040 })); st.position.set(x, 1.28, z); grp.add(st);
+      roomFx.push(() => { st.scale.set(1 + Math.sin(T * 9 + x) * 0.15, 1, 1 + Math.sin(T * 7 + z) * 0.15); });
+    }
+    if (glints.length) { // four-pointed glints winking on the gold, always turned to face you
+      const gg = new THREE.OctahedronGeometry(1, 0), gm = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+      const gl = [...Array(Math.min(12, glints.length))].map(() => { const g2 = new THREE.Group(), a = meshOf(gg, gm), b = meshOf(gg, gm); g2.add(a); g2.add(b); g2.visible = false; grp.add(g2); return { g: g2, a, b, t: rand(-2, 0), at: pick(glints) }; });
+      roomFx.push((sdt, rdt) => {
+        for (const o of gl) {
+          o.t += rdt; if (o.t > 0.45) { o.t = rand(-2.5, -0.3); o.at = pick(glints); }
+          const k = o.t > 0 ? Math.sin(o.t / 0.45 * Math.PI) : 0; o.g.visible = k > 0.02; if (!o.g.visible) continue;
+          o.g.position.copy(o.at); o.g.quaternion.copy(camera.quaternion); o.a.scale.set(0.016 * k, 0.11 * k, 0.004); o.b.scale.set(0.11 * k, 0.016 * k, 0.004);
+        }
+      });
+    }
   }
   if (GL) {
     // water: the pool, the two basins, and the curtains pouring between them
@@ -4415,7 +4576,7 @@ function revealSecret() {
   if (!spots.length) return null;
   const sp = pick(spots), opp = DIRS[sp.d].opp;
   let roll = Math.random() * 100, kind = 'shop'; for (const [k, w] of SECRET_KINDS) { if ((roll -= w) < 0) { kind = k; break; } }
-  const s = { x: sp.x, y: sp.y, type: 'secret', secret: kind, theme: kind === 'hoard' ? 'vault' : kind === 'den' ? 'den' : 'secret', n: { [opp]: true },
+  const s = { x: sp.x, y: sp.y, type: 'secret', secret: kind, theme: kind === 'hoard' ? floorBiome.vault || 'vault' : kind === 'den' ? 'den' : 'secret', n: { [opp]: true },
     visited: false, cleared: true, caps: [], chestOpen: false, fountainUsed: false, fightActive: false, revealed: true, secretDoor: opp, depth: 0, hoard: kind === 'hoard' };
   s.caps = THEMES[s.theme].spots.map(() => 0);
   if (kind === 'shop' || kind === 'den') { s.shopDir = DIRS[opp].opp; s.shop = makeShop(kind === 'shop' ? 'secret' : 'den'); }
