@@ -4,6 +4,8 @@ A first-person dungeon crawler where you brew potions and fling them at things w
 
 **Play:** open the GitHub Pages link for this repo, or download `index.html` and double-click it. It needs an internet connection for the 3D engine and fonts.
 
+**What's new:** see [CHANGES.md](CHANGES.md).
+
 ## Controls
 
 | | |

@@ -1,0 +1,29 @@
+<!-- tools/dev/build.py puts this before the game: with ?mock in the URL, it stands in for claude.ai's co-op room (window.claude.use("room")), so tabs on this machine share a run over BroadcastChannel. -->
+<script>
+if (location.search.includes('mock')) (() => {
+  const bc = new BroadcastChannel('mockroom'), me = Math.random().toString(36).slice(2, 10);
+  let pres = {}, snap = Object.freeze([]); const peers = new Map(), peerCbs = [], topicCbs = {};
+  const S = (peer, p, mine) => Object.freeze({ peer, by: null, isMe: mine, sameTab: mine, kind: 'viewer', guest: false, presence: Object.freeze(Object.assign({}, p)), updatedAt: Date.now() });
+  const rebuild = () => { snap = Object.freeze([S(me, pres, true), ...[...peers.values()].map(p => S(p.peer, p.presence, false))]); };
+  const notify = (joined = [], left = []) => { rebuild(); peerCbs.forEach(f => f({ peers: snap, joined, left, updated: [] })); };
+  bc.onmessage = ev => {
+    const m = ev.data;
+    if (m.k === 'pres') { const old = peers.get(m.peer); peers.set(m.peer, { peer: m.peer, presence: m.p, seen: Date.now() }); if (!old) { bc.postMessage({ k: 'pres', peer: me, p: pres }); notify([{ peer: m.peer }]); } else if (JSON.stringify(old.presence) !== JSON.stringify(m.p)) notify(); }
+    else if (m.k === 'bye') { peers.delete(m.peer); notify([], [{ peer: m.peer }]); }
+    else if (m.k === 'emit') (topicCbs[m.topic] || []).forEach(f => f({ topic: m.topic, data: m.data, peer: m.peer, by: null, isMe: false, sameTab: false, kind: 'viewer', guest: false }));
+  };
+  setInterval(() => { bc.postMessage({ k: 'pres', peer: me, p: pres }); for (const [k, p] of peers) if (Date.now() - p.seen > 3000) { peers.delete(k); notify([], [{ peer: k }]); } }, 1000);
+  addEventListener('beforeunload', () => bc.postMessage({ k: 'bye', peer: me }));
+  window.__mockBytes = 0;
+  const room = {
+    emit: async (topic, data) => { const j = JSON.stringify(data); window.__mockBytes = Math.max(window.__mockBytes, j.length); bc.postMessage({ k: 'emit', topic, data: JSON.parse(j), peer: me }); },
+    on: (t, f) => { (topicCbs[t] = topicCbs[t] || []).push(f); return () => {}; },
+    presence: async patch => { pres = Object.assign({}, pres, patch); for (const k in pres) if (pres[k] === null) delete pres[k]; bc.postMessage({ k: 'pres', peer: me, p: pres }); rebuild(); },
+    peers: () => snap,
+    onPeers: f => { peerCbs.push(f); setTimeout(() => { rebuild(); f({ peers: snap, joined: snap.slice(), left: [], updated: [] }); }, 0); return () => {}; },
+    connected: () => true, onConnection: f => { setTimeout(() => f(true)); return () => {}; },
+  };
+  rebuild(); window.__mockMe = me;
+  window.claude = { use: async n => n === 'room' ? room : null };
+})();
+</script>
