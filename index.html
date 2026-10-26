@@ -508,17 +508,6 @@
   .stats div{display:flex;flex-direction:column}
   .stats b{font:400 clamp(28px,3.4vw,44px)/1 var(--display);letter-spacing:.02em}
   .stats span{font:700 11px var(--ui);letter-spacing:.22em;color:var(--muted);margin-top:4px}
-  .combos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:min(560px,82vw)}
-  @media (max-width:560px){.combos{grid-template-columns:1fr}}
-  .cb{display:flex;flex-direction:column;gap:9px;background:#000;padding:12px 14px;border-left:4px solid var(--yell)}
-  .cb.lock{border-color:#3A3044}
-  .cb .chain{display:flex;align-items:center;gap:6px}
-  .cb .chain svg{width:26px;height:26px;display:block}
-  .cb .chain i{font:400 16px var(--display);font-style:normal;color:#5A5064}
-  .cb .chain em{margin-left:8px;color:#FF8A2A;width:22px;height:22px} .cb .chain em svg{width:100%;height:100%}
-  .cb .chain .q{width:26px;height:26px;border:2px dashed #3A3044;box-sizing:border-box}
-  .cb b{font:400 26px/1 var(--display);letter-spacing:.03em;color:var(--yell)}
-  .cb.lock b{color:#4A4054}
   @media (pointer:coarse){.navhint{display:none}}
   @media (prefers-reduced-motion: reduce){
     .co,.rl,.rl *,.xp,.xp *,.stamp,.banner,.kf,.nt,.lt,.hpop,.ui-in > *,.mi{animation-duration:.01s !important;animation-delay:0s !important}
@@ -767,6 +756,7 @@ const SFX = {
   },
   boom() { if (!live()) return; const t = AC.currentTime; noiseBurst('lowpass', 900, 70, 0.8, t, 0.9, 1.0); osc('sine', 90, 30, t, 0.7, 0.8); },
   thud() { if (!live()) return; osc('sine', 140, 40, AC.currentTime, 0.22, 0.5); },
+  wah() { if (!live()) return; const t = AC.currentTime; osc('sawtooth', 380, 560, t, 0.2, 0.07); osc('sawtooth', 560, 300, t + 0.18, 0.75, 0.08); osc('triangle', 1120, 620, t + 0.18, 0.75, 0.04); },
   bonk(big) { if (!live()) return; const t = AC.currentTime; osc('sine', big ? 700 : 900, 160, t, big ? 0.2 : 0.13, 0.4); osc('triangle', 1900, 500, t, 0.05, 0.12); noiseBurst('lowpass', 1400, 300, 1, t, 0.06, 0.3); },
   whiff() { if (!live()) return; noiseBurst('bandpass', 1400, 500, 1.8, AC.currentTime, 0.13, 0.14); },
   shriek() { if (!live()) return; const t = AC.currentTime; osc('sawtooth', 1800, 3200, t, 0.35, 0.07); osc('square', 2600, 1300, t + 0.05, 0.4, 0.04); noiseBurst('highpass', 3000, 8000, 2, t, 0.45, 0.22); },
@@ -979,7 +969,7 @@ function genFloorRaw(n) {
     r.caps = THEMES[r.theme].spots.map(() => Math.random() < (r.type === 'garden' ? 0.5 : 0.22) ? 1 : 0); r.depth = dist.get(r) || 0; // most walls are bare now; a cap is a find
     if (r.type === 'stairs') { const inDir = Object.keys(r.n).find(d => r.n[d]), free = ['N', 'S', 'W', 'E'].filter(d => !r.n[d]); r.shopDir = inDir && free.includes(DIRS[inDir].opp) ? DIRS[inDir].opp : pick(free); }
   }
-  // some fight rooms get a trap: holes in the floor, spike tiles, or dart turrets on the walls
+  // some fight rooms get a trap: holes in the floor, spike tiles, or orb turrets on the walls
   for (const r of map.values()) if (r.type === 'fight' && Math.random() < (n === 1 ? 0.3 : 0.45)) {
     const th = THEMES[r.theme]; r.trap = pick(th.water ? ['spikes', 'turrets'] : ['pits', 'spikes', 'turrets']);
     if (r.trap === 'pits') r.pits = trapTiles(r, 3 + Math.floor(Math.random() * 2), th, true);
@@ -1872,7 +1862,7 @@ function setDoors(open, quiet) {
   if (!quiet && doors.length) SFX.clang();
 }
 function teardownRoom() {
-  enemies.forEach(e => { endSlam(e); scene.remove(e.root); scene.remove(e.shadow); disposeTree(e.root); e.label.remove(); }); enemies = []; fieldReset(); queenReset();
+  enemies.forEach(e => { endSlam(e); endTantrum(e); scene.remove(e.root); scene.remove(e.shadow); disposeTree(e.root); e.label.remove(); }); enemies = []; fieldReset(); queenReset();
   pickups.forEach(p => { scene.remove(p.g); disposeTree(p.g); gather(p.kind, p.origin); }); pickups.length = 0;
   drops.forEach(d => scene.remove(d.m)); drops.length = 0; clearGoos();
   if (coins.length) { coins.forEach(c => scene.remove(c.g)); gainCoins(coins.length, true); coins.length = 0; }
@@ -1962,7 +1952,7 @@ const TYPES = {
   slime:   { name: 'Slime',   hp: 3, speed: 1.9,  base: 0x7BE05A, eyes: 2, reach: 1.6, dmg: 1, windup: 0.55, cooldown: 1.5, hops: true },
   spitter: { name: 'Spitter', hp: 4, speed: 1.6,  base: 0xB06BE0, core: 0x6A2A9A, emis: 0x3A1060, eyes: 2, reach: 6.5, dmg: 1, windup: 0.9, cooldown: 2.8, hops: true, ranged: true },
   cyclops: { name: 'Cyclops', hp: 6, speed: 1.1,  base: 0xD9A27E, eyes: 1, reach: 2.1, dmg: 1, windup: 0.75, cooldown: 1.9, tall: true, dropsEye: true },
-  chief:   { name: 'Cyclops Chief', hp: 12, speed: 0.75, base: 0xB8745A, eyes: 1, boss: true, reach: 2.6, dmg: 1, windup: 1.2, cooldown: 2.6, tall: true, dropsEye: true },
+  chief:   { name: 'Big Baby', hp: 12, speed: 0.75, base: 0xE8A28A, eyes: 1, boss: true, baby: true, reach: 2.6, dmg: 1, windup: 1.2, cooldown: 2.6, tall: true, dropsEye: true },
   stump:   { name: 'Stumpling',  spiky: true, hp: 5, speed: 1.0,  base: 0x6E4A2C, eyes: 2, reach: 1.9, dmg: 1, windup: 0.8, cooldown: 1.8, immune: ['bog', 'boil'], weak: 'doom', immTxt: 'WATER DOES NOTHING' },
   moth:    { name: 'Gloom Moth', hp: 3, speed: 2.3,  base: 0x9A86C8, eyes: 2, reach: 1.6, dmg: 1, windup: 0.5, cooldown: 1.6, flying: true, immune: ['feather'], immTxt: 'WIND DOES NOTHING' },
   knight:  { name: 'Tin Knight', spiky: true, hp: 7, speed: 0.85, base: 0xA8A8B4, eyes: 1, reach: 2.0, dmg: 1, windup: 0.85, cooldown: 2.0, tall: true, heavy: true, metal: true, immune: ['doom'], weak: 'horn', dropsIron: true, immTxt: 'FIRE DOES NOTHING' },
@@ -1996,6 +1986,43 @@ function buildCyclops(s = 1.35, crown = false, base = 0xD9A27E) {
     body.add(pv); legs.push({ p: pv, ph: sd > 0 ? 0 : Math.PI });
   }
   return { root, body, skin, legs, h: hy + hr, r: 0.78 * s / 1.35, baseEmissive: 0x000000, baseOpacity: 1 };
+}
+// the chief, as a big baby: a bonnet, a nappy, a dummy in its mouth and a rattle for a club
+function buildBaby(s, base) {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const skin = new THREE.MeshStandardMaterial({ color: base, flatShading: true, roughness: 0.75, transparent: true, opacity: 1 });
+  const blue = M(0x5E9CDE), white = M(0xF6F2EA), pink = M(0xF59AB8);
+  body.add(at(meshOf(new THREE.CylinderGeometry(0.42 * s, 0.5 * s, 0.72 * s, 6), skin), 0, 1.02 * s, 0));
+  body.add(at(meshOf(new THREE.CylinderGeometry(0.53 * s, 0.47 * s, 0.36 * s, 6), white), 0, 0.66 * s, 0));
+  for (const sd of [-1, 1]) body.add(at(meshOf(new THREE.BoxGeometry(0.05 * s, 0.15 * s, 0.11 * s), blue), sd * 0.51 * s, 0.72 * s, 0.12 * s));
+  const hr = 0.54 * s, hy = 1.36 * s + hr * 0.8;
+  body.add(at(meshOf(new THREE.IcosahedronGeometry(hr, 1), skin), 0, hy, 0));
+  addEyes(body, new THREE.Vector3(0, hy, 0), hr, 1);
+  const cap = meshOf(new THREE.SphereGeometry(hr * 1.2, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.56), M(0x5E9CDE, { side: THREE.DoubleSide })); cap.rotation.x = -1.15; cap.position.set(0, hy + hr * 0.06, -hr * 0.03); /* tipped back: the bonnet sits up over its forehead */
+  const frill = at(meshOf(new THREE.TorusGeometry(hr * 1.02, hr * 0.08, 4, 12), white), 0, -hr * 0.24, 0); frill.rotation.x = Math.PI / 2; cap.add(frill); body.add(cap);
+  for (const sd of [-1, 1]) { const tie = at(meshOf(new THREE.ConeGeometry(hr * 0.13, hr * 0.32, 4), blue), sd * hr * 0.17, hy - hr * 0.98, hr * 0.42); tie.rotation.z = sd * Math.PI / 2; body.add(tie); }
+  const paci = new THREE.Group(); paci.position.set(0, hy - hr * 0.45, hr * 0.9);
+  const shield = meshOf(new THREE.CylinderGeometry(hr * 0.26, hr * 0.26, hr * 0.07, 8), pink); shield.rotation.x = Math.PI / 2; paci.add(shield);
+  paci.add(at(meshOf(new THREE.TorusGeometry(hr * 0.13, hr * 0.035, 4, 8), white), 0, 0, hr * 0.08)); body.add(paci);
+  const arms = [];
+  for (const sd of [-1, 1]) {
+    const pv = new THREE.Group(); pv.position.set(sd * 0.5 * s, 1.3 * s, 0); pv.rotation.z = sd * 0.45;
+    pv.add(at(meshOf(new THREE.CylinderGeometry(0.12 * s, 0.11 * s, 0.6 * s, 5), skin), 0, -0.3 * s, 0));
+    body.add(pv); arms.push({ p: pv, sd });
+  }
+  const rattle = new THREE.Group(); rattle.position.set(0, -0.6 * s, 0.05 * s); rattle.rotation.x = 1.1;
+  rattle.add(at(meshOf(new THREE.CylinderGeometry(0.045 * s, 0.045 * s, 0.5 * s, 5), white), 0, 0.2 * s, 0));
+  rattle.add(at(meshOf(new THREE.IcosahedronGeometry(0.19 * s, 0), M(0xFFD86A)), 0, 0.5 * s, 0));
+  const band = at(meshOf(new THREE.TorusGeometry(0.17 * s, 0.035 * s, 3, 8), pink), 0, 0.5 * s, 0); band.rotation.x = Math.PI / 2; rattle.add(band);
+  arms[1].p.add(rattle);
+  const legs = [];
+  for (const sd of [-1, 1]) {
+    const pv = new THREE.Group(); pv.position.set(sd * 0.22 * s, 0.58 * s, 0);
+    pv.add(at(meshOf(new THREE.CylinderGeometry(0.14 * s, 0.12 * s, 0.58 * s, 5), skin), 0, -0.29 * s, 0));
+    pv.add(at(meshOf(new THREE.BoxGeometry(0.24 * s, 0.1 * s, 0.32 * s), blue), 0, -0.56 * s, 0.06 * s));
+    body.add(pv); legs.push({ p: pv, ph: sd > 0 ? 0 : Math.PI });
+  }
+  return { root, body, skin, legs, arms, paci, sitDrop: 0.42 * s, h: hy + hr * 1.1, r: 0.78 * s / 1.35, baseEmissive: 0x000000, baseOpacity: 1 };
 }
 // a spike from `from`, pointing along `dir`: spiky creatures prick a ladle that isn't swung all the way
 function spike(from, dir, len, r, mat) {
@@ -2074,7 +2101,7 @@ let adaptedNow = null;
 // a creature's model on its own, with nothing attached yet: spawnEnemy dresses it, the guide takes its picture
 function buildModel(type, kind = 'doom') {
   const T = TYPES[type];
-  return T.queen || T.decoy ? buildQueen(!!T.decoy) : T.mimic ? MK_BUILD[type](kind) : T.hops ? buildSlime(T.base, T.core, T.emis) : type === 'king' ? buildCyclops(2.35, true, T.base) : type === 'chief' ? buildCyclops(1.9, true, T.base) : type === 'stump' ? buildStump(T.base) : type === 'moth' ? buildMoth(T.base) : type === 'knight' ? buildKnight(T.base) : buildCyclops();
+  return T.queen || T.decoy ? buildQueen(!!T.decoy) : T.mimic ? MK_BUILD[type](kind) : T.hops ? buildSlime(T.base, T.core, T.emis) : type === 'king' ? buildCyclops(2.35, true, T.base) : type === 'chief' ? buildBaby(1.9, T.base) : type === 'stump' ? buildStump(T.base) : type === 'moth' ? buildMoth(T.base) : type === 'knight' ? buildKnight(T.base) : buildCyclops();
 }
 function spawnEnemy(type, x, z, opt = {}) {
   const T = TYPES[type], m = buildModel(type, opt.kind);
@@ -2466,7 +2493,7 @@ function kill(e, how, from, launch = 1) {
   if (e.T.boss && !e.clone && potSlots < (has('rim') ? 4 : 3)) { potSlots++; setTimeout(() => stamp('BIGGER POT'), 1800); }
   if (!e.clone && e.T.boss) { const n = e.T.king ? 8 : Math.random() < (has('lucky') ? 0.7 : 0.35) ? 3 : 0; if (n) dropCoins(centerOf(e), n); } // coins are a chest thing; a boss only sometimes has a few
   run.kills++; slingKills.push(e); xp(100, how); feed(e.T.name, how, dmgSrc);
-  e.label.remove(); endSlam(e);
+  e.label.remove(); endSlam(e); endTantrum(e);
   if (e.type === 'lurker' && field.lurk === e) fieldClear(); // the lure goes, and so does the rest of the patch
   if (e.T.queen) queenDied(e);
 }
@@ -2554,7 +2581,7 @@ function groupCenter(list) { const c = new THREE.Vector3(); list.forEach(e => c.
 function multiName(n) { return n >= 4 ? 'MULTI KILL' : n === 3 ? 'TRIPLE KILL' : n === 2 ? 'DOUBLE KILL' : ''; }
 function markFound(b) {
   if (!b.combo || found[b.combo]) return false;
-  found[b.combo] = true; store.set('slingcam.found', found); if (menuOpen) renderMenu(); return true;
+  found[b.combo] = true; store.set('slingcam.found', found); return true;
 }
 
 /* ================= player + input ================= */
@@ -2789,13 +2816,10 @@ const OPTIONS = [
   { label: 'LOOK SPEED', val: () => segs(settings.look), adjust: d => { settings.look = Math.max(1, Math.min(10, settings.look + d)); } },
   { label: 'SCREEN SHAKE', val: () => settings.shake ? 'ON' : 'OFF', adjust: () => { settings.shake = !settings.shake; } },
 ];
-const comboGrid = () => `<div class="combos">${Object.entries(COMBOS).map(([k, C]) => found[k]
-  ? `<div class="cb"><span class="chain">${C.chain.map(i => `<span style="color:${ING[i].css}">${svg(i)}</span>`).join(C.gun ? '<i>+</i>' : '<i>›</i>')}${C.gun ? `<em title="Water gun">${svg('gun')}</em>` : ''}</span><b>${C.name}</b></div>`
-  : `<div class="cb lock"><span class="chain">${C.chain.map(() => '<span class="q"></span>').join('<i>›</i>')}</span><b>???</b></div>`).join('')}</div>`;
 const SCREENS = {
-  title: () => ({ head: LOGO, items: [{ label: 'PLAY', act: startRun }, { label: 'CO-OP', act: () => uiPush('coop') }, { label: 'BREWER', act: () => uiPush('brewer') }, { label: 'COMBOS', act: () => uiPush('combos') }, { label: 'OPTIONS', act: () => uiPush('options') }, { label: 'TEST LAB', act: enterLab }] }),
+  title: () => ({ head: LOGO, items: [{ label: 'PLAY', act: startRun }, { label: 'CO-OP', act: () => uiPush('coop') }, { label: 'BREWER', act: () => uiPush('brewer') }, { label: 'OPTIONS', act: () => uiPush('options') }, { label: 'TEST LAB', act: enterLab }] }),
   lab: () => ({ kicker: 'SITE-19 · TEST CHAMBER 07', body: labBody(), items: labItems() }),
-  pause: () => ({ kicker: 'PAUSED', body: run.items.size ? `<div class="owned">${[...run.items].map(id => `<span title="${ITEMS[id].name}" style="color:${ITEMS[id].color}">${svg(id)}</span>`).join('')}</div>` : '', items: [{ label: 'RESUME', act: play }, { label: 'COMBOS', act: () => uiPush('combos') }, { label: 'OPTIONS', act: () => uiPush('options') }, { label: 'QUIT RUN', act: () => uiPush('confirm') }], foot: `${floorLabel()} · ${score.toLocaleString()} · ${run.coins} COINS` }),
+  pause: () => ({ kicker: 'PAUSED', body: run.items.size ? `<div class="owned">${[...run.items].map(id => `<span title="${ITEMS[id].name}" style="color:${ITEMS[id].color}">${svg(id)}</span>`).join('')}</div>` : '', items: [{ label: 'RESUME', act: play }, { label: 'GUIDE', act: () => guide.open() }, { label: 'OPTIONS', act: () => uiPush('options') }, { label: 'QUIT RUN', act: () => uiPush('confirm') }], foot: `${floorLabel()} · ${score.toLocaleString()} · ${run.coins} COINS` }),
   confirm: () => ({ kicker: 'QUIT THIS RUN?', items: [{ label: 'NO', act: uiBack }, { label: 'YES, QUIT', act: toTitle }] }),
   brewer: () => ({ kicker: 'YOUR BREWER', items: [
     { label: 'BODY', val: brewer.bodyName, adjust: d => { brewer.set('body', d); refreshItem(1); } }, // the classic swatch is per body
@@ -2809,7 +2833,6 @@ const SCREENS = {
   join: () => ({ kicker: 'JOIN WITH CODE', body: `<input id="joinCode" class="codein" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Game code"><p class="${net.coopMsg ? 'cmsg' : 'cnote'}">${esc(net.coopMsg || 'Type the 4-character code on your friend\'s screen.')}</p>`,
     items: [{ label: 'CONNECT', act: joinCode }, { label: 'BACK', act: () => { net.coopMsg = ''; uiBack(); } }] }),
   options: () => ({ kicker: 'OPTIONS', items: [...OPTIONS, { label: 'BACK', act: uiBack }] }),
-  combos: () => ({ kicker: `COMBOS · ${Object.keys(COMBOS).filter(k => found[k]).length}/${Object.keys(COMBOS).length}`, body: comboGrid(), items: [{ label: 'BACK', act: uiBack }] }),
   ko: () => ({ head: '<h2 class="big red">KNOCKED OUT</h2>', body: statsHtml() + (netGuest() ? '<p class="cnote">Waiting on the host to go again.</p>' : ''), items: netGuest() ? [{ label: 'TITLE', act: toTitle }] : [{ label: net.on ? 'TRY AGAIN, TOGETHER' : 'TRY AGAIN', act: net.on ? netAgain : newRun }, { label: 'TITLE', act: toTitle }] }),
   win: () => ({ head: '<h2 class="big fire">RUN COMPLETE</h2>', body: statsHtml(), items: [{ label: 'KEEP DESCENDING', act: () => finishWin('endless') }, { label: 'NEW RUN', act: () => finishWin('again') }, { label: 'TITLE', act: () => finishWin('title') }] }),
 };
@@ -2878,7 +2901,6 @@ uiEl.addEventListener('click', e => {
 });
 addEventListener('resize', placeCursor);
 if (document.fonts) document.fonts.ready.then(placeCursor);
-function renderMenu() { if (ui.screen === 'combos') renderUI(); } // something changed that a menu might be showing
 // a pad drives the menus: d-pad or stick to move, A to pick, B to go back, Start to pause
 let padPrev = [], padDir = null, padRep = 0;
 function pollPad(rdt) {
@@ -2986,7 +3008,7 @@ function renderInv() {
     + shelf('PARTS', fresh.filter(it => it.kind === 'eye' || it.kind === 'iron'))
     + shelf('RANCID', off, 'rot');
   $('#invSlots').innerHTML = Array.from({ length: has('rim') ? 4 : 3 }, (_, i) => i).map(i => {
-    if (i >= potSlots) return `<div class="pslot locked" title="Beat a chief for a bigger pot"><span class="n">${i + 1}</span><span class="lk">${CROWN}</span></div>`;
+    if (i >= potSlots) return `<div class="pslot locked" title="Beat a boss for a bigger pot"><span class="n">${i + 1}</span><span class="lk">${CROWN}</span></div>`;
     const it = potPending[i];
     return it ? `<button type="button" class="pslot ${it.spoiled ? 'rancid' : ''}" data-pslot="${i}" id="pslot${i}" aria-label="Take ${ING[it.kind].name} back out"><span class="n">${i + 1}</span>${ART[it.kind]}<span class="x">×</span></button>`
       : `<div class="pslot empty"><span class="n">${i + 1}</span></div>`;
@@ -3436,7 +3458,7 @@ function slamHit(e) {
 const lab = { on: false, idx: 0, tier: 3, ai: true, god: true, move: 0, cur: null, hits: 0, respawnT: 0, beacons: [] };
 const LAB_SUBJECTS = ['chief', 'king', 'lurker', 'cyclops', 'slime', 'spitter', 'moth', 'stump', 'knight', 'skitter', 'beetle', 'mantis', 'lampcap'];
 const LAB_NOTES = {
-  chief: ['KETER', 'Large and territorial. Learns new attacks the deeper it is found.'],
+  chief: ['KETER', 'Infant. Extremely large. Prone to tantrums; structural damage to the chamber ceiling expected.'],
   king: ['KETER', 'Elite variant. Calls for reinforcements when injured.'],
   cyclops: ['EUCLID', 'Hostile. Stares, then swings.'],
   slime: ['SAFE', 'Gelatinous. Mostly harmless. Mostly.'],
@@ -3456,7 +3478,9 @@ const LAB_MOVES = [
   { id: 'wrong', name: 'WRONG GUESS', ok: e => e.type === 'lurker', run: () => { const f = field.list.filter(s => s.live && !s.real); if (f.length) shroomHit(pick(f)); } },
   { id: 'hop', name: 'HOP', ok: e => e.type === 'beetle', run: e => { if (e.ph === 'live') startHop(e, player.pos); } },
   { id: 'swing', name: 'SWING', ok: e => !e.T.ranged && !e.T.queen, run: e => { e.atk = e.T.windup; } },
-  { id: 'slam', name: 'GROUND SLAM', ok: e => e.T.boss && !e.T.mimic && !e.T.queen, run: e => startSlam(e) },
+  { id: 'slam', name: 'GROUND SLAM', ok: e => e.T.boss && !e.T.mimic && !e.T.queen && !e.T.baby, run: e => startSlam(e) },
+  { id: 'tantrum', name: 'TANTRUM', ok: e => e.T.baby, run: e => startTantrum(e) },
+  { id: 'rocks', name: 'ROCKFALL', ok: e => e.T.baby, run: e => rockfall(e, 6) },
   { id: 'toss', name: 'ROCK TOSS', ok: e => e.T.boss && !e.T.mimic && !e.T.queen, run: e => throwRock(e, player.pos) },
   { id: 'charge', name: 'CHARGE', ok: e => e.T.boss && !e.T.mimic && !e.T.queen, run: e => startCharge(e, player.pos) },
   { id: 'quake', name: 'AFTERSHOCKS', ok: e => e.T.boss && !e.T.queen, run: e => aftershocks(e) },
@@ -3468,7 +3492,7 @@ const LAB_MOVES = [
 const labMoves = () => lab.cur && !lab.cur.dead ? LAB_MOVES.filter(m => m.ok(lab.cur)) : [];
 const labLearn = (type, id) => { const f = (BOSS_MOVES[type] || {})[id]; return f && f > lab.tier ? f : 0; }; // the floor it would learn this on, if not yet
 function labClear() {
-  for (const e of enemies) { endCharge(e); endSlam(e); scene.remove(e.root); scene.remove(e.shadow); disposeTree(e.root); e.label.remove(); }
+  for (const e of enemies) { endCharge(e); endSlam(e); endTantrum(e); scene.remove(e.root); scene.remove(e.shadow); disposeTree(e.root); e.label.remove(); }
   enemies = []; clearGoos(); lab.cur = null; fieldWipe();
 }
 function labSpawn() {
@@ -3483,7 +3507,7 @@ function labSpawn() {
 function labTrigger(i) {
   const list = labMoves(), m = list[i]; if (!m || !lab.cur) return;
   const e = lab.cur; if (e.charge) endCharge(e);
-  e.stun = 0; e.atk = 0; endSlam(e); m.run(e); labHud(m.name);
+  e.stun = 0; e.sitT = 0; e.atk = 0; endSlam(e); endTantrum(e); m.run(e); labHud(m.name);
 }
 function enterLab() {
   if (net.on) return;
@@ -3582,7 +3606,7 @@ function buildLab(grp) {
 
 /* ================= bosses: a random one guards each floor's stairs, and the deeper you go the more moves it knows ================= */
 const BOSS_POOL = [{ id: 'chief', from: 1 }, { id: 'king', from: 3 }]; // the king turns up as the elite pick from floor 3; the last floor is fixed
-const BOSS_MOVES = { chief: { toss: 2, enrage: 2, charge: 3, quake: 4 }, king: { quake: 3, charge: 4, enrage: 5 } }; // the floor each move is learned on
+const BOSS_MOVES = { chief: { charge: 1, toss: 2, enrage: 3, quake: 4 }, king: { quake: 3, charge: 4, enrage: 5 } }; // the floor each move is learned on
 const MOVE_NAME = { toss: 'ROCK TOSS', charge: 'CHARGE', quake: 'AFTERSHOCKS', enrage: 'RAGE' };
 function pickBoss(n) { // runs inside the floor's seeded generation, so co-op partners get the same boss
   const pool = BOSS_POOL.filter(b => b.from <= n), fresh = pool.filter(b => !run.bossLog.includes(b.id));
@@ -3600,6 +3624,7 @@ function bossIntro(r) {
   let sub = r.king && !run.won ? 'FINAL BOSS' : '';
   if (!sub && known.length) sub = !run.bossMet.has(type) ? 'KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : learned.length ? 'LEARNED ' + learned.map(k => MOVE_NAME[k]).join(' · ') : '';
   if (type === 'queen' && !run.bossMet.has(type)) sub = 'SHE PUTS THE LIGHTS OUT' + (known.length ? ' · KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : '');
+  if (type === 'chief' && !run.bossMet.has(type)) sub = 'MIND THE CEILING' + (known.length ? ' · KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : '');
   if (type === 'lurker' && !run.bossMet.has(type)) sub = 'FIND THE REAL ONE' + (known.length ? ' · KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : '');
   run.bossMet.add(type); if (!lab.on) meetCreature(type);
   banner(r.king ? 'THE ' + name : name, sub, 'boss');
@@ -3626,11 +3651,13 @@ function bossCharge(e, sdt) { // true while the charge owns this creature's fram
   const hitR = e.r * e.scale + 0.55;
   if (!c.hit.has('me') && !player.down && !player.fall && Math.hypot(e.pos.x - player.pos.x, e.pos.z - player.pos.z) < hitR) { c.hit.add('me'); hurtPlayer(2, e); }
   if (net.on && net.host) for (const R of net.remotes.values()) if (R.here && !c.hit.has(R.peer) && Math.hypot(e.pos.x - R.pos.x, e.pos.z - R.pos.z) < hitR) { c.hit.add(R.peer); netHurt(R, 2, e.pos); }
+  if (e.T.baby && c.hit.size) { endCharge(e); e.cd = e.T.cooldown * bossCd(e); e.tiltV += 10; return false; } // it got you: no wall this time
   let wall = Math.abs(e.pos.x) > W - 0.9 || Math.abs(e.pos.z) > D - 0.9;
   if (!wall) for (const col of colliders) if (Math.hypot(e.pos.x - col.x, e.pos.z - col.z) < col.r + e.r * e.scale) { wall = true; break; }
   e.pos.x = Math.max(-W + 0.8, Math.min(W - 0.8, e.pos.x)); e.pos.z = Math.max(-D + 0.8, Math.min(D - 0.8, e.pos.z));
   if (wall) { // your opening
-    endCharge(e); e.stun = 1.8; e.tiltV -= 18; e.cd = e.T.cooldown * bossCd(e); shake = Math.max(shake, 0.4); SFX.thud(); SFX.boom();
+    endCharge(e); e.stun = e.T.baby ? BABY_SIT : 1.8; e.tiltV -= 18;
+    if (e.T.baby) { e.sitT = BABY_SIT; SFX.wah(); rockfall(e, Math.min(8, 4 + (e.tier || 1))); } /* down on its bottom, and the ceiling comes down */ e.cd = e.T.cooldown * bossCd(e); shake = Math.max(shake, 0.4); SFX.thud(); SFX.boom();
     puff(centerOf(e), 0x8A7A6A, 10, 1, 0.5, 0.9, 0.3, 0.7); damage(e, 1, 'WALLED', e.pos); return false;
   }
   if (c.t > 1.4) { endCharge(e); e.cd = e.T.cooldown * bossCd(e); return false; }
@@ -3660,6 +3687,87 @@ function aftershocks(e) {
   const at = netTarget(e).pos, spots = [[at.x, at.z]];
   for (let i = 0; i < 2; i++) { const a = rand(0, Math.PI * 2), d = rand(1.6, 2.4); spots.push([Math.max(-W + 1, Math.min(W - 1, at.x + Math.cos(a) * d)), Math.max(-D + 1, Math.min(D - 1, at.z + Math.sin(a) * d))]); }
   spots.forEach(([x, z], i) => { quakeAt(x, z, 0.25 + i * 0.3, false); if (net.on && net.host) netEmit('goo', { k: 'quake', rk: rkOf(room), f: [+x.toFixed(2), 0, +z.toFixed(2)], t: [0.25 + i * 0.3, 0, 0] }); });
+}
+
+/* ================= the Big Baby: tantrums, a ceiling that comes down, and a bump on the bottom ================= */
+const TANTRUM_R = 2.4, BABY_SIT = 3.0, CROCK_WARN = 0.5;
+const crockMat = new THREE.MeshBasicMaterial({ color: 0xFF3B30, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }); crockMat.userData.shared = true;
+// a rock shakes loose from the ceiling: a red outline on the floor for half a second, then it drops
+function ceilingRock(x, z, delay, fake) {
+  const mark = meshOf(GEO.ring, crockMat); mark.rotation.x = -Math.PI / 2; mark.position.set(x, 0.045, z); mark.scale.setScalar(0.8); mark.visible = false; scene.add(mark);
+  const rock = meshOf(GEO.ico0, rockMat); rock.scale.setScalar(rand(0.3, 0.4)); rock.position.set(x, H - 0.1, z); rock.visible = false; scene.add(rock);
+  let t = -delay, vy = -4, lt = -1;
+  addFx(sdt => {
+    t += sdt; if (t < 0) return true;
+    if (lt < 0) {
+      if (!mark.visible) { mark.visible = true; burst(new THREE.Vector3(x, H - 0.2, z), 0x8A7A6A, 5, 0.8, 0.7, 0.05); }
+      mark.scale.setScalar(0.8 + Math.sin(t * 22) * 0.07); if (t < CROCK_WARN) return true;
+      rock.visible = true; vy -= 30 * sdt; rock.position.y += vy * sdt; rock.rotation.x += sdt * 6; rock.rotation.z += sdt * 4;
+      if (rock.position.y > 0.25) return true;
+      lt = 0; rock.position.y = 0.22; scene.remove(mark); const p = new THREE.Vector3(x, 0.2, z);
+      burst(p, 0x8A6A4A, 12, 4, 0.6, 0.09); floorRing(p, 0xB0A090, 0.9, 0.3); SFX.thud(); shake = Math.max(shake, 0.18);
+      if (!fake) { if (!player.down && !player.fall && cine.state === 'idle' && Math.hypot(x - player.pos.x, z - player.pos.z) < 0.8) hurtPlayer(1, p); hurtRemotesNear(p, 0.8, 1); }
+      return true;
+    }
+    lt += sdt; if (lt > 1.1) rock.scale.multiplyScalar(1 - Math.min(1, sdt * 6)); /* the rubble crumbles away */
+    if (lt > 1.6) { scene.remove(rock); return false; }
+    return true;
+  });
+}
+// n rocks: every other one lands near someone, the rest anywhere in the room
+function rockfall(e, n) {
+  const tgts = [player.pos]; if (net.on && net.host) for (const R of net.remotes.values()) if (R.here) tgts.push(R.pos);
+  for (let i = 0; i < n; i++) {
+    const tg = pick(tgts), a = rand(0, Math.PI * 2), d = i % 2 === 0 ? rand(0, 1.3) : rand(2, 6);
+    const x = Math.max(-W + 1, Math.min(W - 1, tg.x + Math.cos(a) * d)), z = Math.max(-D + 1, Math.min(D - 1, tg.z + Math.sin(a) * d)), delay = i * 0.14 + rand(0, 0.1);
+    ceilingRock(x, z, delay, false);
+    if (net.on && net.host) netEmit('goo', { k: 'crock', rk: rkOf(room), f: [+x.toFixed(2), 0, +z.toFixed(2)], t: [+delay.toFixed(2), 0, 0] });
+  }
+  for (let i = 0; i < n; i++) burst(new THREE.Vector3(rand(-W + 1, W - 1), H - 0.2, rand(-D + 1, D - 1)), 0x8A7A6A, 4, 0.6, 0.9, 0.05); // the whole ceiling sheds dust
+}
+// tantrum: it spits its dummy out, wails, and stomps; every stomp hurts close by and shakes rocks loose
+function startTantrum(e) { e.tantrum = { t: 0, n: 0 }; e.atk = 0; e.tiltV -= 10; SFX.wah(); }
+function endTantrum(e) { e.tantrum = null; e.tanNet = false; if (e.tanRing) { scene.remove(e.tanRing); e.tanRing = null; } }
+function babyTantrum(e, sdt) { // true while the tantrum owns this creature's frame
+  if (e.lev > 0 || e.frozen > 0 || e.kbv || e.stun > 0) { endTantrum(e); return false; }
+  const c = e.tantrum, beats = e.enraged ? 6 : 4; c.t += sdt;
+  if (c.n < beats && c.t >= 0.75 + c.n * 0.34) { c.n++; tantrumStomp(e, c.n); }
+  if (c.t > 0.75 + beats * 0.34 + 0.3) { endTantrum(e); e.cd = e.T.cooldown * bossCd(e); if (e.moves && e.moves.has('quake')) aftershocks(e); return false; }
+  enemyLook(e, sdt, false); return true;
+}
+function tantrumStomp(e, n) {
+  shake = Math.max(shake, 0.32); SFX.thud(); if (n % 2) SFX.boom(); if (n % 3 === 0) SFX.wah();
+  burst(e.pos.clone().setY(0.2), 0x8A6A4A, 12, 4, 0.6, 0.1); floorRing(e.pos, 0xFF6A3D, TANTRUM_R, 0.35);
+  if (!player.down && !player.fall && cine.state === 'idle' && Math.hypot(e.pos.x - player.pos.x, e.pos.z - player.pos.z) < TANTRUM_R) hurtPlayer(1, e);
+  hurtRemotesNear(e.pos, TANTRUM_R, 1);
+  rockfall(e, n % 2 ? 2 : 1);
+}
+// its dummy flies out when it gets upset
+function spitDummy(e) {
+  const c = new THREE.Group(); for (const ch of e.paci.children) { const m = new THREE.Mesh(ch.geometry, ch.material); m.position.copy(ch.position); m.rotation.copy(ch.rotation); c.add(m); }
+  e.paci.getWorldPosition(c.position); c.scale.setScalar(e.scale); c.rotation.y = e.yaw; scene.add(c);
+  const v = new THREE.Vector3(Math.sin(e.yaw) * 2.6, 3.2, Math.cos(e.yaw) * 2.6); let t = 0; SFX.pop();
+  addFx(sdt => {
+    t += sdt; v.y -= 14 * sdt; c.position.addScaledVector(v, sdt); c.rotation.x += sdt * 9;
+    if (c.position.y < 0.08) { c.position.y = 0.08; v.y = Math.abs(v.y) * 0.4; v.x *= 0.6; v.z *= 0.6; }
+    if (t > 1.6) { scene.remove(c); return false; } return true;
+  });
+}
+// the baby's body language, on top of the usual walk: tantrums, sitting down hard, the rattle overhead
+function babyPose(e, sdt) {
+  if (e.sitT > 0) e.sitT = Math.max(0, e.sitT - sdt);
+  const tan = !!(e.tantrum || e.tanNet), sit = e.sitT > 0;
+  e.sitK = (e.sitK || 0) + ((sit ? 1 : 0) - (e.sitK || 0)) * (1 - Math.exp(-(sit ? 14 : 4) * sdt));
+  const k = e.sitK;
+  e.body.position.y -= k * e.sitDrop; e.body.rotation.x -= k * 0.3;
+  if (tan) { e.body.position.y += Math.abs(Math.sin(T * 9.2)) * 0.12; e.body.rotation.z += Math.sin(T * 9.2) * 0.12; }
+  for (const l of e.legs) l.p.rotation.x = tan ? Math.sin(T * 9.2 + l.ph) * 0.55 : l.p.rotation.x * (1 - k) - k * (1.45 + Math.sin(T * 9 + l.ph) * 0.2); // stomps, or kicks its legs sat down
+  for (const a of e.arms) a.p.rotation.x = tan ? Math.sin(T * 16 + a.sd * 1.6) * 1.3 - 1.2 : k > 0.1 ? -1.9 * k + Math.sin(T * 11 + a.sd) * 0.25 : a.sd > 0 && e.atk > 0 ? -2.4 : a.sd > 0 && e.lungeT > 0 ? -0.5 : Math.sin(e.walk + a.sd) * 0.25;
+  const paciOn = !tan && !sit;
+  if (e.paci.visible && !paciOn) { e.paci.visible = false; spitDummy(e); } else if (!e.paci.visible && paciOn && k < 0.05) e.paci.visible = true;
+  if (tan && !e.tanRing) { const r = meshOf(GEO.ring, slamMat); r.rotation.x = -Math.PI / 2; r.scale.setScalar(TANTRUM_R); const fill = meshOf(GEO.disc, slamFillMat); fill.position.z = -0.002; r.add(fill); scene.add(r); e.tanRing = r; }
+  else if (!tan && e.tanRing) { scene.remove(e.tanRing); e.tanRing = null; }
+  if (e.tanRing) e.tanRing.position.set(e.pos.x, 0.05, e.pos.z);
 }
 
 /* ================= the Mimicshroom fight: a field of mushrooms, one of them the Lurker's lure, and a bug in every wrong one ================= */
@@ -4782,7 +4890,7 @@ function updateCoins(sdt) {
 // anything still lying around when a run resets just goes away, instead of following you into the next run
 function clearLoose() { pickups.forEach(p => { scene.remove(p.g); disposeTree(p.g); }); pickups.length = 0; coins.forEach(c => scene.remove(c.g)); coins.length = 0; }
 
-/* ================= traps: pitfalls, spike floors, dart turrets ================= */
+/* ================= traps: pitfalls, spike floors, orb turrets ================= */
 const TILE_XS = [-5, -3, -1, 1, 3, 5], TILE_ZS = [-6, -4, -2, 0, 2, 4, 6];
 // floor tiles for a trap, kept off the lanes in from each door and away from pillars
 function trapTiles(r, n, th, spread) {
@@ -4812,7 +4920,11 @@ function safeSpot() {
   }
   return { x: 0, z: 0 };
 }
-const dartGeo = new THREE.ConeGeometry(0.035, 0.32, 5); dartGeo.userData.shared = true;
+// turret shots: slow glowing red orbs, easy to see coming and step out of the way of
+const ORB_SPEED = 3.6, ORB_R = 0.15;
+const orbGeo = new THREE.IcosahedronGeometry(ORB_R, 1); orbGeo.userData.shared = true;
+const orbMat = new THREE.MeshBasicMaterial({ color: 0xFF4A2A }); orbMat.userData.shared = true;
+const orbHaloMat = new THREE.MeshBasicMaterial({ color: 0xFF2010, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }); orbHaloMat.userData.shared = true;
 let pitFx = [], spikeSet = null, turrets = [];
 const darts = [];
 function buildTraps(r) {
@@ -4880,19 +4992,20 @@ function updateTraps(sdt) {
       tu.head.rotation.y = tu.rest + dy; tu.head.rotation.x = -Math.atan2(to.y, Math.hypot(to.x, to.z));
       if (tu.cd <= 0) {
         tu.cd = rand(2.4, 3.4);
-        const dir = new THREE.Vector3(0, 0, 1).applyEuler(tu.head.rotation), m = meshOf(dartGeo, M(0x3A3A44));
-        const pos = tu.pos.clone().addScaledVector(dir, 0.5); m.position.copy(pos); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); scene.add(m);
-        darts.push({ m, pos, vel: dir.multiplyScalar(10), t: 0 }); SFX.thwip();
+        const dir = new THREE.Vector3(0, 0, 1).applyEuler(tu.head.rotation), m = meshOf(orbGeo, orbMat), halo = meshOf(orbGeo, orbHaloMat);
+        halo.scale.setScalar(1.8); m.add(halo);
+        const pos = tu.pos.clone().addScaledVector(dir, 0.5); m.position.copy(pos); scene.add(m);
+        darts.push({ m, halo, pos, vel: dir.multiplyScalar(ORB_SPEED), t: 0 }); SFX.thwip(); burst(pos, 0xFF4A2A, 5, 1.5, 0.3, 0.05, 6);
       }
     } else tu.eyeMat.emissiveIntensity = 0.3;
   }
   for (let i = darts.length - 1; i >= 0; i--) {
-    const d = darts[i]; d.t += sdt; d.pos.addScaledVector(d.vel, sdt); d.m.position.copy(d.pos);
-    let gone = d.t > 3 || Math.abs(d.pos.x) > W - 0.15 || Math.abs(d.pos.z) > D - 0.15 || d.pos.y < 0.05;
+    const d = darts[i]; d.t += sdt; d.pos.addScaledVector(d.vel, sdt); d.m.position.copy(d.pos); d.halo.scale.setScalar(1.7 + Math.sin(d.t * 14) * 0.25);
+    let gone = d.t > 7 || Math.abs(d.pos.x) > W - 0.15 || Math.abs(d.pos.z) > D - 0.15 || d.pos.y < 0.05;
     if (!gone) for (const c of colliders) if (d.pos.y < c.h && Math.hypot(d.pos.x - c.x, d.pos.z - c.z) < c.r) { gone = true; break; }
-    if (!gone && !player.fall && Math.hypot(d.pos.x - player.pos.x, d.pos.z - player.pos.z) < 0.42 && d.pos.y > player.y + 0.1 && d.pos.y < player.y + 1.9) { gone = true; if (cine.state === 'idle') hurtPlayer(1, d.pos); }
-    if (!gone && !netGuest()) for (const e of alive()) if (d.pos.distanceTo(centerOf(e)) < e.r * e.scale + 0.12) { gone = true; damage(e, 1, 'DARTED', d.pos); break; } // darts don't care who they hit
-    if (gone) { scene.remove(d.m); darts.splice(i, 1); burst(d.pos, 0x8A8A96, 4, 1.5, 0.3, 0.04, 6); }
+    if (!gone && !player.fall && Math.hypot(d.pos.x - player.pos.x, d.pos.z - player.pos.z) < 0.42 + ORB_R && d.pos.y > player.y + 0.1 && d.pos.y < player.y + 1.9) { gone = true; if (cine.state === 'idle') hurtPlayer(1, d.pos); }
+    if (!gone && !netGuest()) for (const e of alive()) if (d.pos.distanceTo(centerOf(e)) < e.r * e.scale + ORB_R) { gone = true; damage(e, 1, 'ZAPPED', d.pos); break; } /* orbs don't care who they hit */
+    if (gone) { scene.remove(d.m); darts.splice(i, 1); burst(d.pos, 0xFF4A2A, 8, 2, 0.35, 0.05, 6); }
   }
 }
 
@@ -5472,7 +5585,7 @@ function updatePickups(sdt) {
     if (camMode === 'fp' && cine.state === 'idle' && p.t > 0.6 && Math.hypot(p.pos.x - player.pos.x, p.pos.z - player.pos.z) < 1.2) {
       scene.remove(p.g); disposeTree(p.g); pickups.splice(i, 1);
       gather(p.kind, p.origin); SFX.pop();
-      renderSatchel(); renderInv(); if (menuOpen) renderMenu();
+      renderSatchel(); renderInv();
     }
   }
 }
@@ -5500,7 +5613,7 @@ function completeInteract(t) {
     const wp = new THREE.Vector3(); cap.getWorldPosition(wp);
     burst(wp, ING[t.h.kind].color, 12, 3, 0.7, 0.07, 6); SFX.pop();
     gather(t.h.kind, t.h.origin);
-    renderSatchel(); renderInv(); if (menuOpen) renderMenu();
+    renderSatchel(); renderInv();
   } else if (t.type === 'chest') openChest();
   else if (t.type === 'buy') buy(t.sl);
   else if (t.type === 'xbrick') pressX();
@@ -5534,7 +5647,7 @@ function openChest() {
     }
     if (t > (prize ? 1.5 : 0.7)) {
       fxLight.intensity = 0;
-      if (prize) { scene.remove(display.g); disposeTree(display.g); giveItem(prize); renderMenu(); }
+      if (prize) { scene.remove(display.g); disposeTree(display.g); giveItem(prize); }
       else if (!room.hoard) {
         const got = [pick(DEFAULT_RECIPE), pick(['doom', 'glowcap', 'frost'])];
         for (const k of got) satchel.push(newItem(k, SHOP_ORIGIN[k]));
@@ -6483,10 +6596,10 @@ const guide = (() => {
     ['beetle', 'In the Lurker\'s patch from floor 2. The stem shatters, the cap splits and it hops clear. It leaps at you from across the room, so step out from under it.'],
     ['mantis', 'In the Lurker\'s patch from floor 3. The stem keeps rising, then it unfolds. Slow, but it swats from further away than you\'d think.'],
     ['lampcap', 'In the Lurker\'s patch from floor 4. It was upside down the whole time. It hovers and weaves, then dives at you. A direct hit puts it on the floor.'],
-    ['chief', 'Guards the stairs on floor 1. Deeper down it learns to throw rocks, lose its temper, charge and shake the floor. When a red lane lights up, get out of it: if it charges into a wall it knocks itself silly.'],
+    ['chief', 'A very big baby, guarding the stairs from floor 1. When a red lane lights up it is about to charge: step aside, and it runs into the wall and sits down hard, bawling, which is your chance. Its tantrums bring rocks down from the ceiling: get out from under the red rings. Deeper down it throws rocks, loses its temper and shakes the floor.'],
     ['lurker', 'One mushroom in a whole room of them. Hit the real one and it bursts out and chases you, then burrows and reshuffles the lot. Hit a wrong one and a bug comes out. The tell: spots that blink like clockwork, or teeth clenching in the dirt.'],
     ['queen', 'The Gloom Moths\' mother, from floor 2. She puts the torches out, so aim for the glow of her lace. Bonk her when she swoops low. Glowcap drags her out of the air. When she cocoons herself to heal, break it open: fire burns it fast.'],
-    ['king', 'Waits at the bottom of floor 5, and turns up early from floor 3. Bigger and tougher than the Chief, with a quake, a charge and a temper of its own.'],
+    ['king', 'Waits at the bottom of floor 5, and turns up early from floor 3. Bigger and tougher than the Big Baby, with a quake, a charge and a temper of its own.'],
   ];
   const WEAK = { doom: 'FIRE HURTS IT MORE', horn: 'SPARKS HURT IT MORE' };
   function beastPage(type, blurb) {
@@ -6926,6 +7039,7 @@ const NET_ON = {
     if (d.k === 'field') { if (Array.isArray(d.s)) fieldSync(d.s, Array.isArray(d.pop) ? d.pop : null); return; }
     const f = new THREE.Vector3(...d.f.map(Number)), t = new THREE.Vector3(...d.t.map(Number));
     if (d.k === 'quake') quakeAt(f.x, f.z, Math.min(2, Math.max(0, t.x)), true);
+    else if (d.k === 'crock') ceilingRock(f.x, f.z, Math.min(2, Math.max(0, t.x)), true);
     else if (d.k === 'lane') { const lane = chargeLane(f, t.normalize()); setTimeout(() => scene.remove(lane), 800); }
     else launchGoo(f, t, true, d.k === 'rock' ? 'rock' : d.k === 'silk' ? 'silk' : 'goo', !!d.w);
   },
@@ -6960,7 +7074,7 @@ function netQ(e) { let q = net.hitQ.get(e.netId); if (!q) net.hitQ.set(e.netId, 
 function pupDie(e) {
   e.dead = true; e.hp = 0; const a = rand(0, Math.PI * 2);
   e.vel = new THREE.Vector3(Math.cos(a) * 4, rand(5, 7), Math.sin(a) * 4); e.spin = rand(-10, 10); e.deadT = 2.6;
-  e.label.remove(); endSlam(e); net.deadIds.add(e.netId);
+  e.label.remove(); endSlam(e); endTantrum(e); net.deadIds.add(e.netId);
   if (e.T.decoy) { e.deadT = 0.01; puff(centerOf(e), 0xE8D8FF, 10, 1, 0.5, 1, 0.16, 0.6); }
   if (e.T.queen) darkGoal = 0;
 }
@@ -7001,6 +7115,7 @@ function netPre(rdt) {
       if (slam && !e.slam) startSlam(e); else if (!slam && e.slam) endSlam(e);
       if (Array.isArray(mk) && e.T.mimic) mkFromNet(e, mk);
       else if (Array.isArray(mk) && e.T.queen) queenFromNet(e, mk);
+      else if (Array.isArray(mk) && e.T.baby) { e.sitT = mk[0] ? Math.max(e.sitT || 0, 0.3) : 0; e.tanNet = !!mk[1]; }
     }
     for (const [id, e] of net.pups) if (!seen.has(id) && !e.dead) pupDie(e);
   }
@@ -7082,7 +7197,7 @@ function netFrame(rdt) {
     if (net.snapT <= 0) {
       net.snapT = 0.125;
       const list = enemies.filter(e => !e.dead).slice(0, 24).map(e => [e.id, e.type, +e.pos.x.toFixed(2), +e.pos.y.toFixed(2), +e.pos.z.toFixed(2), +e.yaw.toFixed(2), e.hp, e.maxHp,
-        NBITS.reduce((b, k, i) => b | (e[k] > 0 ? 1 << i : 0), 0) | (e.glass ? 128 : 0) | (e.shrunk ? 256 : 0), e.atk > 0 ? 1 : 0, e.slam ? 1 : 0, e.T.mimic ? [e.kind === 'glow' ? 1 : 0, MK_PH[e.ph] || 0, +(e.lt || 0).toFixed(2), e.open > 0.5 ? 1 : 0] : e.T.queen || e.T.decoy ? queenNet(e) : 0]);
+        NBITS.reduce((b, k, i) => b | (e[k] > 0 ? 1 << i : 0), 0) | (e.glass ? 128 : 0) | (e.shrunk ? 256 : 0), e.atk > 0 ? 1 : 0, e.slam ? 1 : 0, e.T.mimic ? [e.kind === 'glow' ? 1 : 0, MK_PH[e.ph] || 0, +(e.lt || 0).toFixed(2), e.open > 0.5 ? 1 : 0] : e.T.queen || e.T.decoy ? queenNet(e) : e.T.baby ? [e.sitT > 0 ? 1 : 0, e.tantrum ? 1 : 0] : 0]);
       netEmit('snap', { rk: rkOf(room), fl: floorNum, e: list });
     }
     const meDown = player.down || player.hp <= 0, rs = [...net.remotes.values()];
@@ -7120,6 +7235,7 @@ function enemyLook(e, sdt, moving) {
   if (e.wings) { for (const w of e.wings) w.p.rotation.z = w.sd * (0.75 + (e.frozen > 0 ? 0 : Math.sin(T * 18 + e.id) * 0.55)); /* a V, so you see them face-on */ e.fly.position.y = 1.35 + Math.sin(T * 3 + e.id) * 0.12 - (e.lungeT > 0 ? Math.sin(e.lungeT / 0.3 * Math.PI) * 0.55 : 0); }
   e.stars.visible = e.stun > 0; if (e.stun > 0) e.stars.children.forEach((s, i) => { const a = T * 5 + i * 2.1; s.position.set(Math.cos(a) * 0.35, Math.sin(T * 7 + i) * 0.05, Math.sin(a) * 0.35); s.rotation.y += sdt * 6; });
   e.shadow.visible = true; e.shadow.position.set(e.pos.x, 0.015, e.pos.z); e.shadow.scale.setScalar(e.r * e.scale * 1.1 / (1 + e.pos.y * 0.5));
+  if (e.T.baby && e.arms) babyPose(e, sdt);
 }
 
 /* ================= loop ================= */
@@ -7222,6 +7338,7 @@ function frame(now) {
     if (room.pits && !e.T.flying && !e.T.boss && (e.kbv ? e.pos.y < 2.2 : e.lev <= 0 && e.pos.y <= 0.001) && pitAt(e.pos.x, e.pos.z, 0.55)) { e.inPit = true; e.lev = 0; e.fallV = 0; e.atk = 0; e.kbv = null; endSlam(e); continue; } // shoved over a hole, there's no floor to land on
     if (e.T.mimic && mimicStep(e, sdt)) continue;
     if (e.charge) { const owned = bossCharge(e, sdt); if (e.dead) continue; if (owned) continue; }
+    if (e.tantrum && babyTantrum(e, sdt)) continue;
     let moving = false;
     const tg = netTarget(e), tp = tg.pos;
     const pd = Math.hypot(e.pos.x - tp.x, e.pos.z - tp.z), reach = e.T.reach;
@@ -7238,9 +7355,10 @@ function frame(now) {
     if (!grounded) { e.atk = 0; endSlam(e); }
     else if (e.atk > 0) { e.atk -= sdt; if (e.atk <= 0) { e.atk = 0; e.lungeT = 0.3; e.cd = e.T.cooldown * bossCd(e); if (canHit) { if (e.slam) slamHit(e); else if (e.T.ranged) spitGoo(e, 0, tp); else if (pd < reach + 0.6) { if (tg.local) hurtPlayer(e.T.dmg, e); else netHurt(tg, e.T.dmg, e.pos); } } endSlam(e); } }
     else if (canHit && e.cd <= 0 && pd < reach + (e.T.ranged ? 2.5 : e.T.boss ? 1.2 : 0)) {
-      if (e.T.boss && !e.T.mimic && (e.swings = (e.swings || 0) + 1) % 3 === 0) startSlam(e); else e.atk = e.T.windup;
+      if (e.T.boss && !e.T.mimic && (e.swings = (e.swings || 0) + 1) % 3 === 0) { if (e.T.baby) startTantrum(e); else startSlam(e); } else e.atk = e.T.windup;
     }
     else if (canHit && e.cd <= 0 && e.moves && e.moves.has('charge') && pd > 3.4 && pd < 12 && Math.random() < sdt * 0.9) startCharge(e, tp); // learned moves, for when you keep your distance
+    else if (canHit && e.cd <= 0 && e.T.baby && pd > reach + 1.2 && Math.random() < sdt * 0.3) startTantrum(e); // it doesn't need you close to bring the ceiling down
     else if (canHit && e.cd <= 0 && e.moves && e.moves.has('toss') && pd > reach + 2.2 && Math.random() < sdt * 1.4) { throwRock(e, tp); e.cd = e.T.cooldown * bossCd(e); }
     else if (canHit && e.cd <= 0 && e.T.king && pd > reach + 2) { [-1.8, 0, 1.8].forEach((l, i) => setTimeout(() => { if (!e.dead) spitGoo(e, l, tp); }, i * 140)); e.cd = 3.4 * bossCd(e); } // keep your distance and it lobs a spread
     if (e.moves && e.moves.has('enrage') && !e.enraged && e.hp <= e.maxHp * 0.35) enrage(e); // low on health, it gets faster and meaner
