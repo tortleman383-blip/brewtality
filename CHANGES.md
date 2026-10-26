@@ -19,6 +19,19 @@ Brewtality also has a Roblox version that copies this game exactly, and it reads
 
 ---
 
+### 2026-10-26 · Charged bonks, contact damage, spikes, and rancid on pickup
+- **The bonk charges.** Tap for a jab: 1 damage, and it no longer dazes or shoves, so it can't interrupt an attack. Hold 1 s for a heavy bonk: 2 damage, dazes and shoves (bosses take the damage but aren't interrupted). Hold 2 s for a BIG BONK: 4 damage, a big shove that can slam them into a wall, and it staggers bosses too. You walk at 55% speed while winding up; the crosshair ring fills white, then orange at heavy, then flashes red at full; the ladle hauls back over your shoulder and trembles when it's full. A click sounds at heavy and a ding at full. The "every third bonk in a row is a BIG BONK" rule is gone.
+- **Walking into a creature hurts** (1 heart, and you bounce off). Dazed, frozen and floating creatures are safe to touch. Enemies walking up to you don't count, only you walking into them.
+- **Spiky creatures:** the Stumpling (pale thorns round its back and sides) and the Tin Knight (spiked pauldrons and a spike on its shield). Bonking one with anything less than a full charge pricks you for 1 heart. The first prick in a run shows a tip.
+- **Spoilage is a roll, not a timer.** Doom shrooms, glowcaps, frost and cyclops eyes picked up in the dungeon (scraped, or dropped by a creature) come up rancid 1 time in 5. Nothing goes off while you carry it any more. Feathers, bog water, horns, iron, shop buys, fountain water and your starting shelf are always fresh. The pot screen's freshness bars are gone.
+- **Preserving Salt** halves the rancid chance (was: ingredients keep twice as long). **Fermenting Jar** doubles it and still makes rancid extras hit everyone. With both, it's back to 1 in 5.
+- **The chalked controls on the first room's floor are gone** (the guide book covers them). Floor decor in that room is no longer kept clear of where the chalk was.
+- The guide's controls, scraping, Stumpling and Tin Knight pages, its SPIKY tag, the shop tags for the salt and jar, and the out-of-brew tip are updated to match.
+- Numbers: jab / heavy / big damage 1 / 2 / 4 (was 1, and 2 on every third); hold for heavy 1.0 s, for big 2.0 s; daze none / 0.6 s / 1.1 s (bosses: none / none / 0.6 s; heavy creatures ×0.6); shove none / 3.5 / 7 (bosses ×0.25, heavy ×0.6); cooldown after a jab 0.55 s, after a heavy or big 0.4 s (was 0.48 s); walk speed while charging ×0.55; contact damage 1, reach your body + creature radius + 0.85, only while you're moving toward it (within 60°); spike prick 1; rancid chance 0.2 (salt ×0.5, jar ×2). Removed: ING `life` (80/65/45/70 s), the starting eye's 30 s head start.
+- Code: `bonkDown`/`bonkUp`/`bonkTick`/`bonkTier` replace `bonk`; `bonkLand(tier)`; `BONK_HEAVY`, `BONK_FULL`; `vmState.charge`; the `#power` ring; `CONTACT_DMG` and the contact check in the player movement block; `spike()`, `TYPES.stump.spiky`, `TYPES.knight.spiky`, `buildStump`, `buildKnight`; `run.spikeTip`; `RANCID_CHANCE`, `rancidChance`, `gather` (replaces `checkSpoilage`, `lifeOf`, `freshness`); `ING.*.perishable`; `ITEMS.salt`, `ITEMS.jar`; `stockUp`; removed `drawChalk`, `chalkControls` and the start room's chalk keep-clear check in `buildRoom`; input handlers for V, right mouse and the touch BONK button (hold and release).
+
+---
+
 ### 2026-10-26 · A guide book on the title screen
 - A red spellbook sits in the bottom-right corner of the title screen. It bobs, a crack of its cover breathes open on its own, and it falls open with its first page glowing when you point at it. Click it to read the guide.
 - The guide is a parchment two-page spread (one page at a time on a phone) with four chapters on tabs: Controls (keyboard or touch, depending on the device), Brewing (scraping, the pot, all eight ingredients, and the combos you've found so far), Creatures (one page per creature and boss) and Co-op.

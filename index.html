@@ -329,9 +329,6 @@
   .item:focus-visible{outline:2px solid var(--volt);outline-offset:2px;border-radius:8px}
   .item.lifting .art{opacity:.3}
   .item .cnt{position:absolute;top:0;right:8px;font:400 14px/1.3 var(--display);background:#000;padding:0 6px}
-  .item .fb{width:46px;height:3px;background:rgba(255,255,255,.14);overflow:hidden}
-  .item .fb i{display:block;height:100%;background:#9FD86A}
-  .item .fb.low i{background:#E8B04A}
   .item .kn{font:700 10px/1 var(--ui);letter-spacing:.1em;background:var(--rot);color:#000;padding:3px 5px 2px;white-space:nowrap}
   .item.rancid .art{filter:saturate(.4) sepia(.55) hue-rotate(35deg) brightness(.85) drop-shadow(0 0 7px rgba(200,242,90,.55));animation:rotwob 2.2s ease-in-out infinite}
   @keyframes rotwob{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg) translateY(1px)}}
@@ -647,16 +644,16 @@ const ICON = {
 };
 const svg = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 
-// life: seconds of play before a harvested ingredient goes off. Supplies are preserved.
+// perishable: one picked up in the dungeon can come up rancid (RANCID_CHANCE). Supplies never do.
 const ING = {
-  feather: { name: 'Wyvern Feather',     short: 'Feather',     color: 0xF4D35E, css: '#F4D35E', desc: 'Whatever it touches starts floating.', life: Infinity },
-  bog:     { name: 'Bog Water',          short: 'Bog Water',   color: 0x76A86B, css: '#86C27A', desc: 'Soaks everything.', life: Infinity },
-  horn:    { name: 'Storm-bug Horn',     short: 'Storm Horn',  color: 0x8FD3FF, css: '#8FD3FF', desc: 'Calls down a spark. Loves wet things.', life: Infinity },
-  doom:    { name: 'Doom Shroom',        short: 'Doom Shroom', color: 0xE2483B, css: '#FF6A4D', desc: 'Goes bang.', life: 80 },
-  glowcap: { name: 'Glowcap',            short: 'Glowcap',     color: 0x5FF2D6, css: '#5FF2D6', desc: 'Lights them up. Glowing things take +1 from every hit.', life: 65 },
-  eye:     { name: 'Cyclops Eye',        short: 'Cyc. Eye',    color: 0xF2EEE4, css: '#F2EEE4', desc: 'It stares. Whatever it hits stands there dazed.', life: 45 },
-  frost:   { name: 'Frost Lichen',       short: 'Frost',       color: 0xBFE8FF, css: '#BFE8FF', desc: 'Chills them. Freezes anything wet solid.', life: 70 },
-  iron:    { name: 'Iron Filings',       short: 'Iron',        color: 0x9A9AA8, css: '#B0B0C0', desc: 'Drags everything nearby into the splash.', life: Infinity },
+  feather: { name: 'Wyvern Feather',     short: 'Feather',     color: 0xF4D35E, css: '#F4D35E', desc: 'Whatever it touches starts floating.' },
+  bog:     { name: 'Bog Water',          short: 'Bog Water',   color: 0x76A86B, css: '#86C27A', desc: 'Soaks everything.' },
+  horn:    { name: 'Storm-bug Horn',     short: 'Storm Horn',  color: 0x8FD3FF, css: '#8FD3FF', desc: 'Calls down a spark. Loves wet things.' },
+  doom:    { name: 'Doom Shroom',        short: 'Doom Shroom', color: 0xE2483B, css: '#FF6A4D', desc: 'Goes bang.', perishable: true },
+  glowcap: { name: 'Glowcap',            short: 'Glowcap',     color: 0x5FF2D6, css: '#5FF2D6', desc: 'Lights them up. Glowing things take +1 from every hit.', perishable: true },
+  eye:     { name: 'Cyclops Eye',        short: 'Cyc. Eye',    color: 0xF2EEE4, css: '#F2EEE4', desc: 'It stares. Whatever it hits stands there dazed.', perishable: true },
+  frost:   { name: 'Frost Lichen',       short: 'Frost',       color: 0xBFE8FF, css: '#BFE8FF', desc: 'Chills them. Freezes anything wet solid.', perishable: true },
+  iron:    { name: 'Iron Filings',       short: 'Iron',        color: 0x9A9AA8, css: '#B0B0C0', desc: 'Drags everything nearby into the splash.' },
 };
 const KINDS = ['feather', 'bog', 'horn', 'doom', 'glowcap', 'frost', 'eye', 'iron'];
 const ORIGINS = {
@@ -700,8 +697,8 @@ const COMBOS = {
 const ITEMS = {
   bigladle: { name: 'BIGGER LADLE',    tag: 'ONE MORE SLING PER BREW',        color: '#FFB547', price: 12 },
   spoon:    { name: 'COPPER SPOON',    tag: 'SPARKS JUMP TO ONE MORE',        color: '#FF8A4D', price: 12 },
-  salt:     { name: 'PRESERVING SALT', tag: 'INGREDIENTS KEEP TWICE AS LONG', color: '#F2EEE4', price: 10 },
-  jar:      { name: 'FERMENTING JAR',  tag: 'RANCID EXTRAS HIT EVERYONE',     color: '#C8F25A', price: 14 },
+  salt:     { name: 'PRESERVING SALT', tag: 'HALF AS MANY COME UP RANCID',    color: '#F2EEE4', price: 10 },
+  jar:      { name: 'FERMENTING JAR',  tag: 'TWICE THE RANCID · THEIR EXTRAS HIT EVERYONE', color: '#C8F25A', price: 14 },
   bell:     { name: 'ECHO BELL',       tag: 'LAST INGREDIENT GOES OFF TWICE', color: '#FFE14D', price: 14 },
   lucky:    { name: 'LUCKY COIN',      tag: 'MORE COINS DROP',                color: '#FFD23A', price: 10 },
   heart:    { name: 'SPARE HEART',     tag: '+2 MAX HEALTH',                  color: '#FF3B4E', price: 12 },
@@ -721,7 +718,7 @@ if (savedSettings.sound === false && savedSettings.vol === undefined) settings.v
 delete settings.sound; delete settings.reel;
 const FINAL_FLOOR = 5; // the Cyclops King waits at the bottom of floor 5; after that it's endless
 const newUse = () => ({ feather: 0, bog: 0, horn: 0, doom: 0, glowcap: 0, eye: 0, boil: 0 });
-const run = { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false, queenTip: false, cocTip: false };
+const run = { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false, queenTip: false, cocTip: false, spikeTip: false };
 
 /* ================= audio (all synthesised) ================= */
 let AC = null, master = null, noiseBuf = null;
@@ -1068,41 +1065,6 @@ function buildChest(open) {
   if (open) lid.rotation.x = -1.9;
   return { g, lid };
 }
-// TBOI-style: the controls are chalked on the floor of the very first room
-const chalkCv = document.createElement('canvas'); let chalkTex = null;
-function drawChalk() {
-  const c = chalkCv, x = c.getContext('2d'); c.width = 1024; c.height = 512; x.clearRect(0, 0, 1024, 512);
-  x.strokeStyle = x.fillStyle = 'rgba(236,232,222,.92)'; x.lineWidth = 5; x.lineJoin = x.lineCap = 'round'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  const wob = () => (Math.random() - 0.5) * 3;
-  const box = (cx, cy, w, h) => { for (let k = 0; k < 2; k++) { x.beginPath(); x.moveTo(cx - w / 2 + wob(), cy - h / 2 + wob()); x.lineTo(cx + w / 2 + wob(), cy - h / 2 + wob()); x.lineTo(cx + w / 2 + wob(), cy + h / 2 + wob()); x.lineTo(cx - w / 2 + wob(), cy + h / 2 + wob()); x.closePath(); x.stroke(); } };
-  const key = (cx, cy, label, w = 64) => { box(cx, cy, w, 64); x.font = '700 34px "Barlow Condensed", "Arial Narrow", sans-serif'; x.fillText(label, cx, cy + 2); };
-  const word = (cx, cy, t) => { x.font = '400 40px Anton, Impact, sans-serif'; x.fillText(t, cx, cy); };
-  key(140, 90, 'W'); key(70, 160, 'A'); key(140, 160, 'S'); key(210, 160, 'D'); word(140, 240, 'MOVE');
-  x.beginPath(); x.ellipse(420, 140, 46, 66, 0, 0, Math.PI * 2); x.stroke(); // a mouse, left button filled in
-  x.beginPath(); x.moveTo(374, 128); x.lineTo(466, 128); x.moveTo(420, 74); x.lineTo(420, 128); x.stroke();
-  x.save(); x.beginPath(); x.ellipse(420, 140, 46, 66, 0, 0, Math.PI * 2); x.clip(); x.globalAlpha = 0.6; x.fillRect(370, 70, 50, 58); x.restore();
-  word(420, 240, 'HOLD · SLING');
-  key(640, 160, 'E'); word(640, 240, 'SCRAPE');
-  key(850, 160, 'TAB', 120); word(850, 240, 'BREW');
-  key(220, 380, 'ESC', 110); word(220, 460, 'PAUSE');
-  key(512, 380, 'Q'); word(512, 460, 'SWAP');
-  x.beginPath(); x.ellipse(790, 380, 34, 48, 0, 0, Math.PI * 2); x.stroke(); // the mouse again, right button filled this time
-  x.beginPath(); x.moveTo(756, 372); x.lineTo(824, 372); x.moveTo(790, 332); x.lineTo(790, 372); x.stroke();
-  x.save(); x.beginPath(); x.ellipse(790, 380, 34, 48, 0, 0, Math.PI * 2); x.clip(); x.globalAlpha = 0.6; x.fillRect(790, 330, 40, 42); x.restore();
-  word(790, 460, 'BONK');
-  x.globalCompositeOperation = 'destination-out'; // chalk is patchy: knock little holes out of everything
-  for (let i = 0; i < 7000; i++) { x.globalAlpha = Math.random() * 0.7; x.fillRect(Math.random() * 1024, Math.random() * 512, 1 + Math.random() * 3, 1 + Math.random() * 2); }
-  x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
-  if (chalkTex) chalkTex.needsUpdate = true;
-}
-function chalkControls() {
-  if (!chalkTex) {
-    drawChalk(); chalkTex = new THREE.CanvasTexture(chalkCv); chalkTex.anisotropy = 4;
-    if (document.fonts) Promise.all([document.fonts.load('40px Anton'), document.fonts.load('700 34px "Barlow Condensed"')]).then(drawChalk).catch(() => {});
-  }
-  const m = meshOf(new THREE.PlaneGeometry(5.6, 2.8), new THREE.MeshBasicMaterial({ map: chalkTex, transparent: true, opacity: 0.7, depthWrite: false }));
-  m.rotation.x = -Math.PI / 2; m.position.set(0, 0.03, 2.4); return m;
-}
 // the underside of a cave's roof at this spot; the flat ceiling anywhere else
 function roofAt(x, z) {
   const R = caveRoof; if (!R) return H;
@@ -1310,7 +1272,7 @@ function buildRoom(r) {
       let x = rand(-W + 1, W - 1), z = rand(-D + 1, D - 1); const sz = rand(0.45, 1.2);
       if (Math.random() < 0.6) { if (Math.random() < 0.5) x = Math.sign(x || 1) * rand(W - 1.4, W - 0.3); else z = Math.sign(z || 1) * rand(D - 1.4, D - 0.3); }
       if ((r.xTile && near([r.xTile], x, z, sz)) || near(r.spikes, x, z, sz) || near(r.pits, x, z, sz) || (r.type === 'stairs' && near([STAIRS], x, z, sz + 0.2))) continue;
-      if ((r.type === 'start' && floorNum === 1 && Math.abs(x) < 3 + sz && Math.abs(z - 2.4) < 1.5 + sz) || waterRects.some(rc => x > rc[0] - sz && x < rc[1] + sz && z > rc[2] - sz && z < rc[3] + sz)) continue;
+      if (waterRects.some(rc => x > rc[0] - sz && x < rc[1] + sz && z > rc[2] - sz && z < rc[3] + sz)) continue;
       addG(lumpP, x, 0.02, z, sz, 0.035, sz * rand(0.55, 1), pick(greens), 0, rand(0, 6.3), 0);
     }
   }
@@ -1703,7 +1665,6 @@ function buildRoom(r) {
   if (candleFl[0].length) { const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(candleFl[0], 3)); cg.setAttribute('color', new THREE.Float32BufferAttribute(candleFl[1], 3)); candleMesh = meshOf(cg, new THREE.MeshBasicMaterial({ vertexColors: true })); grp.add(candleMesh); }
   if (shiny[0].length) { const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(shiny[0], 3)); sg.setAttribute('color', new THREE.Float32BufferAttribute(shiny[1], 3)); sg.computeVertexNormals(); grp.add(meshOf(sg, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0.45, roughness: 0.38, emissive: 0x3A2808 }))); }
   if (glow[0].length) { const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(glow[0], 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(glow[1], 3)); grp.add(meshOf(gg, new THREE.MeshBasicMaterial({ vertexColors: true }))); }
-  if (r.type === 'start' && floorNum === 1 && !coarse) grp.add(chalkControls());
   if (plugStones.length) plug = { dir: r.shopDir, meshes: plugStones };
   if (plugBricks.length) plug = { dir: r.shopDir, meshes: plugBricks.map(b => {
     const [x, z] = wallXZ(r.shopDir, b.along, b.out), ns = r.shopDir === 'N' || r.shopDir === 'S', m = meshOf(GEO.box, M(b.hex));
@@ -1912,7 +1873,7 @@ function setDoors(open, quiet) {
 }
 function teardownRoom() {
   enemies.forEach(e => { endSlam(e); scene.remove(e.root); scene.remove(e.shadow); disposeTree(e.root); e.label.remove(); }); enemies = []; fieldReset(); queenReset();
-  pickups.forEach(p => { scene.remove(p.g); disposeTree(p.g); satchel.push(newItem(p.kind, p.origin)); loot(p.kind); }); pickups.length = 0;
+  pickups.forEach(p => { scene.remove(p.g); disposeTree(p.g); gather(p.kind, p.origin); }); pickups.length = 0;
   drops.forEach(d => scene.remove(d.m)); drops.length = 0; clearGoos();
   if (coins.length) { coins.forEach(c => scene.remove(c.g)); gainCoins(coins.length, true); coins.length = 0; }
   shopSlots.forEach(sl => sl.tag.remove()); shopSlots = []; goblin = null; plug = null;
@@ -1981,7 +1942,7 @@ function buildGun() {
   return { g, fill, tip };
 }
 const gunVM = buildGun(); gunVM.g.position.set(0.24, -0.25, -0.36); gunVM.g.visible = false; vm.add(gunVM.g);
-const vmState = { wind: 0, swing: 0, full: 1, fill: 1, raise: 0, scrape: 0, bonk: 0 };
+const vmState = { wind: 0, swing: 0, full: 1, fill: 1, raise: 0, scrape: 0, bonk: 0, charge: 0 };
 
 /* ================= creatures ================= */
 const EYE_LAYOUT = { 1: [[0, 0.05]], 2: [[-0.36, 0.08], [0.36, 0.08]] };
@@ -2002,9 +1963,9 @@ const TYPES = {
   spitter: { name: 'Spitter', hp: 4, speed: 1.6,  base: 0xB06BE0, core: 0x6A2A9A, emis: 0x3A1060, eyes: 2, reach: 6.5, dmg: 1, windup: 0.9, cooldown: 2.8, hops: true, ranged: true },
   cyclops: { name: 'Cyclops', hp: 6, speed: 1.1,  base: 0xD9A27E, eyes: 1, reach: 2.1, dmg: 1, windup: 0.75, cooldown: 1.9, tall: true, dropsEye: true },
   chief:   { name: 'Cyclops Chief', hp: 12, speed: 0.75, base: 0xB8745A, eyes: 1, boss: true, reach: 2.6, dmg: 1, windup: 1.2, cooldown: 2.6, tall: true, dropsEye: true },
-  stump:   { name: 'Stumpling',  hp: 5, speed: 1.0,  base: 0x6E4A2C, eyes: 2, reach: 1.9, dmg: 1, windup: 0.8, cooldown: 1.8, immune: ['bog', 'boil'], weak: 'doom', immTxt: 'WATER DOES NOTHING' },
+  stump:   { name: 'Stumpling',  spiky: true, hp: 5, speed: 1.0,  base: 0x6E4A2C, eyes: 2, reach: 1.9, dmg: 1, windup: 0.8, cooldown: 1.8, immune: ['bog', 'boil'], weak: 'doom', immTxt: 'WATER DOES NOTHING' },
   moth:    { name: 'Gloom Moth', hp: 3, speed: 2.3,  base: 0x9A86C8, eyes: 2, reach: 1.6, dmg: 1, windup: 0.5, cooldown: 1.6, flying: true, immune: ['feather'], immTxt: 'WIND DOES NOTHING' },
-  knight:  { name: 'Tin Knight', hp: 7, speed: 0.85, base: 0xA8A8B4, eyes: 1, reach: 2.0, dmg: 1, windup: 0.85, cooldown: 2.0, tall: true, heavy: true, metal: true, immune: ['doom'], weak: 'horn', dropsIron: true, immTxt: 'FIRE DOES NOTHING' },
+  knight:  { name: 'Tin Knight', spiky: true, hp: 7, speed: 0.85, base: 0xA8A8B4, eyes: 1, reach: 2.0, dmg: 1, windup: 0.85, cooldown: 2.0, tall: true, heavy: true, metal: true, immune: ['doom'], weak: 'horn', dropsIron: true, immTxt: 'FIRE DOES NOTHING' },
   king:    { name: 'Cyclops King',  hp: 16, speed: 0.8,  base: 0x8E5A9A, eyes: 1, boss: true, king: true, reach: 2.9, dmg: 1, windup: 1.0, cooldown: 2.2, tall: true, dropsEye: true },
 };
 function buildSlime(base = 0x7BE05A, core = 0x3F9A2E, emis = 0x1C4A10) {
@@ -2036,7 +1997,12 @@ function buildCyclops(s = 1.35, crown = false, base = 0xD9A27E) {
   }
   return { root, body, skin, legs, h: hy + hr, r: 0.78 * s / 1.35, baseEmissive: 0x000000, baseOpacity: 1 };
 }
-// wood: a walking stump. Water does nothing; fire catches
+// a spike from `from`, pointing along `dir`: spiky creatures prick a ladle that isn't swung all the way
+function spike(from, dir, len, r, mat) {
+  const d = dir.clone().normalize(), m = meshOf(new THREE.ConeGeometry(r, len, 4), mat);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d); m.position.copy(from).addScaledVector(d, len / 2); return m;
+}
+// wood: a walking stump. Water does nothing; fire catches; thorns all over the bark
 function buildStump(base) {
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
   const skin = new THREE.MeshStandardMaterial({ color: base, flatShading: true, roughness: 0.92, transparent: true, opacity: 1 });
@@ -2046,6 +2012,10 @@ function buildStump(base) {
   for (const [x, z, s] of [[0.22, -0.12, 0.2], [-0.18, 0.1, 0.16], [0.02, 0.2, 0.13]]) body.add(at(meshOf(new THREE.IcosahedronGeometry(s, 0), M(0x4E8A3A)), x, 1.24 + s * 0.4, z));
   for (const sd of [-1, 1]) { const arm = at(meshOf(new THREE.CylinderGeometry(0.05, 0.08, 0.5, 5), skin), sd * 0.52, 0.85, 0); arm.rotation.z = sd * 0.9; body.add(arm); body.add(at(meshOf(new THREE.IcosahedronGeometry(0.1, 0), M(0x5E9A44)), sd * 0.74, 1.04, 0)); }
   addEyes(body, new THREE.Vector3(0, 0.82, 0), 0.5, 2);
+  const thorn = M(0xE6D2A8);
+  for (const [a, y] of [[1.0, 0.45], [1.7, 0.8], [2.4, 0.4], [3.1, 0.75], [-2.4, 0.45], [-1.7, 0.85], [-1.0, 0.4], [0.5, 0.32], [-0.5, 0.3], [2.0, 1.02], [-2.9, 1.0]]) { // round the back and sides, clear of the face
+    const rr = 0.55 - 0.13 * (y - 0.12); body.add(spike(new THREE.Vector3(Math.sin(a) * rr * 0.9, y, Math.cos(a) * rr * 0.9), new THREE.Vector3(Math.sin(a), 0.3, Math.cos(a)), 0.3, 0.05, thorn));
+  }
   const legs = [];
   for (const sd of [-1, 1]) { const pv = new THREE.Group(); pv.position.set(sd * 0.22, 0.2, 0); pv.add(at(meshOf(new THREE.CylinderGeometry(0.09, 0.13, 0.3, 5), skin), 0, -0.1, 0.04)); body.add(pv); legs.push({ p: pv, ph: sd > 0 ? 0 : Math.PI }); }
   return { root, body, skin, legs, h: 1.3, r: 0.56, baseEmissive: 0x000000, baseOpacity: 1 };
@@ -2080,10 +2050,13 @@ function buildKnight(base) {
   body.add(at(meshOf(new THREE.BoxGeometry(0.32, 0.03, 0.02), M(0xFF4A3A, { emissive: 0xC8180A })), 0, 1.82, 0.35));
   const plume = at(meshOf(new THREE.ConeGeometry(0.08, 0.42, 5), M(0xC8282E)), 0, 2.4, -0.05); plume.rotation.x = -0.4; body.add(plume);
   for (const sd of [-1, 1]) body.add(at(meshOf(new THREE.SphereGeometry(0.2, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2), skin), sd * 0.5, 1.42, 0));
+  const steel = M(0xD8D8E0, { metalness: 0.6, roughness: 0.3 });
+  for (const sd of [-1, 1]) for (const [x, y, z, dx, dy, dz] of [[0.5, 1.6, 0, 0.35, 1, 0], [0.64, 1.5, 0.08, 1, 0.45, 0.25], [0.6, 1.5, -0.1, 0.8, 0.5, -0.45]]) body.add(spike(new THREE.Vector3(sd * x, y, z), new THREE.Vector3(sd * dx, dy, dz), 0.3, 0.05, steel)); // spiked pauldrons
   const sword = new THREE.Group(); sword.position.set(0.6, 0.95, 0.15); sword.rotation.x = 0.6; body.add(sword);
   sword.add(at(meshOf(new THREE.BoxGeometry(0.06, 0.8, 0.02), M(0xD8D8E0, { metalness: 0.6, roughness: 0.3 })), 0, 0.45, 0));
   sword.add(at(meshOf(new THREE.BoxGeometry(0.24, 0.04, 0.05), M(0x8A6A2A)), 0, 0.04, 0));
   const shield = at(meshOf(new THREE.CylinderGeometry(0.32, 0.32, 0.05, 10), M(0x3A5A8A)), -0.58, 1.0, 0.18); shield.rotation.set(Math.PI / 2, 0, 0.3); body.add(shield);
+  body.add(spike(new THREE.Vector3(-0.58, 1.0, 0.2), new THREE.Vector3(-0.1, 0, 1), 0.26, 0.06, steel)); // and a spike on the shield boss
   const legs = [];
   for (const sd of [-1, 1]) {
     const pv = new THREE.Group(); pv.position.set(sd * 0.2, 0.6, 0);
@@ -2330,8 +2303,8 @@ let playT = 0, itemSeq = 0, satchel = [], potPending = [], batch = null, cardIte
 let strains = {}, originEff = {};
 { const effs = shuffle(Object.keys(EXTRAS)); ['cyclops', 'drain', 'torch', 'high'].forEach((o, i) => { originEff[o] = effs[i]; }); }
 const newItem = (kind, origin, age = 0) => ({ id: ++itemSeq, kind, origin, born: playT - age, spoiled: false });
-const lifeOf = k => ING[k].life * (has('salt') ? 2 : 1); // preserving salt doubles it
-const freshness = it => it.spoiled ? 0 : ING[it.kind].life === Infinity ? 1 : Math.max(0, 1 - (playT - it.born) / lifeOf(it.kind));
+const RANCID_CHANCE = 0.2; // a perishable picked up in the dungeon comes up rancid this often
+const rancidChance = () => RANCID_CHANCE * (has('salt') ? 0.5 : 1) * (has('jar') ? 2 : 1); // preserving salt halves it, the fermenting jar doubles it
 function strainFor(it) {
   const key = it.kind + ':' + it.origin;
   if (!strains[key]) strains[key] = { key, kind: it.kind, origin: it.origin, pred: ORIGIN_PRED[it.origin] || 'dry', eff: originEff[it.origin] || 'glass', seen: false, solved: false, landed: 0 };
@@ -2356,18 +2329,16 @@ function addSupplies() {
   const k = pick(DEFAULT_RECIPE); satchel.push(newItem(k, 'stock')); loot(k);
   renderSatchel(); renderInv();
 }
-function checkSpoilage() {
-  const turned = [...satchel, ...potPending].filter(it => !it.spoiled && ING[it.kind].life !== Infinity && playT - it.born > lifeOf(it.kind));
-  if (!turned.length) return;
-  turned.forEach(spoil);
-  const n = {}; turned.forEach(it => { n[it.kind] = (n[it.kind] || 0) + 1; });
-  Object.entries(n).forEach(([k, c]) => loot(k, c > 1 ? `RANCID ×${c}` : 'RANCID', 'rot'));
-  renderSatchel(); renderInv(); if (menuOpen) renderMenu();
+// something picked up in the dungeon (scraped, or pulled out of a creature): a perishable might be rancid already
+function gather(kind, origin) {
+  const it = newItem(kind, origin); satchel.push(it);
+  if (ING[kind].perishable && origin !== 'stock' && Math.random() < rancidChance()) { spoil(it); loot(kind, 'RANCID', 'rot'); } else loot(kind);
+  return it;
 }
-// opening shelf: supplies, a doom shroom or two, and a cyclops eye from yesterday that's about to turn.
-// You start with one batch of the classic already brewed.
+// opening shelf: supplies, a doom shroom and a cyclops eye.
+// You start with one batch already brewed.
 function stockUp() {
-  satchel.push(newItem('feather', 'stock'), newItem('bog', 'stock'), newItem('horn', 'stock'), newItem('doom', 'torch'), newItem('eye', 'cyclops', 30));
+  satchel.push(newItem('feather', 'stock'), newItem('bog', 'stock'), newItem('horn', 'stock'), newItem('doom', 'torch'), newItem('eye', 'cyclops'));
   batch = { items: [newItem('doom', 'torch')], fill: 1 };
 }
 stockUp();
@@ -2587,6 +2558,7 @@ function markFound(b) {
 }
 
 /* ================= player + input ================= */
+const CONTACT_DMG = 1; // walking into a creature
 const player = { moving: false, down: false, dance: -1, danceT0: 0, pos: new THREE.Vector3(0, 0, 6), y: 0, vy: 0, fall: null, yaw: 0, pitch: -0.08, bob: 0, hp: 8, maxHp: 8, grace: 0, kb: new THREE.Vector3(), sq: 0, sqK: 0, sqV: 0, slowT: 0 };
 let koOpen = false;
 const keys = new Set();
@@ -2601,7 +2573,7 @@ const orbit = { c: new THREE.Vector3(), a: 0, r: 5, h: 2, spin: 0.25 };
 const setTS = (v, rate = 12) => { if (net.on) v = Math.max(v, 0.8); tsTarget = v; tsRate = rate; if (rate >= 100) ts = v; }; // co-op keeps one clock for everyone, so slow-mo is only a nudge
 const busy = () => menuOpen || reelOn || invOpen || koOpen || player.down || transit || cine.state !== 'idle' || !!blob || !!player.fall;
 
-function useDown() { if (busy() || player.sq > 0) return; audio(); if (tool === 'ladle') { wind.on = true; wind.power = 0; } else startFire(); }
+function useDown() { if (busy() || player.sq > 0 || bonkHold >= 0) return; audio(); if (tool === 'ladle') { wind.on = true; wind.power = 0; } else startFire(); }
 function useUp() { if (tool === 'ladle') { if (!wind.on) return; wind.on = false; if (menuOpen || invOpen || reelOn || koOpen || transit || cine.state !== 'idle' || blob || wind.power <= 0) return; sling(Math.max(0.15, wind.power)); } else stopFire(); }
 // bandolier: flip between the brew in the ladle and the spare
 function swapBrew() {
@@ -2616,15 +2588,29 @@ function swapTool() {
 }
 
 /* ---------- the bonk: a ladle to the head, for when the brew's gone or something just won't care about it ---------- */
-const BONK_REACH = 2.0;
-let bonkCD = 0, bonkChain = 0, bonkChainT = 0, bonkTip = false;
-function bonk() {
-  if (menuOpen || invOpen || koOpen || reelOn || transit || player.down || player.fall || cine.state !== 'idle' || bonkCD > 0 || player.sq > 0) return;
-  audio(); bonkCD = 0.48; wind.on = false; stopFire();
-  vmState.bonk = 1; SFX.whiff();
-  setTimeout(bonkLand, 100); // it lands partway down the swing
+// tap for a jab that interrupts nothing; hold for a heavy bonk that dazes; hold it all the way for a BIG BONK
+const BONK_REACH = 2.0, BONK_HEAVY = 1.0, BONK_FULL = 2.0; // seconds held for each tier
+let bonkCD = 0, bonkTip = false, bonkHold = -1; // seconds the bonk's been held, -1 when it isn't
+const bonkTier = held => held >= BONK_FULL ? 3 : held >= BONK_HEAVY ? 2 : 1;
+function bonkDown() {
+  if (busy() || bonkCD > 0 || player.sq > 0 || bonkHold >= 0) return;
+  audio(); bonkHold = 0; wind.on = false; stopFire();
 }
-function bonkLand() {
+function bonkUp() {
+  if (bonkHold < 0) return;
+  const tier = bonkTier(bonkHold); bonkHold = -1;
+  if (busy() || player.sq > 0) return;
+  bonkCD = tier === 1 ? 0.55 : 0.4; vmState.bonk = 1; SFX.whiff();
+  setTimeout(() => bonkLand(tier), 100); // it lands partway down the swing
+}
+function bonkTick(rdt) { // the wind-up: a click at heavy, a ring at full
+  if (bonkHold < 0) return;
+  if (busy() || player.sq > 0) { bonkHold = -1; return; }
+  const was = bonkHold; bonkHold += rdt;
+  if (was < BONK_HEAVY && bonkHold >= BONK_HEAVY) SFX.tick();
+  if (was < BONK_FULL && bonkHold >= BONK_FULL) { SFX.ding(); shake = Math.max(shake, 0.08); }
+}
+function bonkLand(tier) {
   if (menuOpen && !net.on) return;
   const fx_ = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), hits = [];
   for (const e of alive()) {
@@ -2636,19 +2622,23 @@ function bonkLand() {
   }
   if (!hits.length) { const R = bonkMate(fx_, fz); if (R) { squishMate(R); return; } }
   if (!hits.length) { const s = bonkShroom(fx_, fz); if (s) { SFX.bonk(false); const sp = project(s.c); if (!sp.behind) callout('bonk', 1, { at: true, x: sp.x, y: sp.y }); shroomStruck(s); } return; }
-  bonkChain = bonkChainT > 0 ? bonkChain + 1 : 1; bonkChainT = 1.3;
-  const big = bonkChain >= 3; if (big) bonkChain = 0; // every third bonk in a row is a big one
-  shake = Math.max(shake, big ? 0.3 : 0.16); SFX.bonk(big); dmgSrc = 'ladle';
+  const big = tier === 3, mid = tier === 2;
+  shake = Math.max(shake, big ? 0.35 : mid ? 0.2 : 0.1); SFX.bonk(big); dmgSrc = 'ladle';
+  let pricked = null;
   for (const e of hits.slice(0, 3)) {
     const away = new THREE.Vector3(e.pos.x - player.pos.x, 0, e.pos.z - player.pos.z); if (away.lengthSq() < 0.01) away.set(fx_, 0, fz); away.normalize();
     const heavy = e.T.boss ? 0.25 : e.T.heavy ? 0.6 : 1;
     if (e.T.metal) SFX.clang();
-    e.tiltV -= big ? 22 : 14; e.stun = Math.max(e.stun, (big ? 1.1 : 0.6) * heavy); if (!e.T.boss) e.atk = 0;
-    e.kbv = away.multiplyScalar((big ? 7 : 3.5) * heavy); e.slamOK = big; // a big bonk can put them into a wall
-    const at_ = centerOf(e).add(new THREE.Vector3(0, e.h * 0.35 * e.scale, 0)); burst(at_, 0xFFF4C0, big ? 14 : 8, 3.5, 0.35, 0.06, 4, true);
-    const sp = project(at_); if (!sp.behind) callout(big ? 'BIG BONK' : 'bonk', big ? 2 : 1, { at: true, x: sp.x, y: sp.y });
-    damage(e, big ? 2 : 1, big ? 'BIG BONK' : 'BONKED', player.pos);
+    e.tiltV -= big ? 22 : mid ? 14 : 7;
+    // a jab doesn't shove or daze, so it can't interrupt a swing; a heavy one dazes and shoves (bosses shrug it off); a big one staggers anything
+    if (big) { e.stun = Math.max(e.stun, e.T.boss ? 0.6 : 1.1 * heavy); e.atk = 0; e.kbv = away.multiplyScalar(7 * heavy); e.slamOK = true; } // into a wall, even
+    else if (mid && !e.T.boss) { e.stun = Math.max(e.stun, 0.6 * heavy); e.atk = 0; e.kbv = away.multiplyScalar(3.5 * heavy); e.slamOK = false; }
+    if (e.T.spiky && !big) pricked = e; // only a full swing gets past the spikes
+    const at_ = centerOf(e).add(new THREE.Vector3(0, e.h * 0.35 * e.scale, 0)); burst(at_, 0xFFF4C0, big ? 16 : mid ? 10 : 5, 3.5, 0.35, 0.06, 4, true);
+    const sp = project(at_); if (!sp.behind) callout(big ? 'BIG BONK' : mid ? 'BONK!' : 'bonk', big ? 2 : 1, { at: true, x: sp.x, y: sp.y });
+    damage(e, big ? 4 : mid ? 2 : 1, big ? 'BIG BONK' : 'BONKED', player.pos);
   }
+  if (pricked && cine.state === 'idle') { hurtPlayer(1, pricked); callout('SPIKY!', 1); if (!run.spikeTip) { run.spikeTip = true; setTimeout(() => notice('SPIKY<em>ONLY A FULL BONK GETS PAST THE SPIKES</em>'), 700); } }
 }
 // a partner standing right in front of you, when there's nothing else to hit
 function bonkMate(fx_, fz) {
@@ -2672,16 +2662,16 @@ function squishMe() {
   if (player.down || player.fall || player.sq > 0) return;
   player.sq = 2; wind.on = false; stopFire(); SFX.squish(); shake = Math.max(shake, 0.25); callout('SQUISHED', 2);
 }
-function bonkHint() { if (bonkTip) return; bonkTip = true; setTimeout(() => notice(`BONK IT INSTEAD${coarse ? '' : '<kbd>RIGHT-CLICK</kbd>'}`), 900); }
+function bonkHint() { if (bonkTip) return; bonkTip = true; setTimeout(() => notice(`BONK IT INSTEAD${coarse ? '' : '<kbd>RIGHT-CLICK</kbd>'}<em>HOLD IT FOR A BIGGER ONE</em>`), 900); }
 
 const lookK = () => 0.35 + settings.look * 0.13; // look speed 5 is the old feel
 canvas.addEventListener('mousedown', e => {
   if (reelOn) { skipReel(); return; }
-  if (e.button === 2 && !menuOpen && !invOpen) { bonk(); return; }
+  if (e.button === 2 && !menuOpen && !invOpen) { bonkDown(); return; }
   if (locked && e.button === 0) useDown();
   else if (!locked && !menuOpen && !invOpen && e.button === 0) relock(); // lost the mouse somehow: a click takes it back
 });
-addEventListener('mouseup', e => { if (e.button === 0 && locked) useUp(); });
+addEventListener('mouseup', e => { if (e.button === 0 && locked) useUp(); if (e.button === 2) bonkUp(); });
 addEventListener('mousemove', e => { if (!locked || menuOpen || camMode !== 'fp' || reelOn) return; const k = 0.0022 * lookK(); player.yaw -= e.movementX * k; player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch - e.movementY * k)); });
 // touch: a finger on the left side becomes a joystick wherever it lands; drag anywhere else to look (also used when pointer lock isn't available)
 let drag = null, joy = null; const JOY_R = 56;
@@ -2716,7 +2706,8 @@ const holdBtn = (el, down, up) => {
 holdBtn($('#slingBtn'), useDown, useUp);
 holdBtn($('#actBtn'), () => { interactHeld = true; }, () => { interactHeld = false; });
 $('#swapBtn').addEventListener('click', swapTool);
-$('#bonkBtn').addEventListener('pointerdown', e => { e.preventDefault(); bonk(); });
+$('#bonkBtn').addEventListener('pointerdown', e => { e.preventDefault(); bonkDown(); });
+for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) $('#bonkBtn').addEventListener(ev, bonkUp);
 $('#hagBtn').addEventListener('click', () => { if (inter.cur && inter.cur.type === 'buy') haggle(inter.cur.sl); });
 const NAV = { arrowup: 'up', w: 'up', arrowdown: 'down', s: 'down', arrowleft: 'left', a: 'left', arrowright: 'right', d: 'right', enter: 'ok', ' ': 'ok', escape: 'back', backspace: 'back' };
 addEventListener('keydown', e => {
@@ -2737,15 +2728,15 @@ addEventListener('keydown', e => {
   if (k === ' ') { e.preventDefault(); if (!e.repeat) useDown(); }
   if (k === 'e') interactHeld = true;
   if (k === 'q' && !e.repeat) swapTool();
-  if (k === 'v' && !e.repeat) bonk();
+  if (k === 'v' && !e.repeat) bonkDown();
   if (lab.on && !e.repeat && k.length === 1 && k >= '0' && k <= '9') { if (k === '0') labSpawn(); else labTrigger(+k - 1); }
   if (k === 'g' && !e.repeat && net.on && !player.down) emote();
   if (k === 'r' && !e.repeat) swapBrew();
   if (k === 'f' && !e.repeat && inter.cur && inter.cur.type === 'buy') haggle(inter.cur.sl);
   if ((k === 'escape' || k === 'p') && !e.repeat && performance.now() - lastUnlock > 500) openMenu();
 });
-addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === ' ') useUp(); if (k === 'e') interactHeld = false; });
-addEventListener('blur', () => { keys.clear(); interactHeld = false; });
+addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === ' ') useUp(); if (k === 'v') bonkUp(); if (k === 'e') interactHeld = false; });
+addEventListener('blur', () => { keys.clear(); interactHeld = false; bonkHold = -1; });
 
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
@@ -2979,13 +2970,11 @@ function renderInv() {
   const shelf = (title, list, cls = '') => {
     const items = groupsOf(list).map(([k, grp]) => {
       const it = grp.reduce((a, b) => a.born < b.born ? a : b), I = ING[it.kind], sx = it.spoiled ? strainFor(it) : null;
-      const fresh = !it.spoiled && I.life !== Infinity ? freshness(it) : null;
       // what you know about a rancid one: its extra once you've seen it, and who it hits once you've seen it twice
       const kn = sx ? (sx.seen ? `${EXTRAS[sx.eff].short} · ${sx.solved ? PREDS[sx.pred].short : '?'}` : '???') : '';
       return `<button type="button" class="item ${it.spoiled ? 'rancid' : ''}" data-grp="${k}" id="it-${k.replace(/[^a-z0-9]/gi, '-')}" style="--c:${I.css}" aria-label="${I.name}${it.spoiled ? ', rancid' : ''}, ${grp.length} on the shelf">`
         + `<span class="art">${ART[it.kind]}</span>${it.spoiled ? '<i class="stink"></i><i class="flies"><b></b><b></b><b></b></i>' : ''}`
         + `<b class="cnt">${grp.length}</b>`
-        + (fresh !== null ? `<span class="fb ${fresh < 0.3 ? 'low' : ''}"><i style="width:${Math.round(fresh * 100)}%"></i></span>` : '')
         + (kn ? `<span class="kn">${kn}</span>` : '')
         + `<span class="tip"><b>${I.name.toUpperCase()}</b><span>${I.desc}</span>${it.spoiled ? `<span class="smell">“${ORIGINS[it.origin].smell}”</span>` : ''}</span></button>`;
     }).join('');
@@ -5482,7 +5471,7 @@ function updatePickups(sdt) {
     p.g.rotation.y += sdt * 1.5; p.g.rotation.x = Math.sin(playT * 2) * 0.3; if (p.g.userData.tick) p.g.userData.tick(playT + i, sdt);
     if (camMode === 'fp' && cine.state === 'idle' && p.t > 0.6 && Math.hypot(p.pos.x - player.pos.x, p.pos.z - player.pos.z) < 1.2) {
       scene.remove(p.g); disposeTree(p.g); pickups.splice(i, 1);
-      satchel.push(newItem(p.kind, p.origin)); SFX.pop(); loot(p.kind);
+      gather(p.kind, p.origin); SFX.pop();
       renderSatchel(); renderInv(); if (menuOpen) renderMenu();
     }
   }
@@ -5510,7 +5499,7 @@ function completeInteract(t) {
     room.caps[t.h.idx]--; const cap = t.h.caps[room.caps[t.h.idx]]; cap.visible = false;
     const wp = new THREE.Vector3(); cap.getWorldPosition(wp);
     burst(wp, ING[t.h.kind].color, 12, 3, 0.7, 0.07, 6); SFX.pop();
-    satchel.push(newItem(t.h.kind, t.h.origin)); loot(t.h.kind);
+    gather(t.h.kind, t.h.origin);
     renderSatchel(); renderInv(); if (menuOpen) renderMenu();
   } else if (t.type === 'chest') openChest();
   else if (t.type === 'buy') buy(t.sl);
@@ -5859,7 +5848,7 @@ function knockedOut(final) {
 }
 function resetRun() {
   clearLoose(); satchel = []; potPending = []; strains = {}; seenTraits.clear(); reserve = null;
-  Object.assign(run, { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false, queenTip: false, cocTip: false });
+  Object.assign(run, { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false, queenTip: false, cocTip: false, spikeTip: false });
   player.maxHp = 8; $('#coinNum').textContent = '0';
   { const effs = shuffle(Object.keys(EXTRAS)); ['cyclops', 'drain', 'torch', 'high'].forEach((o, i) => { originEff[o] = effs[i]; }); }
   stockUp(); hasGun = false; tool = 'ladle'; score = 0; shownScore = 0; $('#scoreNum').textContent = '0';
@@ -6487,9 +6476,9 @@ const guide = (() => {
     ['slime', 'Hops at you and bites. Three good hits and it pops, so it\'s the one to practise your aim on.'],
     ['spitter', 'Hangs back and lobs purple goo across the room. Keep moving, and close the gap between shots.'],
     ['cyclops', 'Slow, with a heavy club. When it goes down it drops its eye: sling an eye at something and it stands there dazed.'],
-    ['stump', 'Water does nothing to it, but wood burns: a doom shroom hits it harder and sets it alight. Lean on water and the dungeon sends more of these.'],
+    ['stump', 'Water does nothing to it, but wood burns: a doom shroom hits it harder and sets it alight. Covered in thorns, so only a BIG BONK is safe. Lean on water and the dungeon sends more of these.'],
     ['moth', 'Quick, and always in the air. Wind does nothing to it. Lean on feathers and more of them turn up.'],
-    ['knight', 'Fire does nothing and it won\'t budge, but metal carries a spark: storm horns hit it harder. It drops iron filings.'],
+    ['knight', 'Fire does nothing and it won\'t budge, but metal carries a spark: storm horns hit it harder. Spiked armour: anything less than a BIG BONK pricks you. It drops iron filings.'],
     ['skitter', 'Hides under a wrong mushroom in the Lurker\'s patch, from floor 1. Small and quick: it claws its way out and scuttles straight at you.'],
     ['beetle', 'In the Lurker\'s patch from floor 2. The stem shatters, the cap splits and it hops clear. It leaps at you from across the room, so step out from under it.'],
     ['mantis', 'In the Lurker\'s patch from floor 3. The stem keeps rising, then it unfolds. Slow, but it swats from further away than you\'d think.'],
@@ -6504,12 +6493,12 @@ const guide = (() => {
     const T = TYPES[type], met = !!seen[type], pic = PICS[type];
     const img = pic ? `<img class="gpic${met ? '' : ' dark'}" src="${met ? pic.lit : pic.dark}" alt="">` : '<div class="gpic"></div>';
     if (!met) return `${img}<h3>???</h3><p class="gnote">${T.boss ? 'A boss' : 'A creature'} you haven't met yet. Keep going down and it'll fill in.</p>`;
-    const tags = [T.boss && `<span class="boss">${T.king ? 'FINAL BOSS' : 'BOSS'}</span>`, T.immTxt && `<span class="imm">${T.immTxt}</span>`, T.weak && `<span class="weak">${WEAK[T.weak]}</span>`, T.flying && '<span>FLIES</span>', T.dropsEye && '<span>DROPS AN EYE</span>', T.dropsIron && '<span>DROPS IRON</span>'].filter(Boolean);
+    const tags = [T.boss && `<span class="boss">${T.king ? 'FINAL BOSS' : 'BOSS'}</span>`, T.immTxt && `<span class="imm">${T.immTxt}</span>`, T.weak && `<span class="weak">${WEAK[T.weak]}</span>`, T.spiky && '<span class="weak">SPIKY</span>', T.flying && '<span>FLIES</span>', T.dropsEye && '<span>DROPS AN EYE</span>', T.dropsIron && '<span>DROPS IRON</span>'].filter(Boolean);
     return `${img}<h3>${T.name.toUpperCase()}</h3>${tags.length ? `<div class="gtags">${tags.join('')}</div>` : ''}<p>${blurb}</p>`;
   }
   const keyRows = () => coarse
-    ? [['Walk', 'Drag on the left side'], ['Look', 'Drag on the right side'], ['Sling', 'Hold <b>SLING</b>, let go to throw'], ['Bonk', 'Tap <b>BONK</b>'], ['Scrape', 'Hold <b>SCRAPE</b>'], ['Brew', 'The pot button'], ['Swap', 'Tap <b>SWAP</b>']]
-    : [['Move', k('W') + k('A') + k('S') + k('D')], ['Look', 'The mouse. Click to grab it'], ['Sling', 'Hold left mouse, let go to throw'], ['Bonk', 'Right-click or ' + k('V')], ['Scrape', 'Hold ' + k('E')], ['Brew', k('TAB')], ['Ladle / water gun', k('Q')], ['Swap brews', k('R') + ' with the bandolier'], ['Emote', k('G') + ' in co-op'], ['Pause', k('ESC')]];
+    ? [['Walk', 'Drag on the left side'], ['Look', 'Drag on the right side'], ['Sling', 'Hold <b>SLING</b>, let go to throw'], ['Bonk', 'Tap <b>BONK</b>, or hold it to wind up'], ['Scrape', 'Hold <b>SCRAPE</b>'], ['Brew', 'The pot button'], ['Swap', 'Tap <b>SWAP</b>']]
+    : [['Move', k('W') + k('A') + k('S') + k('D')], ['Look', 'The mouse. Click to grab it'], ['Sling', 'Hold left mouse, let go to throw'], ['Bonk', 'Right-click or ' + k('V') + '. Hold to wind up'], ['Scrape', 'Hold ' + k('E')], ['Brew', k('TAB')], ['Ladle / water gun', k('Q')], ['Swap brews', k('R') + ' with the bandolier'], ['Emote', k('G') + ' in co-op'], ['Pause', k('ESC')]];
   function pages() {
     const P = [];
     const add = (ch, html) => P.push({ ch, html });
@@ -6517,14 +6506,13 @@ const guide = (() => {
       <p>You brew potions, sling them with a ladle, and bonk whatever's still standing.</p>
       <p>Get down five floors. The <b>Cyclops King</b> waits at the bottom of the fifth, and after that it's endless.</p>
       <p>Doors stay shut until a room is clear. Each floor's stairs have a boss in front of them.</p>
-      <p>Your hearts are at the top of the screen. Lose them all and you're knocked out.</p>
+      <p>Your hearts are at the top of the screen. Lose them all and you're knocked out. Don't walk into things: that hurts too.</p>
       <div class="gicons">${ic('ladle', '#FFB547')}${ic('boil', '#86C27A')}${ic('eye', '#F2EEE4')}</div>`);
     add(0, `<h3>CONTROLS</h3><div class="gkeys">${keyRows().map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('')}</div>
-      ${coarse ? '' : '<p class="gnote">On a touchscreen: drag on the left to walk, on the right to look, and use the buttons.</p>'}
-      <p class="gnote">Out of brew? The bonk always works.</p>`);
+      <p class="gnote">Out of brew? The bonk always works. A tap is a jab; hold it a second for a bonk that dazes, two for a BIG BONK.</p>`);
     add(1, `<h3>SCRAPE</h3>
       <p>Ingredients grow round the dungeon: by the torches, by the drains, and up high on the walls. Walk up and hold ${coarse ? '<b>SCRAPE</b>' : k('E')} to scrape them off. A cyclops drops its eye when it goes down.</p>
-      <p>Fresh things don't last. Shrooms, glowcaps, frost and eyes go off after a while. Feathers, bog water, horns and iron keep forever.</p>
+      <p>Shrooms, glowcaps, frost and eyes sometimes come up <b>rancid</b>: about one in five. Feathers, bog water, horns, iron and anything you buy are always fresh.</p>
       <p>A rancid one still works, with a nasty extra on top. Where it grew decides who the extra picks on.</p>`);
     add(1, `<h3>BREW</h3>
       <p>Press ${coarse ? 'the pot button' : k('TAB')} to open your pot and drop ingredients in. Wherever the ladle lands, they go off <b>in the order you put them in</b>.</p>
@@ -7136,7 +7124,7 @@ function enemyLook(e, sdt, moving) {
 
 /* ================= loop ================= */
 const fpQuat = new THREE.Quaternion(), tmpV = new THREE.Vector3(), bossBar = $('#bossbar'), bossFill = $('#bossFill');
-let last = performance.now(), T = 0, spoilCheck = 0, dripT = 0;
+let last = performance.now(), T = 0, dripT = 0;
 function frame(now) {
   const rdt = Math.min(0.05, (now - last) / 1000); last = now; T += rdt;
   pollPad(rdt);
@@ -7145,7 +7133,6 @@ function frame(now) {
   const sdt = paused ? 0 : rdt * ts;
   playT += sdt; player.grace = Math.max(0, player.grace - sdt);
   if (!paused && camMode !== 'title') run.time += rdt;
-  spoilCheck -= rdt; if (spoilCheck <= 0 && !paused) { spoilCheck = 0.5; checkSpoilage(); }
 
   // player
   if (!paused && camMode === 'fp' && player.fall) updateFall(rdt);
@@ -7158,7 +7145,12 @@ function frame(now) {
     if (keys.has('a') || keys.has('arrowleft')) mv.sub(r);
     if (joy) { const jx = joy.dx / JOY_R, jy = joy.dy / JOY_R; if (Math.hypot(jx, jy) > 0.15) mv.addScaledVector(f, -jy).addScaledVector(r, jx); } // the stick is analog: a small push walks slowly
     player.moving = mv.lengthSq() > 0 && !player.down; if (player.moving && player.dance >= 0) player.dance = -1;
-    if (player.moving) { const amt = Math.min(1, mv.length()) * (player.sq > 0 ? 0.4 : 1) * (player.slowT > 0 ? 0.5 : 1); mv.normalize().multiplyScalar(4.5 * rdt * amt); player.pos.add(mv); player.bob += rdt * 10 * amt; }
+    if (player.moving) { const amt = Math.min(1, mv.length()) * (player.sq > 0 ? 0.4 : 1) * (player.slowT > 0 ? 0.5 : 1) * (bonkHold >= 0 ? 0.55 : 1); mv.normalize().multiplyScalar(4.5 * rdt * amt); player.pos.add(mv); player.bob += rdt * 10 * amt; }
+    if (player.moving && player.grace <= 0 && cine.state === 'idle') for (const e of enemies) { // walk into one and it hurts; dazed, frozen or floating ones are safe to touch
+      if (e.dead || e.hidden || e.T.decoy || e.stun > 0 || e.frozen > 0 || e.lev > 0 || e.pos.y > 1) continue;
+      const dx = e.pos.x - player.pos.x, dz = e.pos.z - player.pos.z, d = Math.hypot(dx, dz);
+      if (d < e.r * e.scale + 0.85 && (dx * mv.x + dz * mv.z) / ((d * mv.length()) || 1) > 0.5) { hurtPlayer(CONTACT_DMG, e); break; }
+    }
     if (player.kb.lengthSq() > 0.01) { player.pos.addScaledVector(player.kb, rdt); player.kb.multiplyScalar(Math.exp(-9 * rdt)); }
     for (const c of colliders) { const dx = player.pos.x - c.x, dz = player.pos.z - c.z, d = Math.hypot(dx, dz), rr = c.r + 0.4; if (d < rr && d > 0.001) { player.pos.x = c.x + dx / d * rr; player.pos.z = c.z + dz / d * rr; } }
     if (!transit) doorClamp();
@@ -7166,7 +7158,7 @@ function frame(now) {
   }
   if (player.sq > 0 && (player.sq -= rdt) <= 0) { player.sq = 0; SFX.boing(); }
   player.sqV += (((player.sq > 0 ? 1 : 0) - player.sqK) * 260 - player.sqV * 16) * rdt; player.sqK += player.sqV * rdt; // a spring, so popping back up overshoots
-  bonkCD = Math.max(0, bonkCD - rdt); bonkChainT = Math.max(0, bonkChainT - rdt); vmState.bonk = Math.max(0, vmState.bonk - rdt * 3.4);
+  bonkCD = Math.max(0, bonkCD - rdt); bonkTick(rdt); vmState.bonk = Math.max(0, vmState.bonk - rdt * 3.4);
   if (scoopT > 0) { scoopT = Math.max(0, scoopT - rdt); vmState.raise = Math.max(vmState.raise, scoopT / 0.65); }
   if (wind.on && scoopT <= 0) wind.power = Math.min(1, wind.power + rdt / 0.75);
 
@@ -7345,6 +7337,9 @@ function frame(now) {
   const bp = 1 - vmState.bonk, bUp = vmState.bonk > 0 && bp < 0.22 ? bp / 0.22 : 0, bChop = vmState.bonk > 0 && bp >= 0.22 ? Math.sin((bp - 0.22) / 0.78 * Math.PI) : 0;
   ladleInner.rotation.x += bUp * 0.9 - bChop * 0.6; ladle.rotation.y = bChop * 0.55; ladle.rotation.z += -bUp * 0.25 + bChop * 0.5; // the bowl sweeps across the middle, so you see it connect
   ladle.position.x -= bChop * 0.12; ladle.position.y += bUp * 0.06 - bChop * 0.02; ladle.position.z -= bChop * 0.08;
+  vmState.charge += ((bonkHold >= 0 ? Math.min(1, bonkHold / BONK_FULL) : 0) - vmState.charge) * (1 - Math.exp(-14 * rdt)); // winding up a bonk: hauled back over the shoulder, trembling once it's full
+  const ck = vmState.charge, trem = ck >= 0.99 ? Math.sin(T * 60) * 0.02 : 0;
+  ladleInner.rotation.x += ck * 0.7 + trem; ladle.rotation.z += ck * 0.3; ladle.position.x += ck * 0.05 + trem; ladle.position.y += ck * 0.04;
   ladleBrew.scale.setScalar(Math.max(0.001, vmState.fill)); ladleBrew.visible = vmState.fill > 0.02;
   for (const b of ladleBubbles) {
     const k = (T * (brewItems().length ? 1.2 : 2.2) + b.ph) % 1; if (k < b.last) { b.x = rand(-0.045, 0.045); b.z = rand(-0.035, 0.035); } b.last = k;
@@ -7389,7 +7384,9 @@ function frame(now) {
   if (boss) { if (bossBar.hidden) { bossBar.hidden = false; $('#bossName').textContent = boss.T.name.toUpperCase(); } bossFill.style.width = (100 * boss.hp / boss.maxHp).toFixed(1) + '%'; }
   else if (!bossBar.hidden) bossBar.hidden = true;
   const ma = document.getElementById('mapArrow'); if (ma) ma.style.transform = `translate(-50%,-50%) rotate(${(-player.yaw * 180 / Math.PI).toFixed(1)}deg)`;
-  $('#power').setAttribute('stroke-dasharray', `${(wind.on ? wind.power : 0) * 138} 140`);
+  const bk = bonkHold >= 0 ? Math.min(1, bonkHold / BONK_FULL) : 0, pw = $('#power');
+  pw.setAttribute('stroke-dasharray', `${(bk > 0 ? bk : wind.on ? wind.power : 0) * 138} 140`);
+  pw.setAttribute('stroke', bk >= 1 ? (Math.sin(T * 24) > 0 ? '#FF3B30' : '#FFE14D') : bk >= BONK_HEAVY / BONK_FULL ? '#FF8A2A' : bk > 0 ? '#FFFFFF' : '#FFE14D');
   const pg = document.getElementById('pgFill'); if (pg && batch) { shownFill += (batch.fill - shownFill) * Math.min(1, rdt * 9); pg.setAttribute('y', (14 + 20 * (1 - shownFill)).toFixed(2)); } // the pot gauge sloshes down
   if (shownScore !== score) { shownScore += Math.ceil((score - shownScore) * Math.min(1, rdt * 8)); if (Math.abs(score - shownScore) < 2) shownScore = score; $('#scoreNum').textContent = shownScore.toLocaleString(); }
 

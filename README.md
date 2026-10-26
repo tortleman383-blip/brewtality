@@ -12,7 +12,7 @@ A first-person dungeon crawler where you brew potions and fling them at things w
 |---|---|
 | Move | WASD |
 | Sling the brew | Hold left mouse, release to throw |
-| Bonk | Right-click or V |
+| Bonk | Right-click or V. Tap for a jab; hold 1 second for a bonk that dazes, 2 seconds for a BIG BONK |
 | Scrape ingredients | E (hold) |
 | Brew | Tab |
 | Swap ladle / water gun | Q |
@@ -21,6 +21,10 @@ A first-person dungeon crawler where you brew potions and fling them at things w
 | Pause | Esc |
 
 **Touchscreen:** put a finger down anywhere on the left side and drag to walk; drag on the right to look. The on-screen buttons sling, bonk, scrape and swap.
+
+**Fighting:** walking into a creature hurts, so keep your distance and let the ladle do the touching. Stumplings and Tin Knights are spiky: only a full-charge BIG BONK is safe on them.
+
+**Rancid ingredients:** shrooms, glowcaps, frost and eyes sometimes come up rancid when you pick them up (about one in five). They still work, with a random nasty extra on top.
 
 **Guide:** click the red book in the bottom-right corner of the title screen. It covers the controls, brewing, every creature (pages fill in as you meet them) and co-op.
 
