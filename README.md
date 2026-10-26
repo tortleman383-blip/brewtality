@@ -22,6 +22,8 @@ A first-person dungeon crawler where you brew potions and fling them at things w
 
 **Touchscreen:** put a finger down anywhere on the left side and drag to walk; drag on the right to look. The on-screen buttons sling, bonk, scrape and swap.
 
+**Guide:** click the red book in the bottom-right corner of the title screen. It covers the controls, brewing, every creature (pages fill in as you meet them) and co-op.
+
 ## Bosses
 
 Each floor's stairs are guarded by a boss picked at random, and bosses learn new moves the deeper you find them. The whole floor dresses for whoever's waiting at the bottom: the Lurker's floors are overgrown cells and dripping grottos, and you fight it in a cave.

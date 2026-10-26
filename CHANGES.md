@@ -19,6 +19,16 @@ Brewtality also has a Roblox version that copies this game exactly, and it reads
 
 ---
 
+### 2026-10-26 · A guide book on the title screen
+- A red spellbook sits in the bottom-right corner of the title screen. It bobs, a crack of its cover breathes open on its own, and it falls open with its first page glowing when you point at it. Click it to read the guide.
+- The guide is a parchment two-page spread (one page at a time on a phone) with four chapters on tabs: Controls (keyboard or touch, depending on the device), Brewing (scraping, the pot, all eight ingredients, and the combos you've found so far), Creatures (one page per creature and boss) and Co-op.
+- Creature pages fill in as you meet things: until then they show the creature as an ink silhouette marked "???". Each page has a picture of the creature, what it shrugs off or is weak to, and how to deal with it.
+- Turn pages with the arrow keys, the dog-eared corners, or the chapter tabs. Esc closes it.
+- Numbers: book 150px in the corner (112px on a phone); cover opens 2.15 rad on hover; spread up to 900px wide and 62% of the screen tall; 22 pages (2 controls, 4 brewing, 14 creatures, 2 co-op).
+- Saves: creatures you've met are kept between runs (`slingcam.seen`). A creature counts as met once it's out in the open in front of you during a run, or when a boss's intro banner plays. The test lab and the title screen don't count.
+- Code: new `guide` section (the book, the creature pictures, the pages, `SCREENS.guide`), `buildModel` (pulled out of `spawnEnemy` so the guide can build a creature on its own), `seen` and `meetCreature` in data, `bossIntro`, the enemy-label pass in the loop, `uiNav`.
+- Roblox note: the creature pictures are taken from the real models; a viewport frame per page would do the same job.
+
 ### 2026-10-26 · Patch notes
 - This file, linked from the README.
 - Web only: CHANGES.md, CLAUDE.md and tools/dev (a debug build for testing); the game itself is unchanged.

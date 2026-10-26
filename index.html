@@ -391,6 +391,64 @@
     #ui.scr-brewer .navhint{right:auto;left:clamp(18px,7vw,96px)}
   }
 
+  /* the guide: a spellbook in the title screen's corner, and the parchment spread it opens to */
+  #bookBtn{position:absolute;right:clamp(8px,2.5vw,36px);bottom:clamp(8px,3vh,34px);z-index:12;display:flex;flex-direction:column;align-items:center;gap:0;width:150px;padding:0;border:0;background:none;cursor:pointer;opacity:0;pointer-events:none;-webkit-tap-highlight-color:transparent}
+  #bookBtn.on{pointer-events:auto}
+  #bookBtn canvas{display:block;width:150px;height:150px}
+  #bookBtn span{margin-top:-14px;background:#000;color:var(--yell);font:400 17px/1 var(--display);letter-spacing:.12em;padding:7px 14px 6px;transform:skewX(-10deg);transition:background .15s,color .15s}
+  #bookBtn:hover span,#bookBtn:focus-visible span{background:var(--yell);color:#000}
+  #bookBtn:focus-visible{outline:none}
+  @media (max-width:759px){#bookBtn{width:112px}#bookBtn canvas{width:112px;height:112px}#bookBtn span{font-size:15px}}
+  #ui.scr-guide{justify-content:center;background:radial-gradient(ellipse at 50% 45%,rgba(20,12,8,.82),rgba(0,0,0,.94) 75%)}
+  #ui.scr-guide .ui-in{align-items:center;gap:14px;padding:3vh 0 52px;margin:auto}
+  #ui.scr-guide .mlist{min-width:min(360px,100%)}
+  #ui.scr-guide .mi{font-size:clamp(22px,2.6vw,32px)}
+  #ui.scr-guide .navhint{left:50%;transform:translateX(-50%);bottom:14px}
+  .gbook{width:min(900px,94vw)}
+  .gtabs{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-bottom:10px}
+  .gtab{font:700 13px/1 var(--ui);letter-spacing:.2em;padding:8px 14px 7px;border:0;background:#2A1A14;color:#C8A880;cursor:pointer;transform:skewX(-12deg)}
+  .gtab:hover{color:#fff} .gtab.on{background:var(--yell);color:#000}
+  .gspread{display:grid;grid-template-columns:1fr 1fr;height:min(520px,62vh);padding:12px;box-sizing:border-box;background:linear-gradient(135deg,#7A2E22,#4E1A14);border-radius:8px;box-shadow:0 0 0 3px #2A0E0A,0 0 0 5px #C89A3A,0 18px 40px rgba(0,0,0,.6);perspective:1400px}
+  .gspread.v1{grid-template-columns:1fr;height:min(560px,64vh)}
+  .gpage{position:relative;overflow:auto;padding:22px 26px 38px;box-sizing:border-box;background:linear-gradient(180deg,#F3E7CC,#E6D4AE);color:#3A2618;font:500 15px/1.42 var(--body);user-select:text;-webkit-user-select:text;scrollbar-width:thin}
+  .gpage.l{border-radius:4px 0 0 4px;box-shadow:inset -22px 0 26px -18px rgba(70,35,10,.6)}
+  .gpage.r{border-radius:0 4px 4px 0;box-shadow:inset 22px 0 26px -18px rgba(70,35,10,.6)}
+  .gpage.l.r{border-radius:4px;box-shadow:none}
+  .gpage.flipF{animation:gflipF .32s cubic-bezier(.2,.9,.3,1)} .gpage.flipB{animation:gflipB .32s cubic-bezier(.2,.9,.3,1)}
+  @keyframes gflipF{from{transform:rotateY(-16deg) translateX(18px);opacity:0}}
+  @keyframes gflipB{from{transform:rotateY(16deg) translateX(-18px);opacity:0}}
+  .gpage h3{margin:0 0 12px;font:400 30px/1 var(--display);letter-spacing:.03em;color:#2A160C}
+  .gpage h3 small{font:700 14px var(--ui);letter-spacing:.16em;color:#8A6A48;margin-left:8px;vertical-align:middle}
+  .gpage p{margin:0 0 10px} .gpage b{color:#1E0E06}
+  .gpage ol{margin:0 0 10px;padding-left:22px} .gpage li{margin-bottom:5px}
+  .gpage .gnote{font-style:italic;color:#6A4A30}
+  .gpage kbd{display:inline-block;min-width:1em;text-align:center;margin-right:3px;font:700 12px/1 var(--ui);letter-spacing:.08em;background:#2A1A14;color:#F3E7CC;padding:4px 6px 3px;border-radius:3px;box-shadow:0 2px 0 #000}
+  .gpage .pn{position:absolute;bottom:14px;left:64px;font:700 12px var(--ui);letter-spacing:.2em;color:#9A7A58}
+  .gpage.r .pn{left:auto;right:64px} .gpage.l.r .pn{left:50%;right:auto;transform:translateX(-50%)}
+  .gturn{position:absolute;bottom:0;width:46px;height:46px;border:0;padding:0;cursor:pointer;background:linear-gradient(135deg,transparent 50%,#C9B286 50%,#F8EED8 100%);filter:drop-shadow(-2px -2px 2px rgba(60,30,10,.35));transition:width .15s,height .15s}
+  .gturn:hover{width:58px;height:58px}
+  .gpage.l .gturn{left:0;transform:scaleX(-1)} .gpage.r .gturn{right:0}
+  .gpage.l.r .gturn[data-d="-1"]{left:0;right:auto;transform:scaleX(-1)} .gpage.l.r .gturn[data-d="1"]{right:0;left:auto;transform:none}
+  .gkeys{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:center;margin-bottom:12px}
+  .gkeys > span:nth-child(odd){font:700 13px var(--ui);letter-spacing:.14em;text-transform:uppercase;color:#6A4A30}
+  .gi{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#2A1A14;flex:none}
+  .gi svg{width:20px;height:20px}
+  .gicons{display:flex;gap:10px;margin-top:14px}
+  .gings{display:grid;grid-template-columns:30px 1fr;gap:7px 12px;align-items:center;font-size:13.5px;line-height:1.3}
+  .gings b{display:block;font:400 17px/1.05 var(--display);letter-spacing:.03em}
+  .gcombos{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;align-items:center;margin-bottom:10px}
+  .gcombos .chain{display:flex;align-items:center;gap:3px}
+  .gcombos .chain .gi{width:24px;height:24px} .gcombos .chain .gi svg{width:15px;height:15px}
+  .gcombos .chain i{font:400 14px var(--display);font-style:normal;color:#9A7A58}
+  .gcombos .q{width:24px;height:24px;border-radius:50%;border:2px dashed #B09670;box-sizing:border-box}
+  .gcombos b{font:400 18px/1 var(--display);letter-spacing:.04em;color:#2A160C} .gcombos b.lock{color:#B09670}
+  .gpic{display:block;width:min(100%,230px);aspect-ratio:1;margin:0 auto 6px;background:radial-gradient(circle at 50% 55%,rgba(255,246,220,.95),rgba(255,246,220,0) 66%)}
+  .gpic.dark{opacity:.8;filter:blur(.4px)}
+  .gspread.v2 .gpic{width:min(100%,220px,26vh)}
+  .gtags{display:flex;flex-wrap:wrap;gap:5px;margin:-4px 0 10px}
+  .gtags span{font:700 11px/1 var(--ui);letter-spacing:.14em;padding:5px 8px 4px;background:#2A1A14;color:#F3E7CC}
+  .gtags .boss{background:#8A1E2E} .gtags .imm{background:#3A5A7A} .gtags .weak{background:#B5562E}
+
   /* co-op: the lobby list and the partner tags over their heads */
   .coop{display:flex;flex-direction:column;gap:6px;min-width:min(440px,82vw)}
   .crow{display:flex;align-items:center;gap:12px;background:#000;padding:9px 14px 8px;border-left:4px solid var(--yell)}
@@ -655,6 +713,8 @@ const has = id => run.items.has(id);
 const DEFAULT_RECIPE = ['feather', 'bog', 'horn'];
 const GAMERTAG = 'xX_LadleLord_Xx';
 let found = store.get('slingcam.found', {}) || {};
+let seen = store.get('slingcam.seen', {}) || {}; // creatures you've laid eyes on in a run, for the guide's creature pages
+function meetCreature(type) { if (seen[type] || !TYPES[type] || TYPES[type].decoy) return; seen[type] = 1; store.set('slingcam.seen', seen); }
 const savedSettings = store.get('slingcam.settings', {}) || {};
 let settings = Object.assign({ cine: 'always', vol: 8, look: 5, shake: true }, savedSettings);
 if (savedSettings.sound === false && savedSettings.vol === undefined) settings.vol = 0; // older saves had a plain on/off
@@ -2038,8 +2098,13 @@ const starGeo = new THREE.TetrahedronGeometry(0.07, 0), starMat = new THREE.Mesh
 shadowGeo.userData.shared = shadowMat.userData.shared = starGeo.userData.shared = starMat.userData.shared = true;
 let enemies = [], eidSeq = 0;
 let adaptedNow = null;
+// a creature's model on its own, with nothing attached yet: spawnEnemy dresses it, the guide takes its picture
+function buildModel(type, kind = 'doom') {
+  const T = TYPES[type];
+  return T.queen || T.decoy ? buildQueen(!!T.decoy) : T.mimic ? MK_BUILD[type](kind) : T.hops ? buildSlime(T.base, T.core, T.emis) : type === 'king' ? buildCyclops(2.35, true, T.base) : type === 'chief' ? buildCyclops(1.9, true, T.base) : type === 'stump' ? buildStump(T.base) : type === 'moth' ? buildMoth(T.base) : type === 'knight' ? buildKnight(T.base) : buildCyclops();
+}
 function spawnEnemy(type, x, z, opt = {}) {
-  const T = TYPES[type], m = T.queen || T.decoy ? buildQueen(!!T.decoy) : T.mimic ? MK_BUILD[type](opt.kind || 'doom') : T.hops ? buildSlime(T.base, T.core, T.emis) : type === 'king' ? buildCyclops(2.35, true, T.base) : type === 'chief' ? buildCyclops(1.9, true, T.base) : type === 'stump' ? buildStump(T.base) : type === 'moth' ? buildMoth(T.base) : type === 'knight' ? buildKnight(T.base) : buildCyclops();
+  const T = TYPES[type], m = buildModel(type, opt.kind);
   const hpS = Math.round(T.hp * (1 + 0.3 * (floorNum - 1))); // +30% health per floor down
   const e = {
     id: ++eidSeq, type, T, ...m, hp: hpS, maxHp: hpS, pos: new THREE.Vector3(x, 7, z), fallV: 0,
@@ -2809,6 +2874,7 @@ function uiNav(a) {
   if (!ui.screen) return;
   const n = ui.items.length;
   if (a === 'up' || a === 'down') { ui.idx = (ui.idx + (a === 'up' ? n - 1 : 1)) % n; placeCursor(); SFX.tick(); }
+  else if (ui.screen === 'guide' && (a === 'left' || a === 'right')) guide.turn(a === 'left' ? -1 : 1); // the arrows turn the pages wherever the cursor is
   else if (a === 'left' || a === 'right') { const it = ui.items[ui.idx]; if (it && it.adjust) { audio(); it.adjust(a === 'left' ? -1 : 1); saveSettings(); refreshItem(ui.idx); SFX.tick(); } }
   else if (a === 'ok') uiActivate(ui.idx);
   else if (a === 'back') uiBack();
@@ -3546,7 +3612,7 @@ function bossIntro(r) {
   if (!sub && known.length) sub = !run.bossMet.has(type) ? 'KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : learned.length ? 'LEARNED ' + learned.map(k => MOVE_NAME[k]).join(' · ') : '';
   if (type === 'queen' && !run.bossMet.has(type)) sub = 'SHE PUTS THE LIGHTS OUT' + (known.length ? ' · KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : '');
   if (type === 'lurker' && !run.bossMet.has(type)) sub = 'FIND THE REAL ONE' + (known.length ? ' · KNOWS ' + known.map(k => MOVE_NAME[k]).join(' · ') : '');
-  run.bossMet.add(type);
+  run.bossMet.add(type); if (!lab.on) meetCreature(type);
   banner(r.king ? 'THE ' + name : name, sub, 'boss');
 }
 // charge: it plants its feet, a red lane lights up the floor, then it barrels down it; hit a wall and it knocks itself silly
@@ -6307,6 +6373,213 @@ const brewer = (() => {
   };
 })();
 
+/* ================= the guide: a spellbook in the title screen's corner, and the pages inside ================= */
+const guide = (() => {
+  /* ---------- the book: its own little canvas, so it's there on a phone too, where the brewer isn't ---------- */
+  const btn = document.createElement('button'); btn.id = 'bookBtn'; btn.type = 'button'; btn.setAttribute('aria-label', 'Open the guide');
+  btn.innerHTML = '<canvas aria-hidden="true"></canvas><span>GUIDE</span>';
+  stage.insertBefore(btn, $('#reel'));
+  const cv = btn.querySelector('canvas');
+  let R = null, w = 0, h = 0, shown = 0, hover = 0, hov = false, t = 0, on = false;
+  const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+  const scn = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.1, 30);
+  cam.position.set(0, 0.3, 4.3); cam.lookAt(0, 0.02, 0);
+  scn.add(new THREE.HemisphereLight(0xB8A8E0, 0x2A1E16, 0.6));
+  const key = new THREE.DirectionalLight(0xFFE2B8, 0.95); key.position.set(2, 4, 5); scn.add(key);
+  const glow = new THREE.PointLight(0xFFE14D, 0, 3.5); glow.position.set(0.2, 0.1, 0.9); scn.add(glow);
+  const mat = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: c, flatShading: true, roughness: 0.8 }, o));
+  const leather = mat(0x7A2E22, { roughness: 0.9 }), gilt = mat(0xFFD23A, { metalness: 0.6, roughness: 0.35, emissive: 0x3A2A04 });
+  const paper = mat(0xEADBB8, { roughness: 1, emissive: 0xFFE14D, emissiveIntensity: 0 }), gemMat = mat(0x8FF25A, { emissive: 0x4AA82A, emissiveIntensity: 0.9, roughness: 0.3 });
+  const box = (x, y, z, m) => new THREE.Mesh(new THREE.BoxGeometry(x, y, z), m);
+  const BW = 1, BH = 1.36, BT = 0.36; // cover width, height, and the thickness of the whole book
+  const book = new THREE.Group(); scn.add(book);
+  book.add(at(box(BW, BH, 0.06, leather), 0, 0, -BT / 2));
+  book.add(at(box(BW - 0.06, BH - 0.08, BT - 0.06, paper), 0.02, 0, 0));
+  const half = (r, len, m) => new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8, 1, false, Math.PI, Math.PI), m); // the round of the spine, on the -x side
+  book.add(at(half(BT / 2 + 0.03, BH, leather), -BW / 2, 0, 0));
+  for (const y of [-0.46, 0.46]) book.add(at(half(BT / 2 + 0.05, 0.07, gilt), -BW / 2, y, 0));
+  const ribbon = at(box(0.06, 0.42, 0.012, mat(0xC8282E)), 0.22, -BH / 2 - 0.13, 0.06); ribbon.rotation.z = 0.12; book.add(ribbon);
+  // the first page, for when it's open: a red capital and a few lines of writing
+  const inkM = new THREE.MeshBasicMaterial({ color: 0x7A5A3A }), zp = (BT - 0.06) / 2 + 0.004;
+  book.add(at(box(0.13, 0.13, 0.006, new THREE.MeshBasicMaterial({ color: 0xB5302A })), -0.24, 0.42, zp));
+  for (let i = 0; i < 8; i++) { const ww = i === 3 || i === 7 ? 0.32 : 0.6 - (i < 2 ? 0.17 : 0); book.add(at(box(ww, 0.028, 0.006, inkM), (i < 2 ? -0.07 : -0.3) + ww / 2 + 0.02, 0.45 - i * 0.12 - (i < 2 ? 0 : 0.02), zp)); }
+  // the front cover swings on the spine: gilt corners, a ring with a gem in it, and a clasp that comes with it when it opens
+  const lid = new THREE.Group(); lid.position.set(-BW / 2, 0, BT / 2); book.add(lid);
+  lid.add(at(box(BW, BH, 0.06, leather), BW / 2, 0, 0));
+  lid.add(at(box(BW - 0.08, BH - 0.08, 0.01, mat(0xC9B48A, { roughness: 1 })), BW / 2, 0, -0.033)); // the endpaper inside the cover
+  for (const sy of [-1, 1]) lid.add(at(box(0.17, 0.17, 0.04, gilt), BW - 0.075, sy * (BH / 2 - 0.075), 0.02));
+  lid.add(at(new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.035, 5, 10), gilt), BW / 2, 0.12, 0.04));
+  const gem = at(new THREE.Mesh(new THREE.OctahedronGeometry(0.13), gemMat), BW / 2, 0.12, 0.07); gem.scale.z = 0.5; lid.add(gem);
+  for (const [y, ww] of [[-0.3, 0.5], [-0.4, 0.34]]) lid.add(at(box(ww, 0.045, 0.02, gilt), BW / 2, y, 0.035));
+  const clasp = at(new THREE.Group(), BW + 0.02, 0, 0.03); clasp.add(at(box(0.05, 0.22, BT + 0.08, gilt), 0, 0, -(BT + 0.08) / 2)); lid.add(clasp); // folds flat as the cover opens
+  // a few motes of glow drifting round it
+  const moteMat = new THREE.MeshBasicMaterial({ color: 0xFFE14D, transparent: true, opacity: 0.85 });
+  const motes = Array.from({ length: 7 }, (_, i) => { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.035), moteMat); m.userData = { a: i / 7 * Math.PI * 2, r: 0.75 + (i % 3) * 0.12, y: (i % 4) * 0.3 - 0.45, s: 0.5 + (i % 2) * 0.35 }; scn.add(m); return m; });
+  const shTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(0,0,0,.65)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.8), new THREE.MeshBasicMaterial({ map: shTex, transparent: true, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = -1.0; scn.add(shadow);
+  const setHov = v => () => { hov = v; };
+  btn.addEventListener('pointerenter', setHov(true)); btn.addEventListener('pointerleave', setHov(false));
+  btn.addEventListener('focus', setHov(true)); btn.addEventListener('blur', setHov(false));
+  btn.addEventListener('click', () => { if (ui.screen !== 'title') return; audio(); SFX.pop(); hov = false; open(); });
+  function update(rdt, screen) {
+    const want = screen === 'title' && !reelOn;
+    if (want !== on) { on = want; btn.classList.toggle('on', on); }
+    shown += ((want ? 1 : 0) - shown) * Math.min(1, rdt * 7);
+    if (shown < 0.01) { if (btn.style.opacity !== '0') btn.style.opacity = '0'; return; }
+    btn.style.opacity = shown.toFixed(3);
+    if (!R) { R = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); R.setPixelRatio(Math.min(devicePixelRatio, 2)); }
+    const W = cv.clientWidth, H = cv.clientHeight;
+    if (W !== w || H !== h) { w = W; h = H; R.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+    const mo = reduceMotion ? 0.25 : 1; t += rdt * mo;
+    hover += ((hov ? 1 : 0) - hover) * Math.min(1, rdt * 8);
+    const k = ease(hover);
+    lid.rotation.y = -(0.05 + 0.05 * Math.max(0, Math.sin(t * 1.3))) * (1 - k) - 2.15 * k; // it breathes a crack open on its own, and falls open when you point at it
+    clasp.scale.z = 1 - 0.95 * k;
+    book.position.set(0.32 * k, 0.07 * Math.sin(t * 1.6) + 0.08 * k, 0);
+    book.rotation.set(-0.1 + 0.03 * Math.sin(t * 1.1), 0.5 + 0.12 * Math.sin(t * 0.7) * (1 - k) - 0.42 * k, 0.05 * Math.sin(t * 0.9) * (1 - k));
+    shadow.scale.setScalar(1 - 0.12 * (book.position.y + 0.1));
+    paper.emissiveIntensity = 0.1 + 0.22 * k; glow.intensity = 0.3 + 1.1 * k + 0.12 * Math.sin(t * 5);
+    gemMat.emissiveIntensity = 0.7 + 0.3 * Math.sin(t * 2.4) + 0.5 * k;
+    for (const m of motes) { const d = m.userData, a = d.a + t * d.s; m.position.set(Math.cos(a) * d.r, d.y + 0.12 * Math.sin(t * 1.4 + d.a) + book.position.y, Math.sin(a) * d.r * 0.6); m.rotation.y = a * 2; m.scale.setScalar(0.7 + 0.5 * k + 0.25 * Math.sin(t * 3 + d.a)); }
+    moteMat.opacity = 0.45 + 0.5 * k;
+    R.render(scn, cam);
+  }
+
+  /* ---------- creature pictures, taken once from the real models ---------- */
+  const PICS = {};
+  function portraits() {
+    if (PICS.done) return; PICS.done = true;
+    const S = 220, r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); r.setPixelRatio(1); r.setSize(S, S, false);
+    const sc = new THREE.Scene(), c = new THREE.PerspectiveCamera(26, 1, 0.05, 100), ink = new THREE.MeshBasicMaterial({ color: 0x4A3220 });
+    sc.add(new THREE.HemisphereLight(0xFFF2D8, 0x5A3A24, 0.95)); const k = new THREE.DirectionalLight(0xFFFFFF, 0.75); k.position.set(3, 5, 6); sc.add(k);
+    for (const [type] of BEASTS) {
+      let m; try { m = posed(type); } catch (err) { continue; }
+      sc.add(m.root); m.root.updateMatrixWorld(true);
+      const bb = new THREE.Box3(); m.root.traverse(o => { if (o.isMesh && o.visible && isShown(o)) bb.expandByObject(o); });
+      const ctr = bb.getCenter(new THREE.Vector3()), sz = bb.getSize(new THREE.Vector3()), rad = Math.max(sz.y, Math.hypot(sz.x, sz.z) * 0.8) * 0.5;
+      const dist = rad / Math.tan(13 * Math.PI / 180) * 1.12;
+      const up = TYPES[type].flying ? 0.55 : 0.16; // fliers from higher up, so the wings show
+      c.position.set(ctr.x + Math.sin(0.45) * dist, ctr.y + dist * up, ctr.z + Math.cos(0.45) * dist); c.lookAt(ctr);
+      r.render(sc, c); const lit = r.domElement.toDataURL();
+      sc.overrideMaterial = ink; r.render(sc, c); sc.overrideMaterial = null;
+      PICS[type] = { lit, dark: r.domElement.toDataURL() };
+      sc.remove(m.root); disposeTree(m.root);
+    }
+    r.dispose(); if (r.forceContextLoss) r.forceContextLoss();
+  }
+  const isShown = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
+  // the mimics keep their real shape folded away until their look code runs, so a stand-in creature runs it for a second
+  function posed(type) {
+    const T = TYPES[type], m = buildModel(type);
+    if (m.look) {
+      const e = Object.assign({}, m, { type, T, hp: T.hp, maxHp: T.hp, pos: new THREE.Vector3(), lev: 0, wet: 0, glow: 0, stun: 0, frozen: 0, chill: 0, fire: 0, tilt: 0, tiltV: 0, walk: 0, yaw: 0, scale: 1, atk: 0, cd: 1, lungeT: 0, kbv: null, kind: 'doom', ph: type === 'lurker' ? 'out' : 'live', lt: 9, open: 0, outT: 0, fired: new Set(), qs: 'fly', qt: 0, tier: 1, moves: new Set(), hidden: false, id: 1, swatT: 0, cocHp: 0, cocMax: 1, shadow: new THREE.Object3D(), stars: new THREE.Group() });
+      try { for (let i = 0; i < 40; i++) m.look(e, 1 / 40, false); } catch (err) { /* a pose that needs the whole fight just stays at rest */ }
+    }
+    m.root.position.set(0, m.root.position.y, 0); m.root.rotation.y = 0;
+    return m;
+  }
+
+  /* ---------- the pages ---------- */
+  const k = s => `<kbd>${s}</kbd>`;
+  const ic = (id, col) => `<span class="gi" style="color:${col}">${svg(id)}</span>`;
+  const BEASTS = [
+    ['slime', 'Hops at you and bites. Three good hits and it pops, so it\'s the one to practise your aim on.'],
+    ['spitter', 'Hangs back and lobs purple goo across the room. Keep moving, and close the gap between shots.'],
+    ['cyclops', 'Slow, with a heavy club. When it goes down it drops its eye: sling an eye at something and it stands there dazed.'],
+    ['stump', 'Water does nothing to it, but wood burns: a doom shroom hits it harder and sets it alight. Lean on water and the dungeon sends more of these.'],
+    ['moth', 'Quick, and always in the air. Wind does nothing to it. Lean on feathers and more of them turn up.'],
+    ['knight', 'Fire does nothing and it won\'t budge, but metal carries a spark: storm horns hit it harder. It drops iron filings.'],
+    ['skitter', 'Hides under a wrong mushroom in the Lurker\'s patch, from floor 1. Small and quick: it claws its way out and scuttles straight at you.'],
+    ['beetle', 'In the Lurker\'s patch from floor 2. The stem shatters, the cap splits and it hops clear. It leaps at you from across the room, so step out from under it.'],
+    ['mantis', 'In the Lurker\'s patch from floor 3. The stem keeps rising, then it unfolds. Slow, but it swats from further away than you\'d think.'],
+    ['lampcap', 'In the Lurker\'s patch from floor 4. It was upside down the whole time. It hovers and weaves, then dives at you. A direct hit puts it on the floor.'],
+    ['chief', 'Guards the stairs on floor 1. Deeper down it learns to throw rocks, lose its temper, charge and shake the floor. When a red lane lights up, get out of it: if it charges into a wall it knocks itself silly.'],
+    ['lurker', 'One mushroom in a whole room of them. Hit the real one and it bursts out and chases you, then burrows and reshuffles the lot. Hit a wrong one and a bug comes out. The tell: spots that blink like clockwork, or teeth clenching in the dirt.'],
+    ['queen', 'The Gloom Moths\' mother, from floor 2. She puts the torches out, so aim for the glow of her lace. Bonk her when she swoops low. Glowcap drags her out of the air. When she cocoons herself to heal, break it open: fire burns it fast.'],
+    ['king', 'Waits at the bottom of floor 5, and turns up early from floor 3. Bigger and tougher than the Chief, with a quake, a charge and a temper of its own.'],
+  ];
+  const WEAK = { doom: 'FIRE HURTS IT MORE', horn: 'SPARKS HURT IT MORE' };
+  function beastPage(type, blurb) {
+    const T = TYPES[type], met = !!seen[type], pic = PICS[type];
+    const img = pic ? `<img class="gpic${met ? '' : ' dark'}" src="${met ? pic.lit : pic.dark}" alt="">` : '<div class="gpic"></div>';
+    if (!met) return `${img}<h3>???</h3><p class="gnote">${T.boss ? 'A boss' : 'A creature'} you haven't met yet. Keep going down and it'll fill in.</p>`;
+    const tags = [T.boss && `<span class="boss">${T.king ? 'FINAL BOSS' : 'BOSS'}</span>`, T.immTxt && `<span class="imm">${T.immTxt}</span>`, T.weak && `<span class="weak">${WEAK[T.weak]}</span>`, T.flying && '<span>FLIES</span>', T.dropsEye && '<span>DROPS AN EYE</span>', T.dropsIron && '<span>DROPS IRON</span>'].filter(Boolean);
+    return `${img}<h3>${T.name.toUpperCase()}</h3>${tags.length ? `<div class="gtags">${tags.join('')}</div>` : ''}<p>${blurb}</p>`;
+  }
+  const keyRows = () => coarse
+    ? [['Walk', 'Drag on the left side'], ['Look', 'Drag on the right side'], ['Sling', 'Hold <b>SLING</b>, let go to throw'], ['Bonk', 'Tap <b>BONK</b>'], ['Scrape', 'Hold <b>SCRAPE</b>'], ['Brew', 'The pot button'], ['Swap', 'Tap <b>SWAP</b>']]
+    : [['Move', k('W') + k('A') + k('S') + k('D')], ['Look', 'The mouse. Click to grab it'], ['Sling', 'Hold left mouse, let go to throw'], ['Bonk', 'Right-click or ' + k('V')], ['Scrape', 'Hold ' + k('E')], ['Brew', k('TAB')], ['Ladle / water gun', k('Q')], ['Swap brews', k('R') + ' with the bandolier'], ['Emote', k('G') + ' in co-op'], ['Pause', k('ESC')]];
+  function pages() {
+    const P = [];
+    const add = (ch, html) => P.push({ ch, html });
+    add(0, `<h3>WELCOME, BREWER</h3>
+      <p>You brew potions, sling them with a ladle, and bonk whatever's still standing.</p>
+      <p>Get down five floors. The <b>Cyclops King</b> waits at the bottom of the fifth, and after that it's endless.</p>
+      <p>Doors stay shut until a room is clear. Each floor's stairs have a boss in front of them.</p>
+      <p>Your hearts are at the top of the screen. Lose them all and you're knocked out.</p>
+      <div class="gicons">${ic('ladle', '#FFB547')}${ic('boil', '#86C27A')}${ic('eye', '#F2EEE4')}</div>`);
+    add(0, `<h3>CONTROLS</h3><div class="gkeys">${keyRows().map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('')}</div>
+      ${coarse ? '' : '<p class="gnote">On a touchscreen: drag on the left to walk, on the right to look, and use the buttons.</p>'}
+      <p class="gnote">Out of brew? The bonk always works.</p>`);
+    add(1, `<h3>SCRAPE</h3>
+      <p>Ingredients grow round the dungeon: by the torches, by the drains, and up high on the walls. Walk up and hold ${coarse ? '<b>SCRAPE</b>' : k('E')} to scrape them off. A cyclops drops its eye when it goes down.</p>
+      <p>Fresh things don't last. Shrooms, glowcaps, frost and eyes go off after a while. Feathers, bog water, horns and iron keep forever.</p>
+      <p>A rancid one still works, with a nasty extra on top. Where it grew decides who the extra picks on.</p>`);
+    add(1, `<h3>BREW</h3>
+      <p>Press ${coarse ? 'the pot button' : k('TAB')} to open your pot and drop ingredients in. Wherever the ladle lands, they go off <b>in the order you put them in</b>.</p>
+      <p>A full pot is five slings. Doubling up on one ingredient waters it down.</p>
+      <p>Your pot only holds one thing to start with. Beat a boss and it holds one more.</p>
+      <p>Shops sell kit that bends the rules: a bigger ladle, a water gun, a bandolier for a second brew.</p>`);
+    add(1, `<h3>INGREDIENTS</h3><div class="gings">${KINDS.map(id => `${ic(id, ING[id].css)}<span><b>${ING[id].name}</b>${ING[id].desc}</span>`).join('')}</div>`);
+    const nFound = Object.keys(COMBOS).filter(c => found[c]).length;
+    add(1, `<h3>COMBOS <small>${nFound}/${Object.keys(COMBOS).length}</small></h3>
+      <p>Some ingredients set each other off. Get them in the right order and you'll know about it.</p>
+      <div class="gcombos">${Object.entries(COMBOS).map(([c, C]) => found[c]
+        ? `<span class="chain">${C.chain.map(i => ic(i, ING[i].css)).join('<i>›</i>')}${C.gun ? ic('gun', '#2A9DF4') : ''}</span><b>${C.name}</b>`
+        : `<span class="chain">${C.chain.map(() => '<span class="q"></span>').join('<i>›</i>')}</span><b class="lock">???</b>`).join('')}</div>
+      <p class="gnote">Hint: wet things and sparks get on very well.</p>`);
+    for (const [type, blurb] of BEASTS) add(2, beastPage(type, blurb));
+    add(3, `<h3>CO-OP</h3>
+      <p>Everyone shares the floors, doors and enemies. Hearts, coins, brews and loot are your own.</p>
+      <ol><li>One player picks <b>CO-OP</b>, then <b>HOST WITH CODE</b>, and reads out the four-character code.</li><li>Everyone else picks <b>JOIN WITH CODE</b> and types it in.</li><li>Anyone presses <b>START RUN</b>.</li></ol>
+      <p>Bonk a partner and they're squished flat for two seconds. It doesn't hurt. If you go down, a partner clearing the room gets you back up.</p>`);
+    add(3, `<h3>NO INTERNET?</h3>
+      <p>Two devices on the same network can link up without the connection server. A phone hotspot works even with its data off.</p>
+      <ol><li>Both pick <b>CO-OP</b>, then <b>NO-INTERNET LINK</b>. One hosts, the other joins.</li><li>The joiner points their webcam at the QR code on the host's screen and gets a reply code.</li><li>The host scans that reply.</li></ol>
+      <p class="gnote">No webcam? Copy the code and paste it on the other device instead.</p>`);
+    if (P.length % 2) add(3, '');
+    return P;
+  }
+  const CHAPTERS = ['CONTROLS', 'BREWING', 'CREATURES', 'CO-OP'];
+  let page = 0, P = [];
+  const perView = () => stage.clientWidth < 760 ? 1 : 2;
+  const pageLabel = () => { const v = perView(); return v === 2 ? `${page + 1}–${Math.min(P.length, page + 2)} / ${P.length}` : `${page + 1} / ${P.length}`; };
+  function spread(dir) {
+    const v = perView(), ch = P[page] ? P[page].ch : 0;
+    const one = (i, side) => P[i] ? `<section class="gpage ${side}${dir ? ' flip' + (dir > 0 ? 'F' : 'B') : ''}">${P[i].html}<span class="pn">${i + 1}</span>`
+      + (side === 'l' && page > 0 ? '<button type="button" class="gturn" data-d="-1" aria-label="Previous page"></button>' : '')
+      + (side === 'r' && page + v < P.length ? '<button type="button" class="gturn" data-d="1" aria-label="Next page"></button>' : '') + '</section>' : '';
+    return `<nav class="gtabs">${CHAPTERS.map((c, j) => `<button type="button" class="gtab${j === ch ? ' on' : ''}" data-ch="${j}">${c}</button>`).join('')}</nav>`
+      + `<div class="gspread v${v}">${v === 2 ? one(page, 'l') + one(page + 1, 'r') : one(page, 'l r')}</div>`;
+  }
+  function draw(dir) { const el = uiEl.querySelector('.gbook'); if (el) el.innerHTML = spread(dir); refreshItem(0); }
+  function go(p, dir) {
+    const v = perView(); p = Math.max(0, Math.min(P.length - 1, p)); p -= p % v;
+    if (p === page) return; page = p; SFX.flutter(); draw(dir);
+  }
+  function turn(d) { go(page + d * perView(), d); }
+  function open() { portraits(); P = pages(); page -= page % perView(); uiPush('guide'); SFX.flutter(); }
+  SCREENS.guide = () => ({ body: `<div class="gbook">${spread(0)}</div>`, items: [{ label: 'TURN PAGE', val: pageLabel, adjust: d => turn(d) }, { label: 'BACK', act: uiBack }] });
+  uiEl.addEventListener('click', e => {
+    if (ui.screen !== 'guide') return;
+    const tb = e.target.closest('.gtab'), tn = e.target.closest('.gturn');
+    if (tb) { const j = +tb.dataset.ch, p = P.findIndex(x => x.ch === j); go(p, p > page ? 1 : -1); }
+    else if (tn) turn(+tn.dataset.d);
+  });
+  addEventListener('resize', () => { if (ui.screen === 'guide') { page -= page % perView(); draw(0); } });
+  return { update, turn, open };
+})();
 /* ================= co-op: everyone with the page open can share a run =================
    The host's game owns the creatures; partners see puppets and send what their brews did to them.
    Each player keeps their own hearts, coins, satchel and loot. Doors, stairs and secrets move everyone together. */
@@ -7087,6 +7360,7 @@ function frame(now) {
 
   renderer.render(scene, camera);
   brewer.update(rdt, ui.screen);
+  guide.update(rdt, ui.screen);
   netFrame(rdt); labTick(rdt);
   if (invOpen || potParts.length) drawPotFx(rdt);
   if (rec) captureFrame(now);
@@ -7095,6 +7369,7 @@ function frame(now) {
   for (const e of enemies) {
     if (e.dead) continue;
     if (e.hidden) { e.label.style.display = 'none'; continue; }
+    if (!seen[e.type] && camMode === 'fp' && !menuOpen && !lab.on) meetCreature(e.type); // it's out in the open: it gets its page in the guide
     const s = project(new THREE.Vector3(e.pos.x, e.pos.y + e.h * e.scale + 0.35, e.pos.z));
     const chips = [e.wet > 0 && '<span class="chip wet">wet</span>', e.lev > 0 && '<span class="chip float">float</span>', e.glow > 0 && '<span class="chip glow">glow</span>', e.glass && '<span class="chip glass">glass</span>', e.stun > 0 && '<span class="chip daze">dazed</span>', e.frozen > 0 && '<span class="chip ice">ice</span>', e.fire > 0 && '<span class="chip burn">fire</span>', e.chill > 0 && !(e.frozen > 0) && '<span class="chip cold">cold</span>', e.atk > 0 && '<span class="chip atk">!</span>', e.T.immune && `<span class="chip imm">${svg(e.T.immune[0])}</span>`].filter(Boolean).join('');
     const html = (e.T.boss ? '' : `<div class="pips">${Array.from({ length: e.maxHp }, (_, i) => `<i class="pip ${i < e.hp ? '' : 'e'}"></i>`).join('')}</div>`) + (chips ? `<div class="chips">${chips}</div>` : '') + '<i class="arrow"></i>'; // bosses get the bar at the bottom instead
