@@ -2270,6 +2270,45 @@ function stormCloud(c, life = 2.4) {
   addFx((sdt, rdt) => { t += rdt; m.opacity = Math.min(0.92, t * 3) * (t > life - 0.5 ? Math.max(0, (life - t) / 0.5) : 1); g.rotation.y += rdt * 0.4; fxLight.intensity = Math.random() < 0.2 ? rand(1, 3) : fxLight.intensity * 0.8; if (t > life) { scene.remove(g); m.dispose(); fxLight.intensity = 0; return false; } });
 }
 // frees what an object owns, skipping the geometries and cached materials everything shares
+// a prop's still parts, fused into one mesh per kind of material with each part's colour moved into its vertices: far fewer draw calls.
+// Parts with a texture, the ones in keep (and everything under them) stay as they are; the ones in hide stay too, but hidden (templates)
+function fuseStatic(roots, into, keep = new Set(), hide = new Set()) {
+  into.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(into.matrixWorld).invert(), buckets = new Map(), drop = [];
+  const sig = m => [m.type, m.roughness, m.metalness, m.emissive ? m.emissive.getHex() : '', m.emissiveIntensity, m.flatShading, m.transparent, m.opacity, m.side, m.depthWrite, m.blending].join('|');
+  const walk = o => {
+    if (keep.has(o)) return;
+    const mt = o.material;
+    if ((o.isMesh || o.isLineSegments) && !o.isInstancedMesh && o.visible && mt && !Array.isArray(mt) && !mt.map && (mt.isMeshStandardMaterial || mt.isMeshBasicMaterial || mt.isLineBasicMaterial)) {
+      const k = (o.isLineSegments ? 'L' : 'M') + sig(mt); if (!buckets.has(k)) buckets.set(k, { mat: mt, line: !!o.isLineSegments, parts: [] });
+      buckets.get(k).parts.push(o); drop.push(o);
+    }
+    for (const c of o.children) walk(c);
+  };
+  roots.forEach(walk);
+  const m4 = new THREE.Matrix4(), n3 = new THREE.Matrix3(), v = new THREE.Vector3(), c = new THREE.Color();
+  for (const b of buckets.values()) {
+    const pos = [], nor = [], col = [];
+    for (const o of b.parts) {
+      m4.multiplyMatrices(inv, o.matrixWorld); n3.getNormalMatrix(m4); c.copy(o.material.color);
+      const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry, P = g.attributes.position, N = b.line ? null : g.attributes.normal;
+      for (let i = 0; i < P.count; i++) {
+        v.fromBufferAttribute(P, i).applyMatrix4(m4); pos.push(v.x, v.y, v.z); col.push(c.r, c.g, c.b);
+        if (N) { v.fromBufferAttribute(N, i).applyMatrix3(n3).normalize(); nor.push(v.x, v.y, v.z); }
+      }
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    if (nor.length === pos.length) geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    const mat = b.mat.clone(); mat.color.set(0xFFFFFF); mat.vertexColors = true;
+    into.add(b.line ? new THREE.LineSegments(geo, mat) : new THREE.Mesh(geo, mat));
+  }
+  for (const o of drop.reverse()) { // deepest first; anything kept under a fused part moves up to its parent
+    if (hide.has(o)) { o.visible = false; continue; }
+    const p = o.parent; if (!p) continue;
+    for (const ch of [...o.children]) p.attach(ch);
+    p.remove(o);
+  }
+}
 function disposeTree(obj) {
   const cached = new Set(Object.values(MATS));
   obj.traverse(o => {
@@ -5593,7 +5632,9 @@ const arcade = (() => {
     sk.add(box(1.0, 0.3, 0.32, M(0x7A2F5A), 0, 1.86, -1.9));
     const sign = meshOf(new THREE.PlaneGeometry(0.96, 0.26), new THREE.MeshBasicMaterial({ map: textTex('SKEE-BALL', 256, 70, '#FFE14D', 44, '#0A0810') })); sign.position.set(0, 1.86, -1.735); sk.add(sign);
     const ball = meshOf(new THREE.IcosahedronGeometry(0.075, 1), M(0xF2EEE4)); ball.visible = false; sk.add(ball);
-    const rack = []; for (let i = 0; i < 9; i++) { const b = at(meshOf(new THREE.IcosahedronGeometry(0.075, 1), M(0xD8D0C0)), -0.32 + (i % 5) * 0.16 + (i >= 5 ? 0.08 : 0), 0.54 + (i >= 5 ? 0.05 : 0), 1.95 - (i >= 5 ? 0.09 : 0)); sk.add(b); rack.push(b); }
+    const rack = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.075, 1), M(0xD8D0C0), 9), im = new THREE.Matrix4(); // one draw for the rack; its count is the balls you've got left
+    for (let i = 0; i < 9; i++) rack.setMatrixAt(i, im.makeTranslation(-0.32 + (i % 5) * 0.16 + (i >= 5 ? 0.08 : 0), 0.54 + (i >= 5 ? 0.05 : 0), 1.95 - (i >= 5 ? 0.09 : 0)));
+    sk.add(rack);
     const aimDot = meshOf(new THREE.ConeGeometry(0.035, 0.1, 4), glow(0xFFE14D)); aimDot.rotation.x = -Math.PI / 2; aimDot.visible = false; sk.add(aimDot);
     const pos = F.V3(F.half - 0.75, 0, 5.2); sk.position.copy(pos); sk.rotation.y = F.yIn; roomGroup.add(sk);
     for (let z = -1.8; z <= 2.0; z += 0.6) { const w = sk.localToWorld(new THREE.Vector3(0, 0, z)); colliders.push({ x: w.x, z: w.z, r: 0.5, h: 0.9 }); }
@@ -5638,7 +5679,7 @@ const arcade = (() => {
       }
     }
     m.ball.visible = !!SK.ball;
-    m.rack.forEach((b, i) => { b.visible = SK.st !== 'play' || i < SK.balls - (SK.ball ? 1 : 0); });
+    m.rack.count = SK.st !== 'play' ? 9 : Math.max(0, SK.balls - (SK.ball ? 1 : 0));
     m.aimDot.visible = here && SK.st === 'play' && !SK.ball && SK.balls > 0;
     if (m.aimDot.visible) { const pw = skPower(); m.aimDot.position.set(SK.aim, laneY(1.55) + 0.1 + pw * 0.05, 1.55 - pw * 0.25); m.aimDot.scale.setScalar(1 + pw * 0.8); }
   }
@@ -5744,7 +5785,9 @@ const arcade = (() => {
   }
   prizeEl.innerHTML = '<b>THE PRIZE COUNTER</b><span id="arcWallet"></span><div id="arcPrizeList">' + ARC_PRIZES.map((p, i) => `<button type="button" class="arcPrize" data-prize="${p.id}"><kbd>${i + 1}</kbd><b>${p.name}<small>${p.note}</small></b><em>${p.cost}<i class="tkt"></i></em></button>`).join('') + '</div>';
   const walletEl = prizeEl.querySelector('#arcWallet');
+  let prizeKey = '';
   function renderPrizes() {
+    const k_ = run.coins + '|' + run.tickets + '|' + unlocked('crown'); if (k_ === prizeKey) return; prizeKey = k_; // only when something's changed, not every frame
     walletEl.innerHTML = `<i class="coin"></i>${run.coins} · <i class="tkt"></i>${run.tickets}`;
     prizeEl.querySelectorAll('.arcPrize').forEach(b => { const p = ARC_PRIZES.find(q => q.id === b.dataset.prize), owned = p.id === 'crown' && unlocked('crown'); b.disabled = owned || run.tickets < p.cost; b.classList.toggle('owned', owned); });
   }
@@ -5777,7 +5820,7 @@ const arcade = (() => {
 
   /* ---------- the room ---------- */
   function spawn(r) {
-    const F = frame(r);
+    const F = frame(r), before = new Set(roomGroup.children);
     A = { r, F, spots: [], prizes: [] };
     const floor = meshOf(new THREE.PlaneGeometry(W * 2, D * 2), new THREE.MeshStandardMaterial({ map: carpet(), roughness: 1 })); floor.rotation.x = -Math.PI / 2; floor.position.y = 0.03; roomGroup.add(floor); // sticky carpet over the flagstones
     const sign = meshOf(new THREE.PlaneGeometry(4.2, 0.9), new THREE.MeshBasicMaterial({ map: textTex('GOBLIN ARCADE', 512, 110, '#FF3D9A', 86, null), transparent: true }));
@@ -5786,6 +5829,8 @@ const arcade = (() => {
     const skee = buildSkee(F); A.skee = skee.mesh; A.spots.push(skee.spot);
     const cups = buildCups(F); A.cups = cups.mesh; A.spots.push(cups.spot);
     A.spots.push(prizeSpot(F)); A.prizes = prizeShelves(F);
+    const sm_ = A.skee; // the cabinets, skee-ball, the dispenser and the shelves go down to a handful of draws. Cups move; the prizes stay hidden as templates for prizeFly
+    fuseStatic(roomGroup.children.filter(c => !before.has(c)), roomGroup, new Set([...A.cups.list.map(c => c.g), A.cups.coin, sm_.ball, sm_.aimDot, sm_.rack].filter(Boolean)), new Set(A.prizes));
     tixEl.hidden = false; showTix();
     flap.reset(); if (SK.st !== 'play') SK.st = 'idle'; if (!['idle', 'done'].includes(CP.st)) CP.st = 'idle';
   }
@@ -6329,6 +6374,7 @@ function buildGnome(sh) {
   const tip = new THREE.Group(); tip.position.y = 0.2; tip.rotation.set(-0.3, 0, -0.6); hat.add(tip); tip.add(at(meshOf(new THREE.ConeGeometry(0.15, 0.4, 7), hatM), 0, 0.19, 0)); // it flops over to one side
   body.position.y = 0.45; g.add(at(meshOf(new THREE.CylinderGeometry(0.3, 0.34, 0.45, 7), M(0x4A3222)), 0, 0.225, 0)); // he stands on a stool to see over the counter
   g.scale.setScalar(1.2);
+  fuseStatic([head], head); fuseStatic([body], body, new Set([head, medal])); // the head turns and the body hops, so each is fused on its own; the medal flashes
   return { g, body, head, hop: 0, shake: 0, medal };
 }
 function spawnShop(r, rising) {
