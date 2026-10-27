@@ -26,6 +26,8 @@ A first-person dungeon crawler where you brew potions and fling them at things w
 
 **Rancid ingredients:** shrooms, glowcaps, frost and eyes sometimes come up rancid when you pick them up (about one in five). They still work, with a random nasty extra on top.
 
+**Goblin Arcade:** one of the secret rooms behind the X brick. A gnome in shades runs it. Machines take coins and pay tickets: Dragon Flap on the first cabinet, skee-ball, and cups on the counter (watch his medal: if it flashes, he's palmed the coin). Walk up and hold E to step up to a machine, and Esc to step back. Spend tickets at his counter on ingredients, coins, a mystery item, or a Paper Crown for your brewer that you can't get anywhere else.
+
 **Guide:** click the red book in the bottom-right corner of the title screen. It covers the controls, brewing, every creature (pages fill in as you meet them) and co-op.
 
 ## Bosses

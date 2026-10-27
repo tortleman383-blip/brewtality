@@ -58,6 +58,29 @@
   #coins.bump{animation:cbump .3s ease-out}
   @keyframes cbump{40%{transform:scale(1.3)}}
   .cine #coins{top:calc(11% + 46px)}
+  /* the goblin arcade: tickets under the coins, the cabinet's screen laid over the frozen room, a scoreboard, the prize counter */
+  #tix{position:absolute;top:80px;right:14px;z-index:4;display:flex;align-items:center;gap:7px;font:400 21px/1 var(--display);letter-spacing:.03em;color:#FFB070;text-shadow:var(--outline);font-variant-numeric:tabular-nums}
+  #tix.bump{animation:bump .3s}
+  i.tkt{display:inline-block;width:20px;height:13px;background:#FF8A2A;border-radius:2px;box-shadow:inset 0 0 0 2px #FFB070,inset 0 0 0 3px #FF8A2A;vertical-align:middle}
+  #arcScreen{position:absolute;left:0;top:0;width:192px;height:256px;transform-origin:0 0;image-rendering:pixelated;z-index:3;touch-action:none}
+  #arcHud{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 16px;background:rgba(8,6,10,.78);text-align:center;max-width:calc(100% - 32px);pointer-events:auto}
+  #arcHud b{font:400 28px/1 var(--display);letter-spacing:.03em;color:var(--yell)}
+  #arcHud span{font:600 14px/1.25 var(--body);letter-spacing:.05em;color:#EDE6F2}
+  #arcHud button{font:400 18px/1 var(--display);letter-spacing:.04em;background:#FF3D9A;color:#1A0610;border:0;padding:9px 14px;cursor:pointer}
+  #arcBack{position:absolute;left:14px;top:14px;z-index:5;display:flex;align-items:center;gap:8px;font:400 18px/1 var(--display);letter-spacing:.04em;color:#EDE6F2;background:rgba(8,6,10,.78);border:0;padding:10px 14px;cursor:pointer}
+  #arcBack kbd{font:600 11px/1 var(--body);border:1px solid currentColor;border-radius:3px;padding:2px 5px}
+  .coarse #arcBack kbd{display:none}
+  #arcPrizes{position:absolute;right:14px;top:112px;z-index:5;width:min(320px,calc(100% - 28px));display:flex;flex-direction:column;gap:8px;padding:14px;background:rgba(8,6,10,.88)}
+  #arcPrizes>b{font:400 24px/1 var(--display);color:var(--yell);letter-spacing:.03em}
+  #arcWallet{font:400 18px/1 var(--display);color:#EDE6F2;display:flex;align-items:center;gap:6px}
+  #arcPrizeList{display:flex;flex-direction:column;gap:6px}
+  .arcPrize{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 10px;background:#1E1824;border:1px solid #3A3046;color:#EDE6F2;text-align:left;cursor:pointer;font:inherit}
+  .arcPrize b{font:400 18px/1.05 var(--display);letter-spacing:.03em} .arcPrize small{display:block;font:600 11px/1.2 var(--body);letter-spacing:.04em;color:#A99CB6;margin-top:3px}
+  .arcPrize em{font:400 18px/1 var(--display);font-style:normal;color:#FFB070;display:flex;align-items:center;gap:5px}
+  .arcPrize kbd{font:600 11px/1 var(--body);border:1px solid #3A3046;border-radius:3px;padding:2px 5px;color:#A99CB6}
+  .coarse .arcPrize kbd{display:none}
+  .arcPrize[disabled]{opacity:.4;cursor:not-allowed} .arcPrize.owned em{visibility:hidden}
+  .arcading #cross,.arcading #cards,.arcading #satchel,.arcading #tool,.arcading #prompt,.arcading .touch,.arcading #joy,.arcading #map,.arcading #menuBtn,.arcading #invBtn,.arcading #hearts,.arcading #score,.arcading #feed{display:none!important}
   .coin{display:inline-block;width:.78em;height:.78em;border-radius:50%;background:radial-gradient(circle at 38% 34%,#FFF4B0,#FFD23A 45%,#A87A0A);box-shadow:0 0 0 2px #000;flex:none}
   .ptag{position:absolute;left:0;top:0;display:flex;align-items:center;gap:6px;background:#000;padding:4px 9px 3px;font:400 17px/1 var(--display);letter-spacing:.04em;color:#FFE38A;white-space:nowrap;will-change:transform;transform:skewX(-8deg)}
   .ptag.poor{color:#FF6A4D}
@@ -537,6 +560,11 @@
     <div id="hearts" aria-label="Health"></div>
     <div id="score" aria-label="Score"><b id="scoreNum">0</b></div>
     <div id="coins" aria-label="Coins"><i class="coin"></i><b id="coinNum">0</b></div>
+    <div id="tix" aria-label="Tickets" hidden><i class="tkt"></i><b id="tixNum">0</b></div>
+    <canvas id="arcScreen" width="192" height="256" hidden></canvas>
+    <div id="arcHud" hidden><b></b><span></span><button type="button" hidden></button></div>
+    <button id="arcBack" type="button" hidden>STEP BACK<kbd>ESC</kbd></button>
+    <div id="arcPrizes" hidden></div>
     <div id="feed"></div>
     <div id="map"></div>
     <div id="satchel" hidden></div>
@@ -707,7 +735,7 @@ if (savedSettings.sound === false && savedSettings.vol === undefined) settings.v
 delete settings.sound; delete settings.reel;
 const FINAL_FLOOR = 5; // the Cyclops King waits at the bottom of floor 5; after that it's endless
 const newUse = () => ({ feather: 0, bog: 0, horn: 0, doom: 0, glowcap: 0, eye: 0, boil: 0 });
-const run = { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false, queenTip: false, cocTip: false, spikeTip: false };
+const run = { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, tickets: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false, queenTip: false, cocTip: false, spikeTip: false };
 
 /* ================= audio (all synthesised) ================= */
 let AC = null, master = null, noiseBuf = null;
@@ -828,10 +856,11 @@ scene.fog = new THREE.Fog(0x0D0A11, 11, 28);
 const camera = new THREE.PerspectiveCamera(72, 1, 0.04, 80);
 scene.add(camera);
 const camHelper = new THREE.PerspectiveCamera();
-let W_px = 1, H_px = 1;
+let W_px = 1, H_px = 1, arcResize = null;
 function resize() {
   W_px = stage.clientWidth; H_px = stage.clientHeight; if (!W_px || !H_px) return;
   renderer.setSize(W_px, H_px, false); camera.aspect = W_px / H_px; camera.updateProjectionMatrix();
+  if (arcResize) arcResize(); // a resize clears the canvas: a frozen arcade room has to be drawn again
 }
 new ResizeObserver(resize).observe(stage); resize();
 canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); notice('GRAPHICS RESET', 'bad'); });
@@ -921,9 +950,9 @@ const THEMES = {
     fog: 0x070C08, hemi: [0x84B48E, 0x1A2214, 0.62], torch: 0xFFB060, accent: [0x7CFFB0, 0, 4.4, 0], pillars: [[-5.6, -6.0], [5.6, 5.4]], cave: true, moss: 1.4, roots: true, glow: true,
     spots: [{ kind: 'frost', origin: 'high', wall: 'N', along: -4.8, y: 2.6 }, { kind: 'frost', origin: 'drain', wall: 'S', along: 5.2, y: 1.25 }],
   },
-  den: {
-    name: 'Gambling Den', stone: [0x3E3A2E, 0x38342A, 0x464034, 0x332F26], floor: [0x2E3A2A, 0x293426, 0x334030], trim: 0x6A4A2A, beam: 0x3A2A1A, ceil: 0x14120C,
-    fog: 0x0C0E08, hemi: [0xC8B878, 0x1E2410, 0.65], torch: 0xFFB050, accent: [0x9AFFB0, 0, 2.4, 0], pillars: [], spots: [],
+  den: { // the goblin arcade: dark plum stone, a sticky carpet, pink and cyan neon instead of torches
+    name: 'Goblin Arcade', stone: [0x2A2236, 0x262032, 0x30283E, 0x221C2C], floor: [0x1B1030, 0x1B1030, 0x1B1030], trim: 0x3D3150, beam: 0x241C30, ceil: 0x0C0812,
+    fog: 0x08060C, hemi: [0xB8A8E0, 0x1A1018, 0.42], torch: 0xFF3D9A, accent: [0x5FF2D6, 0, 3.4, 0], accentI: 1.2, accentD: 12, pillars: [], spots: [], arcade: true,
   },
 };
 const CRATES = [[-6.8, 7.6, 1], [-5.8, 7.9, 0.75], [6.9, -7.8, 1.1], [6.95, -6.6, 0.8]];
@@ -1209,7 +1238,7 @@ function buildRoom(r) {
     for (const k of [-1, 1]) addW(sd, k * 2.9, 1.65, 1.7, 0.4, 3.4, 1.9, th.stone[0]);
     addW(sd, 0, 1.64, 3.36, 6.3, 0.2, 1.84, 0x0E0B10);
     addW(sd, 0, 2.6, 1.75, 6.4, 3.5, 0.2, 0x1A1418);
-    if (r.shop) for (let i = 0; i < 9; i++) { const k = rand(0.22, 0.5), [x, z] = wallXZ(sd, rand(-2.5, 2.5), rand(-1.0, -0.2)); add(x, k / 2, z, k * 1.6, k, k, pick(th.stone), rand(0, Math.PI)); }
+    if (r.shop && !th.arcade) for (let i = 0; i < 9; i++) { const k = rand(0.22, 0.5), [x, z] = wallXZ(sd, rand(-2.5, 2.5), rand(-1.0, -0.2)); add(x, k / 2, z, k * 1.6, k, k, pick(th.stone), rand(0, Math.PI)); }
   }
   if (!th.cave && !th.garden) for (let z = -D + 1.5; z < D; z += 3) { add(0, H - 0.2, z, W * 2, 0.35, 0.4, th.beam); ceilBusy.push({ x0: -W, x1: W, z0: z - 0.2, z1: z + 0.2 }); }
   if (!th.cave) for (const [px, pz] of th.pillars) { add(px, 0.2, pz, 1.7, 0.4, 1.7, th.trim); add(px, H - 0.2, pz, 1.6, 0.4, 1.6, th.trim); }
@@ -1670,10 +1699,10 @@ function buildRoom(r) {
   if (!th.cave) for (const [px, pz] of th.pillars) grp.add(at(meshOf(new THREE.CylinderGeometry(0.55, 0.62, H, 8), M(th.stone[2])), px, H / 2, pz));
   // four torches on the side walls, plus the room's accent light
   [['W', -3.6], ['W', 3.6], ['E', -3.6], ['E', 3.6]].forEach(([dir, along], i) => {
-    wallBusy.push({ dir, a0: along - 0.45, a1: along + 0.45, y0: th.lab ? 3.0 : 1.8, y1: th.lab ? 3.6 : 3.0 });
-    if (th.lab) { // the lab gets steady strip lamps instead of fire
-      const [x, z] = wallXZ(dir, along, -0.05), lamp = at(meshOf(new THREE.BoxGeometry(0.9, 0.16, 0.18), M(0xE8F4FF, { emissive: 0xCFE8FF, emissiveIntensity: 1.2 })), x, 3.3, z);
-      lamp.rotation.y = WALL_RY[dir]; grp.add(lamp); const L = torchLights[i], [lx, lz] = wallXZ(dir, along, -0.6); L.color.set(th.torch); L.position.set(lx, 3.2, lz); L.intensity = 1.25; return;
+    wallBusy.push({ dir, a0: along - 0.45, a1: along + 0.45, y0: th.lab || th.arcade ? 3.0 : 1.8, y1: th.lab || th.arcade ? 3.6 : 3.0 });
+    if (th.lab || th.arcade) { // the lab gets steady strip lamps instead of fire; the arcade gets pink and cyan neon
+      const lc = th.arcade ? (i % 2 ? 0x5FF2D6 : 0xFF3D9A) : 0xE8F4FF, [x, z] = wallXZ(dir, along, -0.05), lamp = at(meshOf(new THREE.BoxGeometry(th.arcade ? 2.4 : 0.9, th.arcade ? 0.07 : 0.16, 0.18), th.arcade ? new THREE.MeshBasicMaterial({ color: lc }) : M(0xE8F4FF, { emissive: 0xCFE8FF, emissiveIntensity: 1.2 })), x, 3.3, z);
+      lamp.rotation.y = WALL_RY[dir]; grp.add(lamp); const L = torchLights[i], [lx, lz] = wallXZ(dir, along, -0.6); L.color.set(th.arcade ? lc : th.torch); L.position.set(lx, 3.2, lz); L.intensity = th.arcade ? 1.5 : 1.25; return;
     }
     const t = new THREE.Group(), [x, z] = wallXZ(dir, along, -0.05);
     const stick = at(meshOf(new THREE.CylinderGeometry(0.05, 0.04, 0.6, 5), M(0x5A3A22)), 0, 0, 0.18); stick.rotation.x = 0.6; t.add(stick);
@@ -1853,7 +1882,7 @@ function buildRoom(r) {
   if (r.shop) spawnShop(r, false);
   if (r.xTile) buildXBrick(r, xCol);
   buildTraps(r);
-  if (r.den) spawnDen(r);
+  if (r.den) arcade.spawn(r);
   if (th.lab) buildLab(grp);
   lightBase();
 }
@@ -1867,7 +1896,7 @@ function teardownRoom() {
   drops.forEach(d => scene.remove(d.m)); drops.length = 0; clearGoos();
   if (coins.length) { coins.forEach(c => scene.remove(c.g)); gainCoins(coins.length, true); coins.length = 0; }
   shopSlots.forEach(sl => sl.tag.remove()); shopSlots = []; goblin = null; plug = null;
-  darts.forEach(d => scene.remove(d.m)); darts.length = 0; if (den) den.pots.forEach(pt => pt.tag.remove()); den = null; tossArmed = false;
+  darts.forEach(d => scene.remove(d.m)); darts.length = 0; arcade.teardown();
   disposeTree(roomGroup);
   scene.remove(roomGroup); roomGroup = null; fxLight.intensity = 0;
   renderSatchel();
@@ -2598,7 +2627,7 @@ const inter = { target: null, key: '', t: 0, sfx: 0 };
 let camMode = 'fp', ts = 1, tsTarget = 1, tsRate = 10, fov = 72, fovTarget = 72, fovRate = 8, shake = 0;
 const orbit = { c: new THREE.Vector3(), a: 0, r: 5, h: 2, spin: 0.25 };
 const setTS = (v, rate = 12) => { if (net.on) v = Math.max(v, 0.8); tsTarget = v; tsRate = rate; if (rate >= 100) ts = v; }; // co-op keeps one clock for everyone, so slow-mo is only a nudge
-const busy = () => menuOpen || reelOn || invOpen || koOpen || player.down || transit || cine.state !== 'idle' || !!blob || !!player.fall;
+const busy = () => menuOpen || reelOn || invOpen || koOpen || player.down || transit || cine.state !== 'idle' || !!blob || !!player.fall || arcade.active();
 
 function useDown() { if (busy() || player.sq > 0 || bonkHold >= 0) return; audio(); if (tool === 'ladle') { wind.on = true; wind.power = 0; } else startFire(); }
 function useUp() { if (tool === 'ladle') { if (!wind.on) return; wind.on = false; if (menuOpen || invOpen || reelOn || koOpen || transit || cine.state !== 'idle' || blob || wind.power <= 0) return; sling(Math.max(0.15, wind.power)); } else stopFire(); }
@@ -2694,6 +2723,7 @@ function bonkHint() { if (bonkTip) return; bonkTip = true; setTimeout(() => noti
 const lookK = () => 0.35 + settings.look * 0.13; // look speed 5 is the old feel
 canvas.addEventListener('mousedown', e => {
   if (reelOn) { skipReel(); return; }
+  if (arcade.active()) return;
   if (e.button === 2 && !menuOpen && !invOpen) { bonkDown(); return; }
   if (locked && e.button === 0) useDown();
   else if (!locked && !menuOpen && !invOpen && e.button === 0) relock(); // lost the mouse somehow: a click takes it back
@@ -2710,6 +2740,7 @@ function joyShow() {
 }
 canvas.addEventListener('pointerdown', e => {
   if (menuOpen || reelOn) return;
+  if (arcade.active()) { arcade.pointer('down', e); return; }
   const r_ = stage.getBoundingClientRect(), x = e.clientX - r_.left, y = e.clientY - r_.top;
   if (e.pointerType !== 'mouse' && !joy && x < r_.width * 0.42) { // the move stick, even while the mouse is locked
     joy = { id: e.pointerId, ox: x, oy: y, dx: 0, dy: 0 }; joyEl.dataset.used = '1'; try { canvas.setPointerCapture(e.pointerId); } catch (err) {} joyShow(); return;
@@ -2718,12 +2749,13 @@ canvas.addEventListener('pointerdown', e => {
   drag = { x: e.clientX, y: e.clientY, id: e.pointerId }; try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
 });
 canvas.addEventListener('pointermove', e => {
+  if (arcade.active()) { arcade.pointer('move', e); return; }
   if (joy && e.pointerId === joy.id) {
     const r_ = stage.getBoundingClientRect(); let dx = e.clientX - r_.left - joy.ox, dy = e.clientY - r_.top - joy.oy; const d = Math.hypot(dx, dy);
     if (d > JOY_R) { dx *= JOY_R / d; dy *= JOY_R / d; } joy.dx = dx; joy.dy = dy; joyShow(); return;
   }
   if (!drag || e.pointerId !== drag.id || camMode !== 'fp') return; const k = 0.005 * lookK(); player.yaw -= (e.clientX - drag.x) * k; player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch - (e.clientY - drag.y) * k)); drag.x = e.clientX; drag.y = e.clientY; });
-const endDrag = e => { if (joy && e.pointerId === joy.id) { joy = null; joyShow(); } if (drag && e.pointerId === drag.id) drag = null; }; // one finger lifting doesn't stop the other
+const endDrag = e => { if (arcade.active()) arcade.pointer('up', e); if (joy && e.pointerId === joy.id) { joy = null; joyShow(); } if (drag && e.pointerId === drag.id) drag = null; }; // one finger lifting doesn't stop the other
 canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 const holdBtn = (el, down, up) => {
@@ -2750,6 +2782,7 @@ addEventListener('keydown', e => {
     uiNav(a); return;
   }
   if (invOpen) { if (k === 'tab' || k === 'i' || k === 'escape') { e.preventDefault(); closeInv(); } return; }
+  if (arcade.active()) { arcade.key(k, true, e); return; } // stood at an arcade machine: Esc steps back, the rest is the game's
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); e.preventDefault(); }
   if (k === 'tab' || k === 'i') { e.preventDefault(); if (!e.repeat) openInv(); return; }
   if (k === ' ') { e.preventDefault(); if (!e.repeat) useDown(); }
@@ -2762,7 +2795,7 @@ addEventListener('keydown', e => {
   if (k === 'f' && !e.repeat && inter.cur && inter.cur.type === 'buy') haggle(inter.cur.sl);
   if ((k === 'escape' || k === 'p') && !e.repeat && performance.now() - lastUnlock > 500) openMenu();
 });
-addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === ' ') useUp(); if (k === 'v') bonkUp(); if (k === 'e') interactHeld = false; });
+addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (arcade.active()) arcade.key(k, false, e); if (k === ' ') useUp(); if (k === 'v') bonkUp(); if (k === 'e') interactHeld = false; });
 addEventListener('blur', () => { keys.clear(); interactHeld = false; bonkHold = -1; });
 
 document.addEventListener('pointerlockchange', () => {
@@ -2914,6 +2947,10 @@ function pollPad(rdt) {
   else if (ui.screen) {
     if (dir && dir !== padDir) { padRep = 0.38; uiNav(dir); } else if (dir && (padRep -= rdt) <= 0) { padRep = 0.11; uiNav(dir); }
     if (hit(0)) uiNav('ok'); else if (hit(1) || (hit(9) && ui.screen === 'pause')) uiNav('back');
+  } else if (arcade.active()) { // at an arcade machine: A is the button, B or Start steps back
+    const fake = { preventDefault() {}, repeat: false };
+    if (hit(1) || hit(9)) arcade.key('escape', true, fake);
+    else if (hit(0)) arcade.key(' ', true, fake); else if (!on(0) && padPrev[0]) arcade.key(' ', false, fake);
   } else if (hit(9)) openMenu();
   padDir = dir; padPrev = p.buttons.map(b => b.pressed);
 }
@@ -3196,18 +3233,17 @@ function noteUse(items) {
 }
 function sling(power) {
   const { origin, v } = launchParams(power);
-  const tossing = tossArmed; tossArmed = false; // a paid toss at the den costs no brew
-  const items = tossing ? [] : useCharge(); if (!tossing) { noteUse(items); if (!items.length) scoopT = 0.65; }
+  const items = useCharge(); noteUse(items); if (!items.length) scoopT = 0.65;
   const pred = trace(origin, v), predTargets = targetsAt(pred.point, pred.hitE);
   const plan = predTargets.length ? planBrew(items, predTargets, pred.point) : [];
   const notable = plan.some(b => b.tier >= 2 || b.extra);
   cine.use = predTargets.length > 0 && items.length > 0 && (settings.cine === 'always' || notable);
   cine.state = 'flight'; slingKills = []; dmgSrc = 'ladle';
   renderCards(items); renderSatchel();
-  const color = tossing ? new THREE.Color(0xFFD23A) : mixColor(items);
+  const color = mixColor(items);
   const mesh = meshOf(GEO.ico1, new THREE.MeshStandardMaterial({ color, emissive: color.clone().multiplyScalar(0.6), flatShading: true, transparent: true, opacity: 0.92 }));
   mesh.position.copy(origin); scene.add(mesh);
-  blob = { pos: origin.clone(), vel: v.clone(), mesh, t: 0, trail: 0, items, color, toss: tossing };
+  blob = { pos: origin.clone(), vel: v.clone(), mesh, t: 0, trail: 0, items, color };
   if (net.on) netEmit('throw', { rk: rkOf(room), o: origin.toArray().map(x => +x.toFixed(2)), v: v.toArray().map(x => +x.toFixed(2)), c: color.getHex() });
   vmState.swing = 1; vmState.full = 0; SFX.whoosh();
   if (cine.use) { camMode = 'follow'; setTS(0.4, 9); fovTarget = 58; fovRate = 5; stage.classList.add('cine'); SFX.slow(); startRec('ladle'); }
@@ -3219,15 +3255,14 @@ function stepBlob(dt) {
   const wob = 1 + Math.sin(b.t * 40) * 0.12; b.mesh.scale.set(wob * 0.17, (2 - wob) * 0.17, wob * 0.17);
   b.trail += dt; if (b.trail > 0.025) { b.trail = 0; burst(b.pos, b.color.getHex(), 1, 0.4, 0.45, 0.05, 2); }
   const hit = collide(b.pos);
-  if (hit || b.t > 4) { scene.remove(b.mesh); b.mesh.material.dispose(); blob = null; onImpact(b.pos.clone(), hit && hit.hitE, b.items, b.color, b.toss, hit && hit.hitS); }
+  if (hit || b.t > 4) { scene.remove(b.mesh); b.mesh.material.dispose(); blob = null; onImpact(b.pos.clone(), hit && hit.hitE, b.items, b.color, hit && hit.hitS); }
 }
 
 /* ================= the sling cinematic ================= */
-async function onImpact(point, hitE, items, color, toss, hitS) {
+async function onImpact(point, hitE, items, color, hitS) {
   let targets = targetsAt(point, hitE);
   burst(point, color.getHex(), 18, 5, 0.8, 0.09); floorRing(point, color.getHex(), 1.6, 0.4); SFX.splash(false);
   if (hitS) shroomStruck(hitS);
-  if (toss) { tossLand(point); return endSling(); }
   const swatted = targets.filter(e => e.T.swats && e.ph === 'live' && !(e.stun > 0) && !(e.frozen > 0) && mkFacing(e)); // a mantis bats away what you throw at its front
   if (swatted.length) { targets = targets.filter(e => !swatted.includes(e)); swatted.forEach(e => { e.swatT = 0.35; SFX.clang(); const sp = project(centerOf(e)); if (!sp.behind) callout('SWATTED', 1, { at: true, x: sp.x, y: sp.y }); }); }
   if (hitE && hitE.T.hover && !hitE.dead && !swatted.includes(hitE)) { hitE.stun = Math.max(hitE.stun, 2.6); const sp = project(centerOf(hitE)); if (!sp.behind) callout('KNOCKED DOWN', 2, { at: true, x: sp.x, y: sp.y }); } // a direct hit puts a lampcap on the floor
@@ -5009,78 +5044,606 @@ function updateTraps(sdt) {
   }
 }
 
-/* ================= the gambling den: cups on the counter, pots on the floor, a few plays each ================= */
-let den = null, tossArmed = false;
-const CUP_SL = [-0.55, 0, 0.55];
-function spawnDen(r) {
-  const dir = r.shopDir, entry = r.secretDoor, cupMat = M(0x9A2A22, { roughness: 0.5 }), trim = M(0xD9B44A, { metalness: 0.5, roughness: 0.4 });
-  const cups = CUP_SL.map((al, i) => {
-    const g = new THREE.Group(); g.add(at(meshOf(new THREE.CylinderGeometry(0.1, 0.15, 0.26, 12), cupMat), 0, 0.13, 0));
-    const band = at(meshOf(new THREE.TorusGeometry(0.135, 0.012, 4, 14), trim), 0, 0.06, 0); band.rotation.x = Math.PI / 2; g.add(band);
-    roomGroup.add(g); return { g, slot: i, up: false, lift: 0 };
-  });
-  const coin = meshOf(coinGeo, coinMat); roomGroup.add(coin);
-  // three pots at a toss line by the door: further pays more
-  const pots = [1, 2, 4].map((pay, i) => {
-    const [x, z] = wallXZ(entry, [-1.8, 1.8, 0][i], -(5.6 + i * 3)), g = new THREE.Group(); g.position.set(x, 0, z);
-    g.add(at(meshOf(new THREE.CylinderGeometry(0.46, 0.34, 0.44, 12), M(0x2B2A33)), 0, 0.22, 0));
-    const rim = at(meshOf(new THREE.TorusGeometry(0.46, 0.04, 5, 16), M(0x4A4850)), 0, 0.44, 0); rim.rotation.x = Math.PI / 2; g.add(rim);
-    const gold = at(meshOf(new THREE.CircleGeometry(0.42, 16), M(0xFFD23A, { emissive: 0x5A3A06 })), 0, 0.38, 0); gold.rotation.x = -Math.PI / 2; g.add(gold);
-    roomGroup.add(g); colliders.push({ x, z, r: 0.5, h: 0.45 });
-    const tag = document.createElement('div'); tag.className = 'ptag'; tag.innerHTML = `+${pay}<i class="coin"></i>`; $('#labels').appendChild(tag);
-    return { x, z, pay, tag };
-  });
-  const ns = entry === 'N' || entry === 'S', [lx, lz] = wallXZ(entry, 0, -3.0), line = at(meshOf(GEO.box, M(0xFFE14D, { emissive: 0x6A5A10 })), lx, 0.032, lz); line.scale.set(ns ? 5 : 0.08, 0.01, ns ? 0.08 : 5); roomGroup.add(line);
-  const [px, pz] = wallXZ(entry, 2.9, -3.0), post = new THREE.Group(); post.position.set(px, 0, pz);
-  post.add(at(meshOf(new THREE.CylinderGeometry(0.07, 0.09, 1.0, 6), M(0x6A4A2A)), 0, 0.5, 0));
-  const box = at(meshOf(GEO.box, M(0x2B2A33)), 0, 1.1, 0); box.scale.set(0.3, 0.26, 0.2); post.add(box);
-  const slotM = at(meshOf(GEO.box, M(0x0E0B10)), 0, 1.16, 0.104); slotM.scale.set(0.12, 0.025, 0.01); post.add(slotM); // the coin slot
-  post.rotation.y = WALL_RY[entry]; roomGroup.add(post); colliders.push({ x: px, z: pz, r: 0.25, h: 1.3 });
-  den = { r, dir, cups, coin, pots, post: new THREE.Vector3(px, 1.1, pz), state: 'idle', t: 0, coinCup: 0, swaps: [], swapT: 0.32 };
-}
-function playCups() {
-  const D_ = den.r.den; if (den.state !== 'idle' || D_.cups <= 0 || run.coins < 2) return;
-  run.coins -= 2; $('#coinNum').textContent = run.coins; D_.cups--;
-  den.coinCup = Math.floor(Math.random() * 3); den.cups.forEach((c, i) => { c.slot = i; c.up = i === den.coinCup; });
-  const n = Math.min(14, 6 + floorNum); den.swaps = Array.from({ length: n }, () => { const a = Math.floor(Math.random() * 3); let b = Math.floor(Math.random() * 2); if (b >= a) b++; return [a, b]; });
-  den.swapT = Math.max(0.2, 0.34 - floorNum * 0.02); den.state = 'show'; den.t = 0; SFX.gob(); if (goblin) goblin.hop = 0.5;
-}
-function pickCup(i) {
-  if (den.state !== 'pick') return; den.state = 'reveal'; den.t = 0; den.cups[i].up = true;
-  if (i === den.coinCup) { const [x, z] = wallXZ(den.dir, 0, -0.5); dropCoins(new THREE.Vector3(x, 1.1, z), 6); callout('WINNER', 2, { sub: '+6' }); SFX.fanfare(); if (goblin) goblin.shake = 0.5; }
-  else { setTimeout(() => { if (den) den.cups[den.coinCup].up = true; }, 450); callout('NOPE', 1); SFX.nope(); if (goblin) goblin.hop = 0.5; }
-}
-function updateDen(sdt) {
-  if (!den) return; const d = den; d.t += sdt;
-  const place = (c, al, off, lift) => { const [x, z] = wallXZ(d.dir, al, 0.8 + off); c.g.position.set(x, 0.845 + lift, z); };
-  if (d.state === 'shuffle') {
-    const sw = d.swaps[0];
-    if (!sw) { d.state = 'pick'; d.t = 0; }
-    else {
-      const k = Math.min(1, d.t / d.swapT), e = k * k * (3 - 2 * k), ca = d.cups.find(c => c.slot === sw[0]), cb = d.cups.find(c => c.slot === sw[1]);
-      place(ca, CUP_SL[sw[0]] + (CUP_SL[sw[1]] - CUP_SL[sw[0]]) * e, Math.sin(e * Math.PI) * 0.2, 0); // one passes behind, the other in front
-      place(cb, CUP_SL[sw[1]] + (CUP_SL[sw[0]] - CUP_SL[sw[1]]) * e, -Math.sin(e * Math.PI) * 0.2, 0);
-      d.cups.forEach(c => { if (c !== ca && c !== cb) place(c, CUP_SL[c.slot], 0, 0); });
-      if (k >= 1) { ca.slot = sw[1]; cb.slot = sw[0]; d.swaps.shift(); d.t = 0; SFX.tick(); }
-    }
-  } else {
-    d.cups.forEach(c => { c.lift += ((c.up ? 0.32 : 0) - c.lift) * Math.min(1, sdt * 10); place(c, CUP_SL[c.slot], 0, c.lift); });
-    if (d.state === 'show' && d.t > 1.1) { d.cups.forEach(c => { c.up = false; }); if (d.t > 1.5) { d.state = 'shuffle'; d.t = 0; } }
-    if (d.state === 'reveal' && d.t > 1.9) { d.cups.forEach(c => { c.up = false; }); if (d.t > 2.3) { d.state = 'idle'; d.t = 0; } }
+/* ================= the goblin arcade: a gnome's secret arcade. Coins go in, tickets come out, the prize counter turns them into things ================= */
+// It's laid out in the room's own frame, so it fits whichever way the secret room faces:
+// v runs from the counter wall (0) toward the door, u runs across the room, and negative v is behind the counter.
+const ARC_PLAYS = { flap: 3, skee: 3, cups: 3 }; // goes per machine per visit, then the gnome hangs a CLOSED sign on it
+const ARC_PRIZES = [
+  { id: 'ing', name: 'INGREDIENT', note: 'A RANDOM ONE OFF THE SHELF', cost: 10 },
+  { id: 'coins', name: '5 COINS', note: 'TICKETS BACK INTO MONEY', cost: 25 },
+  { id: 'item', name: 'MYSTERY ITEM', note: 'ONE FROM THE SHOP LIST', cost: 60 },
+  { id: 'crown', name: 'PAPER CROWN', note: 'FOR YOUR BREWER · ONLY SOLD HERE', cost: 100 },
+];
+const unlocked = k => !!(store.get('slingcam.unlocks', {}) || {})[k];
+const arcade = (() => {
+  let A = null, play = null; // the room's arcade bits; what you're stood at playing: { S, k, back, frozen, fromP, fromQ, toQ }
+  const sm = k => k * k * (3 - 2 * k), lerp = (a, b, k) => a + (b - a) * k, clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const screenEl = $('#arcScreen'), sx = screenEl.getContext('2d'), hudEl = $('#arcHud'), hudMain = hudEl.querySelector('b'), hudSub = hudEl.querySelector('span'), hudBtn = hudEl.querySelector('button');
+  const backEl = $('#arcBack'), prizeEl = $('#arcPrizes'), tixEl = $('#tix'), tixNum = $('#tixNum');
+
+  /* ---------- sound: built on the game's own synth ---------- */
+  const tone = (type, f0, f1, dur, vol, at = 0) => { if (live()) osc(type, f0, f1, AC.currentTime + at, dur, vol); };
+  const hiss = (type, f0, f1, dur, vol, at = 0) => { if (live()) noiseBurst(type, f0, f1, 2, AC.currentTime + at, dur, vol); };
+  const ASFX = {
+    coin() { tone('triangle', 1900, null, 0.07, 0.08); tone('triangle', 2500, null, 0.18, 0.07, 0.06); hiss('lowpass', 700, 300, 0.08, 0.06, 0.14); }, // a clink, then the thunk down the slot
+    tickets(n) { for (let i = 0; i < Math.min(14, n); i++) { tone('square', 2200, 1600, 0.025, 0.03, i * 0.045); hiss('highpass', 3000, 4000, 0.03, 0.04, i * 0.045); } },
+    mutter() { let t = 0; for (let i = 0; i < 4 + Math.floor(Math.random() * 3); i++) { const f = 280 + Math.random() * 420; tone('square', f, f * rand(0.75, 1.35), 0.07, 0.04, t); t += rand(0.06, 0.11); } },
+    blip(f, d, type = 'square') { tone(type, f, null, d, 0.05); },
+    slide() { hiss('bandpass', 1800, 1200, 0.12, 0.06); },
+    thunk() { tone('sine', 160, 60, 0.14, 0.18); },
+    ding(k = 1) { tone('triangle', 880 * k, null, 0.25, 0.08); tone('triangle', 1320 * k, null, 0.3, 0.06, 0.05); },
+    win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, null, 0.22, 0.08, i * 0.07)); },
+    lose() { tone('sawtooth', 300, 110, 0.4, 0.06); },
+    whoosh() { hiss('bandpass', 400, 1400, 0.35, 0.07); },
+  };
+  // Dragon Flap's tune: 16 steps of melody and bass, looped while you're playing it
+  const NOTE = n => 440 * Math.pow(2, (n - 69) / 12), TUNE = { mel: [76, 0, 79, 0, 81, 79, 76, 0, 74, 0, 76, 0, 72, 0, 0, 0], bass: [45, 0, 45, 0, 52, 0, 52, 0, 43, 0, 43, 0, 50, 0, 50, 0] };
+  let tuneStep = 0, tuneNext = 0;
+  setInterval(() => {
+    if (!live() || !play || play.S.kind !== 'cab' || !play.frozen || flap.st !== 'play' || flap.hold || menuOpen) { tuneNext = 0; return; }
+    const len = 60 / 150 / 2; if (!tuneNext) tuneNext = AC.currentTime + 0.05;
+    while (tuneNext < AC.currentTime + 0.12) { const k = tuneStep % 16, t0 = tuneNext; if (TUNE.mel[k]) osc('square', NOTE(TUNE.mel[k]), null, t0, len * 0.9, 0.02); if (TUNE.bass[k]) osc('triangle', NOTE(TUNE.bass[k]), null, t0, len * 1.6, 0.05); tuneStep++; tuneNext += len; }
+  }, 30);
+
+  /* ---------- tickets ---------- */
+  function award(n) {
+    if (!n) return; run.tickets += n; showTix(); ASFX.tickets(n);
+    tixEl.classList.remove('bump'); void tixEl.offsetWidth; tixEl.classList.add('bump');
   }
-  const cc = d.cups[d.coinCup].g.position; d.coin.position.set(cc.x, 0.857, cc.z); // the coin rides under its cup
-}
-function armToss() {
-  const D_ = den.r.den; if (tossArmed || D_.toss <= 0 || run.coins < 1) return;
-  run.coins -= 1; $('#coinNum').textContent = run.coins; D_.toss--; tossArmed = true;
-  if (tool !== 'ladle') { tool = 'ladle'; vmState.raise = 1; renderTool(); updateHint(); }
-  notice('TOSS READY<em>SLING AT A POT</em>'); SFX.pop();
-}
-function tossLand(point) {
-  const pot = den && den.pots.find(p => Math.hypot(p.x - point.x, p.z - point.z) < 0.62);
-  if (pot) { dropCoins(new THREE.Vector3(pot.x, 0.9, pot.z), pot.pay); burst(new THREE.Vector3(pot.x, 0.6, pot.z), 0xFFD23A, 20, 4, 0.8, 0.07, 4, true); callout(pot.pay === 4 ? 'NOTHING BUT POT' : 'SWISH', pot.pay === 4 ? 3 : 2, { sub: '+' + pot.pay }); SFX.fanfare(); }
-  else callout('brick', 1);
-}
+  const showTix = () => { tixNum.textContent = run.tickets; };
+  const payCoins = n => { if (run.coins < n) return false; gainCoins(-n, true); ASFX.coin(); return true; };
+
+  /* ---------- the room's frame, and some shapes ---------- */
+  function frame(r) {
+    const b = DIRS[r.shopDir], nb = { x: -b.nx, z: -b.nz }, rt = { x: -nb.z, z: nb.x }, ext = b.nx ? W : D;
+    const V3 = (u, y, v) => new THREE.Vector3(b.nx * ext + nb.x * v + rt.x * u, y, b.nz * ext + nb.z * v + rt.z * u);
+    return { V3, half: b.nx ? D : W, depth: ext * 2, yIn: Math.atan2(nb.x, nb.z), yRt: Math.atan2(rt.x, rt.z) };
+  }
+  const box = (w, h, d, mt, x, y, z) => at(meshOf(new THREE.BoxGeometry(w, h, d), mt), x, y, z);
+  const glow = c => new THREE.MeshBasicMaterial({ color: c });
+  function textTex(text, w, h, col, size, bg) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'), t = new THREE.CanvasTexture(c);
+    const draw = () => {
+      x.clearRect(0, 0, w, h); if (bg) { x.fillStyle = bg; x.fillRect(0, 0, w, h); }
+      let fs = size; x.font = `400 ${fs}px Anton, Impact, sans-serif`; const fw = x.measureText(text).width; if (fw > w * 0.9) { fs = Math.floor(fs * w * 0.9 / fw); x.font = `400 ${fs}px Anton, Impact, sans-serif`; } // long names shrink to fit
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.shadowColor = col; x.shadowBlur = h * 0.18; x.fillStyle = col; x.fillText(text, w / 2, h / 2 + 2);
+      x.shadowBlur = 0; x.globalAlpha = 0.5; x.fillStyle = '#FFFFFF'; x.fillText(text, w / 2, h / 2 + 2); x.globalAlpha = 1; t.needsUpdate = true;
+    };
+    draw(); if (document.fonts) document.fonts.ready.then(draw); return t;
+  }
+  function carpet() {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(16, 18); t.magFilter = THREE.NearestFilter; /* a metre a tile */
+    x.fillStyle = '#1B1030'; x.fillRect(0, 0, 128, 128); x.lineWidth = 3; x.lineCap = 'round';
+    const inks = ['#FF3D9A', '#5FF2D6', '#FFE14D', '#7A4AE0']; let s = 3; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 14; i++) {
+      x.strokeStyle = inks[i % 4]; x.globalAlpha = 0.5; const px = rnd() * 128, py = rnd() * 128; x.beginPath();
+      if (i % 3 === 0) { x.moveTo(px, py); for (let k = 1; k < 5; k++) x.lineTo(px + k * 7, py + (k % 2 ? -7 : 0)); }
+      else if (i % 3 === 1) x.arc(px, py, 5 + rnd() * 4, 0, 6.3);
+      else { x.moveTo(px, py - 6); x.lineTo(px + 5, py + 4); x.lineTo(px - 5, py + 4); x.closePath(); }
+      x.stroke();
+    }
+    return t;
+  }
+
+  /* ---------- the cabinets: side panels cut to the classic profile, a slanted control panel, the monitor leaning back ---------- */
+  const PROFILE = [[-0.4, 0], [0.34, 0], [0.34, 0.85], [0.5, 0.92], [0.5, 0.97], [0.34, 1.1], [0.3, 1.12], [0.18, 1.8], [0.28, 1.86], [0.28, 2.14], [-0.4, 2.14]];
+  let sideGeo = null;
+  const side = () => { if (!sideGeo) { const sh = new THREE.Shape(); PROFILE.forEach(([x, y], k) => k ? sh.lineTo(x, y) : sh.moveTo(x, y)); sh.closePath(); sideGeo = new THREE.ExtrudeGeometry(sh, { depth: 0.05, bevelEnabled: false }); sideGeo.userData.shared = true; } return sideGeo; };
+  const slab = (w, thick, mt, a, b) => { const dz = b[0] - a[0], dy = b[1] - a[1], m = meshOf(new THREE.BoxGeometry(w, Math.hypot(dz, dy), thick), mt); m.position.set(0, (a[1] + b[1]) / 2, (a[0] + b[0]) / 2); m.rotation.x = Math.atan2(dz, dy); return m; }; // spans profile points a→b
+  const CABS = [['DRAGON FLAP', 0x3A2F7A, '#FFE14D'], ['BREWKOUT', 0x7A2F5A, '#FF3D9A'], ['SLIME SNAKE', 0x1F5A6A, '#C8F25A'], ['GOBLIN INVADERS', 0x5A4A1F, '#5FF2D6']];
+  function cabinet(i, F, v) {
+    const [name, col, accent] = CABS[i], g = new THREE.Group(), face = M(col), sideM = M(new THREE.Color(col).multiplyScalar(0.42).getHex()), dark = M(0x0E0B12), wIn = 0.8;
+    const trim = new THREE.LineBasicMaterial({ color: accent });
+    for (const sxp of [0.45, -0.4]) {
+      const p = meshOf(side(), sideM); p.rotation.y = -Math.PI / 2; p.position.x = sxp; g.add(p);
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(side()), trim); e.rotation.y = -Math.PI / 2; e.position.x = sxp + (sxp > 0 ? 0.002 : -0.002); g.add(e); // the glowing T-moulding round the rim
+    }
+    const P_ = PROFILE;
+    g.add(slab(wIn, 0.03, face, [0.325, 0], [0.325, 0.85]));
+    g.add(box(0.26, 0.3, 0.02, dark, 0, 0.48, 0.345)); for (const cx of [-0.06, 0.06]) g.add(box(0.03, 0.07, 0.01, glow(0xFF8A2A), cx, 0.54, 0.357)); // the coin door
+    g.add(slab(wIn, 0.03, face, [0.34, 0.85], [0.5, 0.92])); g.add(slab(wIn, 0.05, dark, [0.5, 0.92], [0.5, 0.97]));
+    const panel = slab(wIn, 0.03, M(0x1A1420), [0.5, 0.97], [0.34, 1.1]); g.add(panel); g.add(slab(wIn, 0.02, dark, [0.34, 1.1], [0.3, 1.12]));
+    const onPanel = (o, x, t) => { o.position.set(x, 0.97 + 0.13 * t + 0.02, 0.5 - 0.16 * t); o.rotation.x = panel.rotation.x + Math.PI / 2; g.add(o); }; // standing up off the slanted panel
+    [[-0.05, 0xFF3D3D], [0.09, 0xFFE14D], [0.23, 0x3DA0FF]].forEach(([bx, bc]) => onPanel(meshOf(new THREE.CylinderGeometry(0.032, 0.032, 0.03, 8), glow(bc)), bx, 0.5));
+    const stick = new THREE.Group(); stick.add(at(meshOf(new THREE.CylinderGeometry(0.011, 0.011, 0.1, 5), dark), 0, 0.05, 0)); stick.add(at(meshOf(new THREE.IcosahedronGeometry(0.034, 1), glow(0xFF3D3D)), 0, 0.11, 0)); onPanel(stick, -0.24, 0.5);
+    const mon = slab(wIn, 0.03, face, P_[6], P_[7]); g.add(mon);
+    const tilt = mon.rotation.x, nrm = new THREE.Vector3(0, -Math.sin(tilt), Math.cos(tilt)), mid = new THREE.Vector3(0, (P_[6][1] + P_[7][1]) / 2, (P_[6][0] + P_[7][0]) / 2);
+    const bez = meshOf(new THREE.BoxGeometry(0.5, 0.62, 0.012), dark); bez.position.copy(mid).addScaledVector(nrm, 0.02); bez.rotation.x = tilt; g.add(bez);
+    // every monitor stands on end, like the old vertical cabinets: Dragon Flap shows the real game, the others aren't plugged in yet
+    const cv = i === 0 ? flap.cv : outOfOrder(name, accent), tex = new THREE.CanvasTexture(cv); tex.magFilter = tex.minFilter = THREE.NearestFilter;
+    const screen = meshOf(new THREE.PlaneGeometry(0.42, 0.56), new THREE.MeshBasicMaterial({ map: tex })); screen.position.copy(mid).addScaledVector(nrm, 0.03); screen.rotation.x = tilt; g.add(screen);
+    g.add(slab(wIn, 0.02, dark, P_[7], P_[8]));
+    g.add(slab(0.74, 0.012, glow(new THREE.Color(accent).getHex()), [P_[7][0] + 0.01, P_[7][1] - 0.012], [P_[8][0] - 0.005, P_[8][1] - 0.012])); // a light strip under the marquee
+    const marq = meshOf(new THREE.PlaneGeometry(wIn, 0.26), new THREE.MeshBasicMaterial({ map: textTex(name, 256, 84, accent, 46, '#0A0810') })); marq.position.set(0, 2.0, 0.285); g.add(marq);
+    g.add(box(wIn, 0.03, 0.68, face, 0, 2.125, -0.06)); g.add(box(wIn, 2.14, 0.03, dark, 0, 1.07, -0.385));
+    const pos = F.V3(-F.half + 0.45, 0, v); g.position.copy(pos); g.rotation.y = F.yRt; roomGroup.add(g);
+    colliders.push({ x: pos.x, z: pos.z, r: 0.55, h: 2.2 });
+    g.updateMatrixWorld(true);
+    const c = new THREE.Vector3(), n = nrm.clone().applyQuaternion(g.quaternion); screen.getWorldPosition(c);
+    return { id: 'cab' + i, kind: i === 0 ? 'cab' : 'broken', name, plays: i === 0 ? 'flap' : null, cost: 1, target: c.clone(), close: c.clone().addScaledVector(n, 0.82), look: c.clone(), screen, tex, fov: 50 };
+  }
+  function outOfOrder(name, accent) {
+    const c = document.createElement('canvas'); c.width = 192; c.height = 256; const x = c.getContext('2d');
+    x.fillStyle = '#07060A'; x.fillRect(0, 0, 192, 256);
+    for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(160,150,190,${(Math.random() * 0.25).toFixed(2)})`; x.fillRect(Math.random() * 192 | 0, Math.random() * 256 | 0, 2, 1); } // static
+    x.font = '24px VT323, monospace'; x.textAlign = 'center'; x.fillStyle = accent; x.fillText(name, 96, 90);
+    x.save(); x.translate(96, 150); x.rotate(-0.35); x.fillStyle = '#FFE14D'; x.fillRect(-120, -14, 240, 28); x.fillStyle = '#1A1206'; x.font = '22px VT323, monospace'; x.fillText('OUT OF ORDER', 0, 7); x.restore();
+    return c;
+  }
+
+  /* ---------- Dragon Flap: a baby dragon through the drain pipes ---------- */
+  const flap = (() => {
+    const cv = document.createElement('canvas'); cv.width = 192; cv.height = 256; const fx = cv.getContext('2d'); fx.imageSmoothingEnabled = false;
+    const FW = 192, FH = 256, GRAV = 620, FLAP = -205, PIPE_W = 26;
+    const PAY = [[0, 2, 1], [3, 7, 2], [8, 14, 4], [15, 24, 7], [25, Infinity, 10]];
+    const G = { st: 'attract', y: 120, vy: 0, pipes: [], score: 0, t: 0, dist: 0, won: 0, flapT: -1, hold: false, best: store.get('slingcam.arcade.flap', 0) };
+    let embers = [];
+    const gapFor = s => Math.max(62, 84 - s * 1.2), speedFor = s => Math.min(118, 72 + s * 2);
+    const px = (x, y, w, h, c) => { fx.fillStyle = c; fx.fillRect(Math.round(x), Math.round(y), w, h); };
+    const text = (s, x, y, size, col) => { fx.font = size + 'px VT323, monospace'; fx.textAlign = 'center'; fx.fillStyle = col; fx.fillText(s, x, y); };
+    const hash = (a, b) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v); };
+    function addPipe(x) { const gap = gapFor(G.score); G.pipes.push({ x, top: 30 + Math.random() * (FH - 80 - gap), gap, passed: false, seed: Math.random() * 100 }); }
+    function start() {
+      if (!room.den || room.den.flap <= 0) { G.st = 'closed'; G.t = 0; return; }
+      if (!payCoins(1)) { G.st = 'broke'; G.t = 0; return; }
+      room.den.flap--; Object.assign(G, { st: 'play', y: 120, vy: FLAP * 0.6, pipes: [], score: 0, t: 0, dist: 0, hold: false });
+      for (let i = 0; i < 3; i++) addPipe(170 + i * 92);
+    }
+    function flapUp() {
+      G.hold = false; // a flap picks a paused run back up
+      if (G.st === 'play') { G.vy = FLAP; G.flapT = G.t; for (let i = 0; i < 4; i++) embers.push({ x: 59, y: G.y - 2 + Math.random() * 3, vx: 50 + Math.random() * 40, vy: -10 + Math.random() * 20, life: 0.35 + Math.random() * 0.2, t: 0 }); ASFX.blip(520, 0.05, 'triangle'); }
+      else if (G.st === 'over' && G.t > 0.8) { G.st = 'attract'; G.t = 0; }
+      else if (G.st !== 'over') start();
+    }
+    function die() {
+      G.st = 'over'; G.t = 0; G.won = PAY.find(([a, b]) => G.score >= a && G.score <= b)[2]; award(G.won); ASFX.lose();
+      if (G.score > G.best) { G.best = G.score; store.set('slingcam.arcade.flap', G.best); }
+    }
+    // the baby dragon, Clash of Clans style: painted from round shapes into a tiny grid, then outlined
+    const DW = 28, DH = 24;
+    function dragonSprite(up) {
+      const grid = Array.from({ length: DH }, () => Array(DW).fill(null));
+      const ell = (cx, cy, rx, ry, c) => { for (let y = 0; y < DH; y++) for (let x = 0; x < DW; x++) if (((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1) grid[y][x] = c; };
+      const dot = (x, y, c) => { if (grid[y] && x >= 0 && x < DW) grid[y][x] = c; };
+      ell(5, 15, 3, 2, '#4FA83C'); ell(2.6, 13.4, 1.8, 1.4, '#4FA83C'); dot(0, 12, '#F2C26A'); dot(1, 11, '#F2C26A'); dot(1, 12, '#F2C26A');
+      ell(12, 15, 7, 6, '#5DBB46'); ell(13.5, 16.5, 4.4, 3.8, '#D8EE8A'); ell(9, 17, 3, 2.5, '#4FA83C');
+      if (up) { ell(10, 6.5, 3.2, 4.8, '#E8803A'); ell(9.6, 5.6, 1.8, 3.2, '#FFB06A'); dot(10, 1, '#C8602A'); dot(7, 3, '#C8602A'); dot(12, 2, '#C8602A'); }
+      else { ell(9, 12, 4.6, 2.6, '#E8803A'); ell(8.4, 11.4, 3, 1.3, '#FFB06A'); dot(4, 13, '#C8602A'); }
+      ell(10, 21, 2, 1.6, '#3E8A32'); ell(15, 21, 2, 1.6, '#3E8A32'); dot(9, 22, '#F2EEE4'); dot(14, 22, '#F2EEE4');
+      ell(18, 9, 7, 6.6, '#5DBB46'); ell(23.5, 11.5, 3.6, 2.8, '#6CCB52'); ell(15.5, 12.5, 2.4, 1.6, '#4FA83C');
+      dot(14, 2, '#F2C26A'); dot(13, 1, '#F2C26A'); dot(14, 1, '#F2C26A'); dot(19, 2, '#F2C26A'); dot(19, 1, '#F2C26A'); dot(20, 0, '#F2C26A');
+      ell(20, 8, 3, 3.2, '#FFFFFF'); ell(21, 8.4, 1.7, 2, '#1A1020'); dot(20, 7, '#FFFFFF');
+      dot(25, 10, '#2A4A1E'); dot(22, 13, '#2A4A1E'); dot(23, 13, '#2A4A1E'); dot(24, 12, '#2A4A1E'); dot(17, 12, '#F58A9A');
+      const out = grid.map(r => r.slice());
+      for (let y = 0; y < DH; y++) for (let x = 0; x < DW; x++) if (!grid[y][x] && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => grid[y + b] && grid[y + b][x + a])) out[y][x] = '#1A1020';
+      const c = document.createElement('canvas'); c.width = DW; c.height = DH; const g = c.getContext('2d');
+      out.forEach((r, y) => r.forEach((col, x) => { if (col) { g.fillStyle = col; g.fillRect(x, y, 1, 1); } }));
+      return c;
+    }
+    const DRAGON = [dragonSprite(false), dragonSprite(true)];
+    function drawDragon(y, vy, flapT) { fx.save(); fx.translate(46, Math.round(y)); fx.rotate(Math.round(clamp(vy / 380, -0.4, 0.8) / 0.2) * 0.2); fx.drawImage(DRAGON[flapT < 0.14 ? 1 : 0], -15, -13); fx.restore(); } // tilts in steps, so the pixels stay crisp
+    // the drain pipes: shaded like cylinders, iron bands with rivets, a lip at the mouth, moss off the rim, drips across the gap
+    const PIPE_COLS = [[0, 2, '#1E1726'], [2, 6, '#2E2539'], [6, 12, '#3E3350'], [12, 17, '#54476A'], [17, 20, '#6E5F88'], [20, 23, '#45395A'], [23, 26, '#2A2135']];
+    const LIP_COLS = [[0, 3, '#251C30'], [3, 9, '#3E3350'], [9, 16, '#5A4C72'], [16, 21, '#7E6E9A'], [21, 26, '#4A3E60'], [26, 32, '#2A2135']];
+    function pipeBody(x, y0, y1, band0) {
+      if (y1 <= y0) return;
+      for (const [a, b, c] of PIPE_COLS) px(x + a, y0, b - a, y1 - y0, c);
+      for (let y = band0; y < y1; y += 26) {
+        const top = Math.max(y0, y), h = Math.min(y1, y + 4) - top; if (h <= 0) continue;
+        px(x - 1, top, PIPE_W + 2, h, '#5E5070'); px(x - 1, top, PIPE_W + 2, 1, '#8A7AA6');
+        if (y + 2 >= y0 && y + 2 < y1) for (const rx of [3, 13, 22]) px(x + rx, y + 2, 1, 1, '#B8A8D2');
+      }
+    }
+    function lip(x, y, down) { for (const [a, b, c] of LIP_COLS) px(x - 3 + a, y, b - a, 8, c); px(x - 3, down ? y + 7 : y, PIPE_W + 6, 1, '#0E0A12'); px(x - 3, down ? y : y + 7, PIPE_W + 6, 1, '#8A7AA6'); }
+    function drawPipe(p) {
+      const x = Math.round(p.x), top = Math.round(p.top), bot = top + p.gap, seed = p.seed;
+      pipeBody(x, 0, top - 8, (top - 8) % 26 - 26); lip(x, top - 8, true); pipeBody(x, bot + 8, FH - 12, bot + 20); lip(x, bot, false);
+      for (let k = 0; k < PIPE_W + 6; k++) {
+        const r = hash(seed, k), len = r < 0.45 ? 0 : 1 + Math.floor(hash(k, seed) * (r > 0.85 ? 5 : 3));
+        if (len) { px(x - 3 + k, top, 1, len, r > 0.7 ? '#7AB84A' : '#4E8A3A'); if (len > 3) px(x - 3 + k, top + len, 1, 1, '#5FF2D6'); }
+        const t2 = hash(seed + 7, k); if (t2 > 0.62) px(x - 3 + k, bot - (t2 > 0.86 ? 2 : 1), 1, t2 > 0.86 ? 2 : 1, t2 > 0.8 ? '#7AB84A' : '#4E8A3A');
+      }
+      const k = ((G.t + seed * 3) % 1.6) / 1.6, dx = x + 6 + Math.floor(hash(seed, 3) * 14);
+      if (k < 0.3) px(dx, top + 1, 2, 1 + Math.floor(k * 7), '#5FF2D6');
+      else { const dy = top + 2 + (k - 0.3) / 0.7 * (p.gap - 4); if (dy < bot - 2) { px(dx, dy, 2, 3, '#5FF2D6'); px(dx, dy - 2, 1, 2, '#2E8A7A'); } else { px(dx - 2, bot - 1, 1, 1, '#5FF2D6'); px(dx + 3, bot - 1, 1, 1, '#5FF2D6'); } }
+    }
+    function drawBack(scroll) {
+      fx.fillStyle = '#120E16'; fx.fillRect(0, 0, FW, FH); fx.fillStyle = '#1C1622';
+      for (let r = 0; r < 16; r++) { const off = (r % 2 ? 10 : 0) - (scroll * 0.3) % 20; for (let c = -1; c < 11; c++) fx.fillRect(c * 20 + off, r * 16, 18, 14); }
+      for (const tx of [40, 140]) { const x = ((tx - scroll * 0.3) % 220 + 220) % 220 - 14; fx.fillStyle = '#5A3A26'; fx.fillRect(x, 70, 4, 12); fx.fillStyle = Math.sin(G.t * 20 + tx) > 0 ? '#FFB547' : '#FF8A2A'; fx.fillRect(x - 1, 62, 6, 8); }
+      fx.fillStyle = '#0B080E'; fx.fillRect(0, FH - 12, FW, 12);
+    }
+    function step(dt, active) {
+      G.t += dt;
+      if (!active || G.st !== 'play' || G.hold) return;
+      const sp = speedFor(G.score); G.dist += sp * dt; G.vy += GRAV * dt; G.y += G.vy * dt;
+      for (const p of G.pipes) p.x -= sp * dt;
+      if (G.pipes.length && G.pipes[0].x < -PIPE_W - 4) { G.pipes.shift(); addPipe(G.pipes[G.pipes.length - 1].x + 92); }
+      for (const p of G.pipes) {
+        if (!p.passed && p.x + PIPE_W < 40) { p.passed = true; G.score++; ASFX.blip(990, 0.05); }
+        if (46 + 9 > p.x && 46 - 10 < p.x + PIPE_W && (G.y - 7 < p.top || G.y + 7 > p.top + p.gap)) { die(); return; }
+      }
+      if (G.y > FH - 16 || G.y < -20) die();
+    }
+    function draw() {
+      const live_ = G.st === 'play' || G.st === 'over';
+      drawBack(live_ ? G.dist : G.t * 40);
+      if (live_) G.pipes.forEach(drawPipe);
+      if (!live_) {
+        text('DRAGON', FW / 2, 70, 34, '#FFE14D'); text('FLAP', FW / 2, 100, 34, '#FFE14D');
+        drawDragon(140 + Math.sin(G.t * 3) * 8, Math.cos(G.t * 3) * 60, (G.t * 2.2) % 1);
+        const left = room && room.den ? room.den.flap : 0;
+        if (G.st === 'broke') { text('NEED A COIN', FW / 2, 190, 18, '#FF3D9A'); }
+        else if (G.st === 'closed' || left <= 0) { text('CLOSED', FW / 2, 190, 22, '#FF3D9A'); text('COME BACK NEXT TIME', FW / 2, 206, 14, '#A99CB6'); }
+        else { if (Math.sin(G.t * 4) > -0.3) text('INSERT COIN · TAP', FW / 2, 192, 16, '#FF3D9A'); text(left + (left === 1 ? ' PLAY LEFT' : ' PLAYS LEFT'), FW / 2, 208, 14, '#A99CB6'); }
+        text('BEST ' + G.best, FW / 2, 232, 14, '#A99CB6');
+      } else {
+        drawDragon(G.y, G.st === 'over' ? 300 : G.vy, G.st === 'over' ? 1 : G.t - G.flapT);
+        embers = embers.filter(e => (e.t += 1 / 60) < e.life);
+        embers.forEach(e => { e.x += e.vx / 60; e.y += e.vy / 60; const k = e.t / e.life; px(e.x, e.y, k < 0.5 ? 3 : 2, k < 0.5 ? 3 : 2, k < 0.3 ? '#FFE14D' : k < 0.6 ? '#FF8A2A' : '#9A2A22'); });
+        text(String(G.score), FW / 2, 30, 30, '#FFFFFF');
+        if (G.hold && G.st === 'play') { fx.fillStyle = 'rgba(8,6,10,.6)'; fx.fillRect(0, 100, FW, 52); text('PAUSED', FW / 2, 124, 24, '#FFE14D'); text('FLAP TO CARRY ON', FW / 2, 142, 14, '#A99CB6'); }
+      }
+      if (G.st === 'over') {
+        fx.fillStyle = 'rgba(8,6,10,.75)'; fx.fillRect(16, 74, FW - 32, 104);
+        text('SPLAT', FW / 2, 98, 26, '#FF3D9A'); text(G.score + (G.score === 1 ? ' GATE' : ' GATES'), FW / 2, 120, 18, '#FFFFFF');
+        text('+' + G.won + (G.won === 1 ? ' TICKET' : ' TICKETS'), FW / 2, 142, 20, '#FF8A2A');
+        if (G.t > 0.8 && Math.sin(G.t * 4) > -0.3) text('TAP TO CONTINUE', FW / 2, 166, 14, '#A99CB6');
+      }
+    }
+    return {
+      cv, G, step, draw, get st() { return G.st; }, get hold() { return G.hold; },
+      key(k, down, rep) { if (down && !rep && [' ', 'w', 'arrowup', 'enter'].includes(k)) flapUp(); },
+      pointer(type) { if (type === 'down') flapUp(); },
+      leave() { if (G.st === 'play') G.hold = true; if (G.st === 'broke' || G.st === 'closed') G.st = 'attract'; },
+      reset() { if (G.st !== 'play') { G.st = 'attract'; G.t = 0; } },
+    };
+  })();
+
+  /* ---------- skee-ball: hold to wind up, let go to roll; nine balls a game ---------- */
+  const SK = { st: 'idle', balls: 9, score: 0, aim: 0, hold: null, keys: new Set(), ball: null, last: '', lastT: 0, won: 0, best: store.get('slingcam.arcade.skee', 0) };
+  const SK_PAY = [[0, 49, 1], [50, 119, 2], [120, 199, 4], [200, 299, 7], [300, Infinity, 10]];
+  const laneY = z => 0.605 + (0.15 - z) * 0.1; // the lane's surface, rising toward the board
+  const skPower = () => SK.hold == null ? 0 : 1 - Math.abs(((performance.now() - SK.hold) / 800) % 2 - 1); // up for 0.8 s and back down: hold it too long and it fades
+  function skeeTex() {
+    const c = document.createElement('canvas'); c.width = 220; c.height = 270; const x = c.getContext('2d'), cx = 110, cy = 165, S = 250;
+    x.fillStyle = '#1A1024'; x.fillRect(0, 0, 220, 270);
+    [[0.36, '#3A2050'], [0.26, '#FF3D9A'], [0.17, '#5FF2D6'], [0.08, '#FFE14D']].forEach(([r, col]) => { x.fillStyle = col; x.beginPath(); x.arc(cx, cy, r * S, 0, 6.3); x.fill(); x.fillStyle = '#0A0610'; x.beginPath(); x.arc(cx, cy, r * S - 7, 0, 6.3); x.fill(); x.globalAlpha = 0.25; x.fillStyle = col; x.beginPath(); x.arc(cx, cy, r * S - 7, 0, 6.3); x.fill(); x.globalAlpha = 1; });
+    for (const s_ of [-1, 1]) { x.fillStyle = '#FF8A2A'; x.beginPath(); x.arc(cx + s_ * 0.33 * S, 35, 15, 0, 6.3); x.fill(); x.fillStyle = '#0A0610'; x.beginPath(); x.arc(cx + s_ * 0.33 * S, 35, 10, 0, 6.3); x.fill(); }
+    const label = () => { x.font = '400 18px Anton, Impact, sans-serif'; x.textAlign = 'center'; x.fillStyle = '#FFFFFF'; [[10, cy + 0.31 * S], [20, cy + 0.215 * S], [30, cy + 0.125 * S], [50, cy + 6]].forEach(([n, y]) => x.fillText(String(n), cx, y)); x.font = '400 14px Anton, Impact, sans-serif'; x.fillStyle = '#FF8A2A'; x.fillText('100', cx - 0.33 * S, 62); x.fillText('100', cx + 0.33 * S, 62); t.needsUpdate = true; };
+    const t = new THREE.CanvasTexture(c); label(); return t;
+  }
+  function skeePoints(u, v) {
+    if (Math.hypot(Math.abs(u) - 0.33, v - 0.4) < 0.06) return 100;
+    const d = Math.hypot(u, v + 0.12); return d < 0.08 ? 50 : d < 0.17 ? 30 : d < 0.26 ? 20 : d < 0.36 ? 10 : 0;
+  }
+  function buildSkee(F) {
+    const sk = new THREE.Group(), slope = Math.atan(0.1);
+    const lane = box(0.8, 0.1, 3.3, M(0x8A6A3A), 0, 0.555, 0.15); lane.rotation.x = slope; sk.add(lane);
+    for (const s_ of [-0.45, 0.45]) { const rail = box(0.08, 0.3, 3.4, M(0x3D3150), s_, 0.68, 0.15); rail.rotation.x = slope; sk.add(rail); const tube = box(0.02, 0.02, 3.4, glow(0xFF3D9A), s_, 0.84, 0.15); tube.rotation.x = slope; sk.add(tube); }
+    const hump = box(0.8, 0.06, 0.16, M(0x6A4A2A), 0, 0.8, -1.48); hump.rotation.x = 0.5; sk.add(hump);
+    sk.add(box(0.9, 0.08, 0.3, M(0x3D3150), 0, 0.42, 1.95));
+    const board = new THREE.Group(); board.position.set(0, 1.12, -1.78); board.rotation.x = -0.3; sk.add(board);
+    board.add(box(0.92, 1.12, 0.06, M(0x7A2F5A), 0, 0, -0.035)); board.add(meshOf(new THREE.PlaneGeometry(0.88, 1.08), new THREE.MeshBasicMaterial({ map: skeeTex() })));
+    sk.add(box(1.0, 0.3, 0.32, M(0x7A2F5A), 0, 1.86, -1.9));
+    const sign = meshOf(new THREE.PlaneGeometry(0.96, 0.26), new THREE.MeshBasicMaterial({ map: textTex('SKEE-BALL', 256, 70, '#FFE14D', 44, '#0A0810') })); sign.position.set(0, 1.86, -1.735); sk.add(sign);
+    const ball = meshOf(new THREE.IcosahedronGeometry(0.075, 1), M(0xF2EEE4)); ball.visible = false; sk.add(ball);
+    const rack = []; for (let i = 0; i < 9; i++) { const b = at(meshOf(new THREE.IcosahedronGeometry(0.075, 1), M(0xD8D0C0)), -0.32 + (i % 5) * 0.16 + (i >= 5 ? 0.08 : 0), 0.54 + (i >= 5 ? 0.05 : 0), 1.95 - (i >= 5 ? 0.09 : 0)); sk.add(b); rack.push(b); }
+    const aimDot = meshOf(new THREE.ConeGeometry(0.035, 0.1, 4), glow(0xFFE14D)); aimDot.rotation.x = -Math.PI / 2; aimDot.visible = false; sk.add(aimDot);
+    const pos = F.V3(F.half - 0.75, 0, 5.2); sk.position.copy(pos); sk.rotation.y = F.yIn; roomGroup.add(sk);
+    for (let z = -1.8; z <= 2.0; z += 0.6) { const w = sk.localToWorld(new THREE.Vector3(0, 0, z)); colliders.push({ x: w.x, z: w.z, r: 0.5, h: 0.9 }); }
+    sk.updateMatrixWorld(true);
+    const L = (x, y, z) => sk.localToWorld(new THREE.Vector3(x, y, z));
+    return { mesh: { sk, ball, rack, aimDot }, spot: { id: 'skee', kind: 'skee', name: 'SKEE-BALL', plays: 'skee', cost: 1, target: L(0, 0.9, 1.5), close: L(0, 1.45, 2.4), look: L(0, 1.05, -1.5), fov: 58 } };
+  }
+  function skeeStart() {
+    if (!room.den || room.den.skee <= 0) { SK.last = 'CLOSED FOR TODAY'; SK.lastT = 1.5; ASFX.lose(); return; }
+    if (!payCoins(1)) { SK.last = 'NEED A COIN'; SK.lastT = 1.5; ASFX.lose(); return; }
+    room.den.skee--; Object.assign(SK, { st: 'play', balls: 9, score: 0, hold: null, ball: null, lastT: 0 });
+  }
+  function skeeDown() { if (SK.st !== 'play') { skeeStart(); return; } if (!SK.ball && SK.balls > 0) SK.hold = performance.now(); }
+  function skeeUp() { if (SK.hold == null || SK.st !== 'play') return; const p = skPower(); SK.hold = null; SK.ball = { phase: 'roll', x: SK.aim, z: 1.65, v: 1.6 + p * 4.2, t: 0 }; ASFX.thunk(); }
+  function skeeStep(dt) {
+    const m = A && A.skee; if (!m) return;
+    SK.lastT -= dt;
+    const here = play && play.S.kind === 'skee' && ready();
+    const mv = (SK.keys.has('d') || SK.keys.has('arrowright') ? 1 : 0) - (SK.keys.has('a') || SK.keys.has('arrowleft') ? 1 : 0);
+    if (mv && here) SK.aim = clamp(SK.aim + mv * 0.5 * dt, -0.34, 0.34);
+    const B = SK.ball;
+    if (B) {
+      B.t += dt;
+      if (B.phase === 'roll') {
+        B.v -= 0.55 * dt; B.z -= B.v * dt;
+        if (B.v <= 0.05) { B.phase = 'back'; B.t = 0; }
+        else if (B.z <= -1.45) { // off the hump and into the air
+          const u = B.x + rand(-0.02, 0.02), v = -0.5 + B.v * 0.18; B.pts = skeePoints(u, v); B.phase = 'fly'; B.t = 0;
+          B.from = new THREE.Vector3(B.x, laneY(-1.45) + 0.075, -1.45); B.to = new THREE.Vector3(u, 1.12 + 0.955 * v, -1.78 - 0.296 * v + 0.05);
+        }
+        m.ball.position.set(B.x, laneY(B.z) + 0.075, B.z); m.ball.rotation.x -= B.v * dt * 12;
+        if (Math.random() < dt * 10) hiss('lowpass', 300, 200, 0.08, 0.04);
+      } else if (B.phase === 'back') { B.z += 1.6 * dt; m.ball.position.set(B.x, laneY(B.z) + 0.075, B.z); if (B.z > 1.7) { B.pts = 0; B.phase = 'done'; } }
+      else if (B.phase === 'fly') {
+        const k = Math.min(1, B.t / 0.3); m.ball.position.copy(B.from).lerp(B.to, k); m.ball.position.y += Math.sin(k * Math.PI) * 0.12;
+        if (k >= 1) { B.phase = B.pts ? 'sink' : 'bounce'; B.t = 0; ASFX.thunk(); if (B.pts) { SK.score += B.pts; SK.last = '+' + B.pts + (B.pts >= 50 ? '!' : ''); SK.lastT = 1.2; ASFX.ding(B.pts >= 100 ? 2 : B.pts >= 50 ? 1.5 : 1); } else { SK.last = 'MISSED THE RINGS'; SK.lastT = 1.0; } }
+      } else if (B.phase === 'sink') { m.ball.position.z -= dt * 0.4; m.ball.scale.setScalar(Math.max(0.01, 1 - B.t * 4)); if (B.t > 0.3) B.phase = 'done'; }
+      else if (B.phase === 'bounce') { const k = Math.min(1, B.t / 0.5); m.ball.position.set(B.x, lerp(B.to.y, laneY(-1.3) + 0.075, k) + Math.sin(k * Math.PI) * 0.1, lerp(B.to.z, -1.3, k)); if (k >= 1) { B.phase = 'back'; B.z = -1.3; } }
+      if (B.phase === 'done') {
+        SK.ball = null; m.ball.scale.setScalar(1); SK.balls--;
+        if (SK.balls <= 0) { SK.st = 'over'; SK.won = SK_PAY.find(([a, b]) => SK.score >= a && SK.score <= b)[2]; award(SK.won); ASFX.win(); if (SK.score > SK.best) { SK.best = SK.score; store.set('slingcam.arcade.skee', SK.best); } }
+      }
+    }
+    m.ball.visible = !!SK.ball;
+    m.rack.forEach((b, i) => { b.visible = SK.st !== 'play' || i < SK.balls - (SK.ball ? 1 : 0); });
+    m.aimDot.visible = here && SK.st === 'play' && !SK.ball && SK.balls > 0;
+    if (m.aimDot.visible) { const pw = skPower(); m.aimDot.position.set(SK.aim, laneY(1.55) + 0.1 + pw * 0.05, 1.55 - pw * 0.25); m.aimDot.scale.setScalar(1 + pw * 0.8); }
+  }
+  function skeeHud() {
+    const pw = skPower(), n = Math.round(pw * 8), bar = '■'.repeat(n) + '□'.repeat(8 - n), left = room.den ? room.den.skee : 0;
+    if (SK.st === 'play') hud(SK.score + ' · BALL ' + Math.min(9, 10 - SK.balls) + '/9', SK.lastT > 0 ? SK.last : SK.hold != null ? 'POWER ' + bar : 'HOLD TO WIND UP · 50 IN THE MIDDLE, 100 IN THE TOP CORNERS');
+    else if (SK.st === 'over') hud(SK.score + ' POINTS · +' + SK.won + (SK.won === 1 ? ' TICKET' : ' TICKETS'), left > 0 ? 'TAP OR SPACE TO GO AGAIN · ' + left + ' LEFT' : 'THAT\'S ALL THE PLAYS FOR NOW');
+    else hud('SKEE-BALL', SK.lastT > 0 ? SK.last : left > 0 ? `HOLD TO WIND UP, LET GO TO ROLL · AIM WITH THE MOUSE OR A D · 1 COIN, 9 BALLS · ${left} LEFT` : 'CLOSED FOR TODAY');
+  }
+
+  /* ---------- cups: the gnome's shell game. When his medal flashes, he's palmed the coin ---------- */
+  const CP = { st: 'idle', t: 0, i: 0, swaps: [], coinCup: 0, cheat: false, rounds: 0, picked: -1, called: false, msg: '', won: 0, palmAt: -1, palmT: -1, swapT: 0.3 };
+  const CUP_U = s => -1.15 + s * 0.5;
+  function buildCups(F) {
+    const cupMat = M(0x9A2A22, { roughness: 0.5 }), trimM = M(0xD9B44A, { metalness: 0.5, roughness: 0.4 }), list = [];
+    for (let i = 0; i < 3; i++) {
+      const g = new THREE.Group(); g.add(at(meshOf(new THREE.CylinderGeometry(0.1, 0.15, 0.26, 12), cupMat), 0, 0.13, 0));
+      const band = at(meshOf(new THREE.TorusGeometry(0.135, 0.012, 4, 14), trimM), 0, 0.06, 0); band.rotation.x = Math.PI / 2; g.add(band);
+      g.children[0].userData.cup = i; roomGroup.add(g); list.push({ g, slot: i, lift: 0 });
+    }
+    const coin = meshOf(coinGeo, coinMat); coin.visible = false; roomGroup.add(coin);
+    const at_ = (s, z) => F.V3(CUP_U(s), 0.84, -0.88 + z);
+    return { mesh: { list, coin, at: at_ }, spot: { id: 'cups', kind: 'cups', name: 'CUPS', plays: 'cups', cost: 2, target: F.V3(-0.65, 1.0, -0.88), close: F.V3(-0.55, 1.95, 1.3), look: F.V3(-0.45, 1.25, -1.4), fov: 58 } };
+  }
+  function cupsStart() {
+    if (!room.den || room.den.cups <= 0) { CP.st = 'done'; CP.msg = 'CLOSED FOR TODAY'; CP.won = 0; ASFX.lose(); return; }
+    if (!payCoins(2)) { CP.st = 'done'; CP.msg = 'NEED 2 COINS'; CP.won = 0; ASFX.lose(); return; }
+    room.den.cups--; CP.rounds++; ASFX.mutter();
+    const n = 7 + Math.min(6, CP.rounds + floorNum);
+    Object.assign(CP, { st: 'show', t: 0, i: 0, coinCup: Math.floor(Math.random() * 3), cheat: CP.rounds > 1 && Math.random() < 0.3, picked: -1, called: false, won: 0, palmT: -1, swapT: Math.max(0.2, 0.32 - (CP.rounds + floorNum) * 0.012) });
+    CP.swaps = Array.from({ length: n }, () => { const a = Math.floor(Math.random() * 3); let b = Math.floor(Math.random() * 2); if (b >= a) b++; return [a, b]; });
+    CP.palmAt = CP.cheat ? 2 + Math.floor(Math.random() * (n - 4)) : -1;
+    A.cups.list.forEach((c, i) => { c.slot = i; c.lift = 0; });
+  }
+  function cupsPick(c) {
+    if (!c || CP.st !== 'pick') return; CP.picked = A.cups.list.indexOf(c);
+    const win = !CP.cheat && CP.picked === CP.coinCup; CP.won = win ? 5 : 0;
+    if (win) { award(5); CP.msg = 'WINNER'; ASFX.win(); } else { CP.msg = CP.cheat ? 'HE PALMED IT' : 'NOPE'; ASFX.lose(); if (goblin) goblin.hop = 0.5; }
+    CP.st = 'reveal'; CP.t = 0;
+  }
+  function cupsCall() {
+    if (CP.st !== 'pick') return; CP.called = true;
+    if (CP.cheat) { CP.won = 10; award(10); CP.msg = 'CAUGHT HIM'; ASFX.win(); ASFX.mutter(); if (goblin) goblin.shake = 0.6; }
+    else { CP.won = 0; CP.msg = 'HE WAS HONEST'; ASFX.lose(); ASFX.mutter(); if (goblin) goblin.hop = 0.5; }
+    CP.st = 'reveal'; CP.t = 0;
+  }
+  function cupsStep(dt) {
+    const C = A && A.cups; if (!C) return;
+    CP.t += dt; const L = C.list, place = (c, u, z, y) => { c.g.position.copy(C.at(u, z)); c.g.position.y += y; };
+    if (CP.st === 'show') { const cc = L[CP.coinCup]; cc.lift = CP.t < 1.2 ? Math.min(1, CP.t * 4) : Math.max(0, 1 - (CP.t - 1.2) * 4); if (CP.t > 1.6) { CP.st = 'shuffle'; CP.t = 0; CP.i = 0; } }
+    if (CP.st === 'shuffle') {
+      const sw = CP.swaps[CP.i];
+      if (!sw) { CP.st = 'pick'; CP.t = 0; }
+      else {
+        const k = Math.min(1, CP.t / CP.swapT), e_ = sm(k), ca = L.find(c => c.slot === sw[0]), cb = L.find(c => c.slot === sw[1]);
+        place(ca, lerp(sw[0], sw[1], e_), Math.sin(e_ * Math.PI) * 0.12, 0); place(cb, lerp(sw[1], sw[0], e_), -Math.sin(e_ * Math.PI) * 0.12, 0); // one passes in front, the other behind
+        L.forEach(c => { if (c !== ca && c !== cb) place(c, c.slot, 0, 0); });
+        if (k >= 1) { ca.slot = sw[1]; cb.slot = sw[0]; CP.i++; CP.t = 0; ASFX.slide(); if (CP.i === CP.palmAt) { CP.palmT = 0; ASFX.blip(2600, 0.05, 'triangle'); } }
+      }
+    }
+    // the tell: his medal catches the light and he glances away, just as the coin goes up his sleeve
+    if (CP.palmT >= 0) { CP.palmT += dt; if (goblin && goblin.medal) goblin.medal.material.emissive.setHex(CP.palmT < 0.3 ? 0xFFF0A0 : 0x3A2A04); if (goblin && CP.palmT < 0.5) goblin.head.rotation.y = 0.8; if (CP.palmT > 0.5) CP.palmT = -1; }
+    const cc = L[CP.coinCup];
+    if (CP.st === 'reveal' || CP.st === 'done') {
+      L.forEach((c, i) => { const want = i === CP.picked || (CP.t > 0.5 && i === CP.coinCup && !CP.cheat) ? 1 : 0; c.lift += (want - c.lift) * Math.min(1, dt * 10); });
+      if (CP.cheat && CP.msg !== 'CLOSED FOR TODAY' && CP.msg !== 'NEED 2 COINS') { C.coin.visible = CP.t > 0.4; C.coin.position.copy(C.at(1.54, -0.32)); C.coin.position.y += 0.55 + Math.min(1, CP.t) * 0.3; C.coin.rotation.set(Math.PI / 2, 0, CP.t * 6); } // out of his sleeve
+      else { C.coin.visible = true; C.coin.rotation.set(0, 0, 0); C.coin.position.set(cc.g.position.x, 0.86, cc.g.position.z); }
+      if (CP.st === 'reveal' && CP.t > 1.4) CP.st = 'done';
+    } else if (CP.st === 'show') { C.coin.visible = true; C.coin.rotation.set(0, 0, 0); C.coin.position.copy(C.at(cc.slot, 0)); C.coin.position.y = 0.86; }
+    else C.coin.visible = false;
+    if (CP.st !== 'shuffle') L.forEach(c => place(c, c.slot, 0, c.lift * 0.24));
+  }
+  function cupsHud() {
+    hudBtn.hidden = CP.st !== 'pick'; hudBtn.textContent = 'HE CHEATED!';
+    const left = room.den ? room.den.cups : 0;
+    if (CP.st === 'idle') hud('CUPS', left > 0 ? `FOLLOW THE COIN · 2 COINS · WIN 5, OR 10 FOR CATCHING HIM CHEAT · ${left} LEFT` : 'CLOSED FOR TODAY');
+    else if (CP.st === 'show') hud('WATCH THE COIN', 'HE SHUFFLES FASTER EVERY ROUND');
+    else if (CP.st === 'shuffle') hud('…', 'KEEP YOUR EYE ON IT');
+    else if (CP.st === 'pick') hud('WHICH CUP?', coarse ? 'TAP A CUP · OR CALL HIM OUT' : 'CLICK A CUP OR PRESS 1 2 3 · C IF HE CHEATED');
+    else hud(CP.msg, (CP.won ? '+' + CP.won + ' TICKETS · ' : '') + (left > 0 ? 'TAP OR SPACE TO GO AGAIN' : 'THAT\'S ALL THE PLAYS FOR NOW'));
+  }
+
+  /* ---------- the prize counter ---------- */
+  function prizeSpot(F) {
+    const disp = box(0.3, 0.4, 0.25, M(0x2A2232), 0, 0, 0); disp.position.copy(F.V3(1.0, 1.04, -0.88)); disp.rotation.y = F.yIn; roomGroup.add(disp);
+    for (let i = 0; i < 5; i++) { const tk = box(0.12, 0.012, 0.18, glow(0xFF8A2A), 0, 0, 0); tk.position.copy(F.V3(1.0, 0.86 - i * 0.008, -0.62 + i * 0.15)); tk.rotation.y = F.yIn; tk.rotation.x = -0.3 + (i % 2) * 0.6; roomGroup.add(tk); } // a curl of tickets off the end of the counter
+    return { id: 'prizes', kind: 'prizes', name: 'PRIZE COUNTER', cost: 0, target: F.V3(1.0, 1.1, -0.88), close: F.V3(0.7, 1.9, 1.4), look: F.V3(0.2, 1.75, -2.0), fov: 58 };
+  }
+  function prizeShelves(F) {
+    const shelfM = M(0x3D3150), cols = [0xFF5A7A, 0x5FF2D6, 0xFFE14D, 0xC8F25A, 0x8FD3FF, 0xFF8A2A, 0xB07AFF], list = []; let k = 0;
+    for (const y of [1.45, 2.05, 2.65]) {
+      const s = box(4.8, 0.06, 0.3, shelfM, 0, 0, 0); s.position.copy(F.V3(0, y, -2.45)); s.rotation.y = F.yIn; roomGroup.add(s);
+      for (let i = 0; i < 11; i++) {
+        const u = -2.2 + i * 0.44, c = cols[(k++) % cols.length], kind = (i + Math.round(y * 3)) % 4; let p;
+        if (kind === 0) p = meshOf(new THREE.CylinderGeometry(0.06, 0.1, 0.26, 6), M(c, { emissive: c, emissiveIntensity: 0.25 }));
+        else if (kind === 1) p = meshOf(new THREE.IcosahedronGeometry(0.12, 0), M(c));
+        else if (kind === 2) p = meshOf(new THREE.ConeGeometry(0.12, 0.28, 5), M(c));
+        else { p = meshOf(new THREE.CylinderGeometry(0.11, 0.11, 0.04, 10), M(0xFFD23A, { metalness: 0.5, roughness: 0.4 })); p.rotation.x = Math.PI / 2; }
+        p.position.copy(F.V3(u, y + 0.16, -2.42)); p.rotation.y += F.yIn; roomGroup.add(p); list.push(p);
+      }
+    }
+    return list;
+  }
+  prizeEl.innerHTML = '<b>THE PRIZE COUNTER</b><span id="arcWallet"></span><div id="arcPrizeList">' + ARC_PRIZES.map((p, i) => `<button type="button" class="arcPrize" data-prize="${p.id}"><kbd>${i + 1}</kbd><b>${p.name}<small>${p.note}</small></b><em>${p.cost}<i class="tkt"></i></em></button>`).join('') + '</div>';
+  const walletEl = prizeEl.querySelector('#arcWallet');
+  function renderPrizes() {
+    walletEl.innerHTML = `<i class="coin"></i>${run.coins} · <i class="tkt"></i>${run.tickets}`;
+    prizeEl.querySelectorAll('.arcPrize').forEach(b => { const p = ARC_PRIZES.find(q => q.id === b.dataset.prize), owned = p.id === 'crown' && unlocked('crown'); b.disabled = owned || run.tickets < p.cost; b.classList.toggle('owned', owned); });
+  }
+  function buy(id) {
+    const p = ARC_PRIZES.find(q => q.id === id); if (!p || run.tickets < p.cost || (id === 'crown' && unlocked('crown'))) { ASFX.lose(); return; }
+    if (id === 'item' && !chestItemPeek()) { notice('NOTHING LEFT<em>YOU\'VE GOT EVERYTHING HE STOCKS</em>'); ASFX.lose(); return; }
+    run.tickets -= p.cost; showTix(); ASFX.ding(); ASFX.mutter(); if (goblin) goblin.hop = 0.5; prizeFly();
+    if (id === 'ing') { const k = pick(KINDS); satchel.push(newItem(k, SHOP_ORIGIN[k])); loot(k); renderSatchel(); renderInv(); }
+    else if (id === 'coins') gainCoins(5);
+    else if (id === 'item') { const it = chestItem(); if (it) setTimeout(() => giveItem(it), 500); }
+    else { const u = store.get('slingcam.unlocks', {}) || {}; u.crown = true; store.set('slingcam.unlocks', u); notice('PAPER CROWN<em>WEAR IT FROM THE BREWER MENU</em>', 'good'); SFX.fanfare(); }
+    renderPrizes();
+  }
+  const chestItemPeek = () => Object.keys(ITEMS).some(k => !run.items.has(k) && !ITEMS[k].secret);
+  prizeEl.addEventListener('click', e => { const b = e.target.closest('.arcPrize'); if (b && !b.disabled) buy(b.dataset.prize); });
+  // a prize leaves the shelf and comes your way
+  const flying = [];
+  function prizeFly() {
+    if (!A || !A.prizes.length) return;
+    const src = pick(A.prizes), m = new THREE.Mesh(src.geometry, src.material); src.getWorldPosition(m.position); m.quaternion.copy(src.quaternion); m.userData.borrowed = true; roomGroup.add(m);
+    flying.push({ m, t: 0, from: m.position.clone() });
+  }
+  function flyStep(dt) {
+    for (const f of flying.slice()) {
+      f.t += dt; const k = Math.min(1, f.t / 0.9), dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), to = camera.position.clone().addScaledVector(dir, 0.6).add(new THREE.Vector3(0, -0.3, 0));
+      f.m.position.copy(f.from).lerp(to, sm(k)); f.m.position.y += Math.sin(k * Math.PI) * 0.4; f.m.rotation.y += dt * 8; f.m.scale.setScalar(1 + k * 0.6);
+      if (k >= 1) { if (f.m.parent) f.m.parent.remove(f.m); flying.splice(flying.indexOf(f), 1); }
+    }
+  }
+
+  /* ---------- the room ---------- */
+  function spawn(r) {
+    const F = frame(r);
+    A = { r, F, spots: [], prizes: [] };
+    const floor = meshOf(new THREE.PlaneGeometry(W * 2, D * 2), new THREE.MeshStandardMaterial({ map: carpet(), roughness: 1 })); floor.rotation.x = -Math.PI / 2; floor.position.y = 0.03; roomGroup.add(floor); // sticky carpet over the flagstones
+    const sign = meshOf(new THREE.PlaneGeometry(4.2, 0.9), new THREE.MeshBasicMaterial({ map: textTex('GOBLIN ARCADE', 512, 110, '#FF3D9A', 86, null), transparent: true }));
+    sign.position.copy(F.V3(0, 4.25, 0.08)); sign.rotation.y = F.yIn; roomGroup.add(sign); A.sign = sign;
+    [3.0, 4.6, 6.2, 7.8].forEach((v, i) => A.spots.push(cabinet(i, F, v)));
+    const skee = buildSkee(F); A.skee = skee.mesh; A.spots.push(skee.spot);
+    const cups = buildCups(F); A.cups = cups.mesh; A.spots.push(cups.spot);
+    A.spots.push(prizeSpot(F)); A.prizes = prizeShelves(F);
+    tixEl.hidden = false; showTix();
+    flap.reset(); if (SK.st !== 'play') SK.st = 'idle'; if (!['idle', 'done'].includes(CP.st)) CP.st = 'idle';
+  }
+  function teardown() {
+    if (play) endNow();
+    A = null; flying.length = 0; tixEl.hidden = true; SK.ball = null; SK.st = 'idle';
+  }
+
+  /* ---------- walking up, pushing in, stepping back ---------- */
+  const ready = () => !!(play && !play.back && play.k >= 1);
+  function enter(S) {
+    if (play || !A) return;
+    const q = new THREE.PerspectiveCamera(); q.position.copy(S.close); q.lookAt(S.look); /* a camera, so lookAt points its -z at the screen */
+    play = { S, k: 0, back: false, frozen: false, fromP: camera.position.clone(), fromQ: camera.quaternion.clone(), toQ: q.quaternion.clone(), relock: locked };
+    camMode = 'arcade'; fovTarget = S.fov; fovRate = 6; wind.on = false; stopFire(); interactHeld = false; keys.clear();
+    stage.classList.add('arcading'); backEl.hidden = false; ASFX.whoosh();
+    if (locked) { invUnlocking = true; document.exitPointerLock(); }
+    if (S.kind === 'prizes') ASFX.mutter();
+    if (S.kind === 'cups' && CP.st === 'done') CP.st = 'idle';
+    if (S.kind === 'skee' && SK.st === 'over') SK.st = 'idle';
+    if (S.kind === 'cab') flap.reset();
+  }
+  function leave() {
+    if (!play || play.back) return;
+    if (play.S.kind === 'cab') flap.leave();
+    if (play.S.kind === 'skee') { SK.hold = null; SK.keys.clear(); }
+    play.back = true; play.frozen = false; screenEl.hidden = true; hudEl.hidden = true; prizeEl.hidden = true; backEl.hidden = true;
+  }
+  function endNow() { // out at once: the room's changing under you
+    if (!play) return; if (play.S.kind === 'cab') flap.leave();
+    play = null; camMode = 'fp'; fovTarget = 72; stage.classList.remove('arcading'); screenEl.hidden = hudEl.hidden = prizeEl.hidden = backEl.hidden = true;
+  }
+  function cameraStep(rdt) {
+    if (!play) { camMode = 'fp'; return; }
+    const P = play; P.k = clamp(P.k + rdt / (reduceMotion ? 0.05 : 0.55) * (P.back ? -1 : 1), 0, 1);
+    const e_ = sm(P.k), toP = P.S.close;
+    if (P.back) { P.fromP.copy(tmpEye()); P.fromQ.copy(fpQuat); } // going back to wherever your head is
+    camera.position.copy(P.fromP).lerp(toP, e_); camera.quaternion.copy(P.fromQ).slerp(P.toQ, e_);
+    if (P.back && P.k <= 0) { // standing again
+      play = null; camMode = 'fp'; fovTarget = 72; stage.classList.remove('arcading');
+      if (P.relock && !coarse) relock();
+    } else if (P.S.kind === 'cab' && P.k >= 1 && !P.back && !P.frozen) P.freeze = true; // after this frame renders, the room holds still
+  }
+  const eyeV = new THREE.Vector3();
+  const tmpEye = () => eyeV.set(player.pos.x, 1.6 + player.y, player.pos.z);
+  // the 2D game, laid exactly over the cabinet's screen: four projected corners, one CSS matrix3d
+  const adj = m => [m[4] * m[8] - m[5] * m[7], m[2] * m[7] - m[1] * m[8], m[1] * m[5] - m[2] * m[4], m[5] * m[6] - m[3] * m[8], m[0] * m[8] - m[2] * m[6], m[2] * m[3] - m[0] * m[5], m[3] * m[7] - m[4] * m[6], m[1] * m[6] - m[0] * m[7], m[0] * m[4] - m[1] * m[3]];
+  const mm = (a, b) => { const c = []; for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) c.push(a[3 * r] * b[k] + a[3 * r + 1] * b[3 + k] + a[3 * r + 2] * b[6 + k]); return c; };
+  const mv = (m, v) => [m[0] * v[0] + m[1] * v[1] + m[2] * v[2], m[3] * v[0] + m[4] * v[1] + m[5] * v[2], m[6] * v[0] + m[7] * v[1] + m[8] * v[2]];
+  const basis = p => { const m = [p[0], p[2], p[4], p[1], p[3], p[5], 1, 1, 1], v = mv(adj(m), [p[6], p[7], 1]); return mm(m, [v[0], 0, 0, 0, v[1], 0, 0, 0, v[2]]); };
+  function afterRender() {
+    if (!play || !play.freeze) return;
+    play.freeze = false; const sc = play.S.screen, gw = 0.21, gh = 0.28, dst = [];
+    for (const [x, y] of [[-gw, gh], [gw, gh], [-gw, -gh], [gw, -gh]]) { const p = new THREE.Vector3(x, y, 0).applyMatrix4(sc.matrixWorld).project(camera); dst.push((p.x + 1) / 2 * W_px, (1 - p.y) / 2 * H_px); }
+    const raw = mm(basis(dst), adj(basis([0, 0, 192, 0, 0, 256, 192, 256]))), t = raw.map(v => v / raw[8]);
+    screenEl.style.transform = `matrix3d(${[t[0], t[3], 0, t[6], t[1], t[4], 0, t[7], 0, 0, 1, 0, t[2], t[5], 0, t[8]].join(',')})`;
+    sx.drawImage(flap.cv, 0, 0); screenEl.hidden = false; play.frozen = true;
+  }
+  function hud(main, sub) { hudEl.hidden = false; if (hudMain.textContent !== main) hudMain.textContent = main; if (hudSub.textContent !== (sub || '')) hudSub.textContent = sub || ''; }
+
+  /* ---------- the frame ---------- */
+  let texT = 0;
+  function update(sdt, rdt) {
+    if (!A) return;
+    flap.step(sdt, !!(play && play.S.kind === 'cab' && ready())); // the run only moves while you're stood at the cabinet
+    if (play && play.frozen) { flap.draw(); sx.drawImage(flap.cv, 0, 0); }
+    else if ((texT += rdt) > 1 / 15) { texT = 0; flap.draw(); A.spots[0].tex.needsUpdate = true; } // its attract screen, 15 times a second
+    skeeStep(sdt); cupsStep(sdt); flyStep(rdt);
+    A.sign.material.opacity = 0.92 + Math.sin(T * 30) * 0.04;
+    if (ready()) {
+      const k = play.S.kind;
+      if (k === 'skee') skeeHud(); else if (k === 'cups') cupsHud(); else if (k === 'prizes') { if (prizeEl.hidden) { prizeEl.hidden = false; } renderPrizes(); hudEl.hidden = true; } else hudEl.hidden = true;
+    }
+  }
+
+  /* ---------- input while you're at a machine ---------- */
+  function key(k, down, e) {
+    if (!play) return;
+    if (down && (k === 'escape' || k === 'backspace')) { e.preventDefault(); leave(); return; }
+    if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'tab'].includes(k)) e.preventDefault();
+    if (!ready()) return;
+    const S = play.S, rep = e.repeat;
+    if (S.kind === 'cab') flap.key(k, down, rep);
+    else if (S.kind === 'skee') { if (down) SK.keys.add(k); else SK.keys.delete(k); if (!rep && [' ', 'enter', 'w', 'arrowup'].includes(k)) { if (down) skeeDown(); else skeeUp(); } }
+    else if (S.kind === 'cups' && down && !rep) {
+      if (CP.st === 'idle' || CP.st === 'done') { if (k === ' ' || k === 'enter') cupsStart(); }
+      else if (CP.st === 'pick') { const n = { 1: 0, 2: 1, 3: 2 }[k]; if (n != null) cupsPick(A.cups.list.find(c => c.slot === n)); else if (k === 'c') cupsCall(); }
+    } else if (S.kind === 'prizes' && down && !rep) { const n = { 1: 0, 2: 1, 3: 2, 4: 3 }[k]; if (n != null) buy(ARC_PRIZES[n].id); }
+  }
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  function aim(e) { const r_ = stage.getBoundingClientRect(); ndc.set((e.clientX - r_.left) / r_.width * 2 - 1, -((e.clientY - r_.top) / r_.height) * 2 + 1); ray.setFromCamera(ndc, camera); }
+  function pointer(type, e) {
+    if (!ready()) return;
+    const S = play.S;
+    if (S.kind === 'skee') { const r_ = stage.getBoundingClientRect(); if (type !== 'up') SK.aim = clamp(((e.clientX - r_.left) / r_.width - 0.5) * 1.3, -0.34, 0.34); if (type === 'down') skeeDown(); else if (type === 'up') skeeUp(); }
+    else if (S.kind === 'cups' && type === 'down') {
+      if (CP.st === 'idle' || CP.st === 'done') { cupsStart(); return; }
+      if (CP.st !== 'pick') return;
+      aim(e); const h = ray.intersectObjects(A.cups.list.map(c => c.g.children[0]), false)[0]; if (h) cupsPick(A.cups.list[h.object.userData.cup]);
+    }
+  }
+  screenEl.addEventListener('pointerdown', e => { e.preventDefault(); if (ready() && play.S.kind === 'cab') flap.pointer('down'); });
+  backEl.addEventListener('click', () => leave());
+  hudBtn.addEventListener('click', () => { if (ready() && play.S.kind === 'cups') cupsCall(); });
+
+  /* ---------- the prompt you see when you walk up ---------- */
+  function interacts(consider) { if (A && !play) for (const S of A.spots) consider(S.target, 2.4, 0.82, { type: 'arcade', S, key: 'arc-' + S.id }); }
+  const usable = S => S.kind !== 'broken';
+  function promptHtml(S, ok, keyHtml, bar) {
+    if (S.kind === 'broken') return '<span>OUT OF ORDER</span>';
+    if (S.kind === 'prizes') return `<span>${keyHtml}PRIZES</span><small>${run.tickets} TICKETS TO SPEND</small>${bar}`;
+    const left = A.r.den[S.plays];
+    return `<span>${keyHtml}${S.name}<i class="coin"></i>${S.cost}</span><small>${left > 0 ? left + (left === 1 ? ' PLAY LEFT' : ' PLAYS LEFT') : 'CLOSED FOR TODAY'}</small>${bar}`;
+  }
+  arcResize = () => { if (play && play.frozen) { play.frozen = false; screenEl.hidden = true; play.freeze = true; } };
+  return {
+    spawn, teardown, update, enter, interacts, usable, promptHtml, key, pointer, afterRender, cameraStep,
+    active: () => !!play, frozen: () => !!(play && play.frozen),
+    get here() { return !!A; }, award, flap, SK, CP, get A() { return A; }, get play() { return play; },
+  };
+})();
+
 // haggling: one try per item. Sometimes he caves, sometimes he digs in, sometimes you've made it worse
 function haggle(sl) {
   const s = sl.s; if (!s || s.sold || s.haggled || !s.price) return;
@@ -5148,7 +5711,7 @@ function revealSecret() {
     visited: false, cleared: true, caps: [], chestOpen: false, fountainUsed: false, fightActive: false, revealed: true, secretDoor: opp, depth: 0, hoard: kind === 'hoard' };
   s.caps = THEMES[s.theme].spots.map(() => 0);
   if (kind === 'shop' || kind === 'den') { s.shopDir = DIRS[opp].opp; s.shop = makeShop(kind === 'shop' ? 'secret' : 'den'); }
-  if (kind === 'den') s.den = { cups: 3, toss: 5 }; // a few plays each, then he closes up
+  if (kind === 'den') s.den = Object.assign({}, ARC_PLAYS); // a few goes on each machine, then he closes them up
   else if (kind === 'gift') s.shop = makeShop('gift');
   floorMap.set(keyXY(sp.x, sp.y), s);
   sp.r.n[sp.d] = true; sp.r.secretDoor = sp.d;
@@ -5165,6 +5728,7 @@ const GOB = {
       'THE ABSOLUTELY NOT A THIEF', 'THE DAMP', 'THE UNREFUNDABLE', 'THE TALL (FOR A GOBLIN)', 'THE BAD AT MATHS', 'THE TWICE DIVORCED', 'THE LEGALLY DISTINCT'],
 };
 const gobName = () => `${pick(GOB.a)}${pick(GOB.b)} ${pick(GOB.t)}`;
+const gnomeName = () => `${pick(['NORBERT', 'GUSTAV', 'BARNABY', 'FENWICK', 'TOBIAS', 'GRIMBLE', 'WENDEL', 'OSWALD', 'PIP'])} THE ${pick(['GNOME', 'GNOME', 'PROPRIETOR', 'UNBEATEN', 'SLIGHTLY CROOKED', 'COOL'])}`;
 const SHOP_ORIGIN = { feather: 'stock', bog: 'stock', horn: 'stock', doom: 'torch', glowcap: 'high', eye: 'cyclops', frost: 'drain', iron: 'stock' };
 let shopSlots = [], goblin = null, plug = null; // the current room's shop bits
 function makeShop(kind = 'goblin') {
@@ -5181,7 +5745,7 @@ function makeShop(kind = 'goblin') {
   else slots = [item(), ing(), Math.random() < 0.5 ? { kind: 'heart', id: 'heart', price: 5 } : ing()];
   const up = Math.max(0, floorNum - FINAL_FLOOR); // endless gets pricier
   slots.forEach(sl => { if (sl.price) sl.price += up; sl.sold = false; });
-  return { name: gobName(), kind, hat: Math.floor(Math.random() * 3), robe: pick([0x7A4A2A, 0x5A3A7A, 0x8A2A2A, 0x2A5A4A]), slots };
+  return { name: kind === 'den' ? gnomeName() : gobName(), kind, hat: Math.floor(Math.random() * 3), robe: pick([0x7A4A2A, 0x5A3A7A, 0x8A2A2A, 0x2A5A4A]), slots };
 }
 const goodsInfo = s => s.kind === 'item' ? ITEMS[s.id] : s.kind === 'heart' ? { name: 'HEARTY STEW', tag: 'HEALS 3' } : { name: (s.qty > 1 ? s.qty + '× ' : '') + ING[s.id].name.toUpperCase(), tag: '' };
 // shop goods as little 3D models that spin on their pedestals
@@ -5473,13 +6037,39 @@ function buildGoblin(sh) {
   g.scale.setScalar(1.2);
   return { g, body, head, hop: 0, shake: 0 };
 }
+// the arcade's keeper: a garden gnome who went into business. A pointy hat with a flop, a big beard, shades, a gold chain
+function buildGnome(sh) {
+  const g = new THREE.Group(), body = new THREE.Group(), head = new THREE.Group(); g.add(body);
+  const skin = M(0xF0BC98), coatM = M(0x2F5AAE), gold = M(0xFFD23A, { metalness: 0.7, roughness: 0.3, emissive: 0x3A2A04 }), shades = M(0x0A0A10, { metalness: 0.8, roughness: 0.15 }), beardM = M(0xF4F2EE), hatM = M(0xC8282E);
+  body.add(at(meshOf(new THREE.CylinderGeometry(0.26, 0.4, 0.75, 7), coatM), 0, 0.38, 0));
+  body.add(at(meshOf(new THREE.CylinderGeometry(0.41, 0.41, 0.08, 7), M(0x3A2A1E)), 0, 0.3, 0));
+  for (const sd of [-1, 1]) { const arm = at(meshOf(new THREE.CylinderGeometry(0.06, 0.05, 0.48, 5), coatM), sd * 0.3, 0.58, 0.12); arm.rotation.set(-0.95, 0, sd * 0.45); body.add(arm); body.add(at(meshOf(new THREE.IcosahedronGeometry(0.07, 0), skin), sd * 0.36, 0.5, 0.33)); }
+  const chain = at(meshOf(new THREE.TorusGeometry(0.2, 0.025, 4, 12), gold), 0, 0.66, 0.08); chain.rotation.x = 1.25; body.add(chain);
+  const medal = at(meshOf(new THREE.CylinderGeometry(0.06, 0.06, 0.02, 8), new THREE.MeshStandardMaterial({ color: 0xFFD23A, metalness: 0.7, roughness: 0.3, emissive: 0x3A2A04, flatShading: true })), 0, 0.5, 0.3); medal.rotation.x = Math.PI / 2; body.add(medal); // it catches the light when he cheats at cups
+  head.position.set(0, 0.98, 0); body.add(head);
+  head.add(meshOf(new THREE.IcosahedronGeometry(0.26, 1), skin));
+  const beard = at(meshOf(new THREE.ConeGeometry(0.28, 0.55, 7), beardM), 0, -0.3, 0.1); beard.rotation.x = Math.PI + 0.25; head.add(beard);
+  for (const sd of [-1, 1]) head.add(at(meshOf(new THREE.IcosahedronGeometry(0.12, 0), beardM), sd * 0.2, -0.08, 0.12));
+  head.add(at(meshOf(new THREE.IcosahedronGeometry(0.09, 1), M(0xE8806E)), 0, -0.02, 0.27));
+  for (const sd of [-1, 1]) {
+    head.add(at(meshOf(new THREE.BoxGeometry(0.15, 0.08, 0.03), shades), sd * 0.1, 0.08, 0.25));
+    head.add(at(meshOf(new THREE.BoxGeometry(0.05, 0.012, 0.005), new THREE.MeshBasicMaterial({ color: 0xFF3D9A })), sd * 0.1 - 0.03, 0.1, 0.268));
+    head.add(at(meshOf(new THREE.BoxGeometry(0.02, 0.02, 0.26), shades), sd * 0.2, 0.09, 0.12));
+  }
+  head.add(at(meshOf(new THREE.BoxGeometry(0.06, 0.02, 0.02), shades), 0, 0.1, 0.26));
+  const hat = at(meshOf(new THREE.CylinderGeometry(0.15, 0.29, 0.42, 7), hatM), 0, 0.31, -0.02); hat.rotation.x = -0.08; head.add(hat);
+  const tip = new THREE.Group(); tip.position.y = 0.2; tip.rotation.set(-0.3, 0, -0.6); hat.add(tip); tip.add(at(meshOf(new THREE.ConeGeometry(0.15, 0.4, 7), hatM), 0, 0.19, 0)); // it flops over to one side
+  body.position.y = 0.45; g.add(at(meshOf(new THREE.CylinderGeometry(0.3, 0.34, 0.45, 7), M(0x4A3222)), 0, 0.225, 0)); // he stands on a stool to see over the counter
+  g.scale.setScalar(1.2);
+  return { g, body, head, hop: 0, shake: 0, medal };
+}
 function spawnShop(r, rising) {
   const sh = r.shop, dir = r.shopDir, center = !dir; // no alcove: the gift just sits in the middle of the room
   if (!center) {
     const ns = dir === 'N' || dir === 'S', [gx, gz] = wallXZ(dir, 0, 1.45), [cx, cz] = wallXZ(dir, 0, 0.88);
-    goblin = buildGoblin(sh); goblin.g.position.set(gx, 0, gz); goblin.g.rotation.y = WALL_RY[dir]; roomGroup.add(goblin.g);
-    const [lx, lz] = wallXZ(dir, 0, -2.2); accentLight.color.set(sh.kind === 'den' ? 0xC8FFB0 : 0xFFD9A0); accentLight.position.set(lx, 2.7, lz); accentLight.intensity = 1.8; // a light over the counter
-    const counter = at(meshOf(GEO.box, M(0x6A4A2A)), cx, 0.42, cz); counter.scale.set(ns ? 2.0 : 0.56, 0.84, ns ? 0.56 : 2.0); roomGroup.add(counter);
+    goblin = sh.kind === 'den' ? buildGnome(sh) : buildGoblin(sh); goblin.g.position.set(gx, 0, gz); goblin.g.rotation.y = WALL_RY[dir]; roomGroup.add(goblin.g);
+    const [lx, lz] = wallXZ(dir, 0, -2.2); accentLight.color.set(sh.kind === 'den' ? 0xFF3D9A : 0xFFD9A0); accentLight.position.set(lx, 2.7, lz); accentLight.intensity = 1.8; // a light over the counter
+    const den_ = sh.kind === 'den', cw = den_ ? 3.6 : 2.0, counter = at(meshOf(GEO.box, M(den_ ? 0x3A2A4A : 0x6A4A2A)), cx, 0.42, cz); counter.scale.set(ns ? cw : 0.56, 0.84, ns ? 0.56 : cw); roomGroup.add(counter); // the arcade's counter is wider: cups at one end, the prize dispenser at the other
   } else { accentLight.color.set(0xFFD9A0); accentLight.position.set(0, 2.8, 0); accentLight.intensity = 1.8; }
   shopSlots = sh.slots.map((s, i) => {
     const off = (i - (sh.slots.length - 1) / 2) * 1.5, [px, pz] = center ? [off, 0] : wallXZ(dir, off, -1.7), ped = new THREE.Group(); ped.position.set(px, rising ? -1.1 : 0, pz); roomGroup.add(ped);
@@ -5597,11 +6187,7 @@ function findInteract() {
   harvestables.forEach((h, i) => { if (room.caps[h.idx] > 0) consider(h.pos, 2.6, 0.8, { type: 'harvest', h, key: 'h' + i }); });
   if (roomChest && !room.chestOpen) consider(roomChest.g.position.clone().setY(0.6), 2.6, 0.7, { type: 'chest', key: 'chest' });
   if (fountainSpot) consider(fountainSpot, fountainReach, 0.6, { type: 'fountain', key: 'fountain' });
-  if (den) {
-    if (den.state === 'pick') den.cups.forEach((c, i) => consider(c.g.position.clone().setY(0.98), 3.2, 0.975, { type: 'cup', i, key: 'cup' + i }));
-    else { const [cx, cz] = wallXZ(den.dir, 0, 0.8); consider(new THREE.Vector3(cx, 1.0, cz), 3.0, 0.8, { type: 'cups', key: 'cups' }); }
-    consider(den.post, 2.6, 0.75, { type: 'toss', key: 'toss' });
-  }
+  arcade.interacts(consider);
   if (xBrick && !room.xPressed) consider(xBrick.pos, 2.1, 0.94, { type: 'xbrick', key: 'xb' });
   shopSlots.forEach((sl, i) => { if (!sl.s.sold && sl.ped.position.y > -0.2) consider(sl.pos, 2.4, 0.7, { type: 'buy', sl, key: 'buy' + i }); });
   if (!best && trapdoor && trapdoor.open && Math.hypot(player.pos.x - STAIRS.x, player.pos.z - STAIRS.z) < 3.2) best = { type: 'stairs', key: 'stairs' };
@@ -5617,9 +6203,7 @@ function completeInteract(t) {
   } else if (t.type === 'chest') openChest();
   else if (t.type === 'buy') buy(t.sl);
   else if (t.type === 'xbrick') pressX();
-  else if (t.type === 'cups') playCups();
-  else if (t.type === 'cup') pickCup(t.i);
-  else if (t.type === 'toss') armToss();
+  else if (t.type === 'arcade') arcade.enter(t.S);
   else if (t.type === 'fountain' && !room.fountainUsed) {
     room.fountainUsed = true; fountainDry();
     satchel.push(newItem('bog', 'stock'));
@@ -5664,11 +6248,11 @@ function updateInteract(rdt) {
   if (!t) { pr.hidden = true; act.hidden = true; $('#hagBtn').hidden = true; inter.t = 0; inter.key = ''; inter.cur = null; return; }
   if (t.key !== inter.key) { inter.key = t.key; inter.t = 0; }
   const usable = t.type === 'harvest' || t.type === 'chest' || (t.type === 'fountain' && !room.fountainUsed) || (t.type === 'buy' && canAfford(t.sl.s)) || t.type === 'xbrick'
-    || (t.type === 'cups' && den.state === 'idle' && den.r.den.cups > 0 && run.coins >= 2) || (t.type === 'cup' && den.state === 'pick') || (t.type === 'toss' && !tossArmed && den.r.den.toss > 0 && run.coins >= 1);
+    || (t.type === 'arcade' && arcade.usable(t.S));
   inter.cur = t;
   if (t.type === 'buy' && !usable && interactHeld && !inter.noped) { inter.noped = true; SFX.nope(); if (goblin) goblin.shake = 0.4; } // can't afford it: he shakes his head
   if (!interactHeld) inter.noped = false;
-  const need = t.type === 'harvest' ? 0.5 : t.type === 'cup' ? 0.15 : 0.35;
+  const need = t.type === 'harvest' ? 0.5 : 0.35;
   if (interactHeld && usable) {
     inter.t += rdt; vmState.scrape = 1;
     inter.sfx -= rdt; if (inter.sfx <= 0) { inter.sfx = 0.09; if (t.type === 'harvest') SFX.scrape(); }
@@ -5679,9 +6263,7 @@ function updateInteract(rdt) {
   else if (t.type === 'chest') { pr.innerHTML = `<span>${key}OPEN</span>${bar}`; act.innerHTML = 'HOLD<br>OPEN'; }
   else if (t.type === 'fountain') { pr.innerHTML = room.fountainUsed ? '<span>DRY</span>' : `<span>${key}DRINK</span>${bar}`; act.innerHTML = 'HOLD<br>DRINK'; }
   else if (t.type === 'buy') { const sx = t.sl.s, gi = goodsInfo(sx), hg = sx.price && !sx.haggled ? `<em class="hg">${coarse ? '' : '<kbd>F</kbd>'}HAGGLE</em>` : ''; pr.innerHTML = `<span>${usable ? key + (sx.price ? 'BUY' : 'TAKE') : 'NEED'}${sx.price ? costHtml(sx) : ''}${hg}</span><small>${gi.name}${gi.tag ? ' · ' + gi.tag : ''}</small>${usable ? bar : ''}`; act.innerHTML = 'HOLD<br>BUY'; }
-  else if (t.type === 'cups') { const n = den.r.den.cups; pr.innerHTML = n <= 0 ? '<span>CUPS CLOSED</span>' : den.state !== 'idle' ? '<span>WATCH THE COIN</span>' : `<span>${usable ? key + 'CUPS' : 'NEED'}<i class="coin"></i>2</span><small>FIND THE COIN · WIN 6 · ${n} LEFT</small>${usable ? bar : ''}`; act.innerHTML = 'HOLD<br>PLAY'; }
-  else if (t.type === 'cup') { pr.innerHTML = `<span>${key}THIS ONE</span>${bar}`; act.innerHTML = 'HOLD<br>PICK'; }
-  else if (t.type === 'toss') { const n = den.r.den.toss; pr.innerHTML = n <= 0 && !tossArmed ? '<span>TOSS CLOSED</span>' : tossArmed ? '<span>SLING AT A POT</span>' : `<span>${usable ? key + 'TOSS' : 'NEED'}<i class="coin"></i>1</span><small>LAND IN A POT · ${n} LEFT</small>${usable ? bar : ''}`; act.innerHTML = 'HOLD<br>PAY'; }
+  else if (t.type === 'arcade') { pr.innerHTML = arcade.promptHtml(t.S, usable, key, usable ? bar : ''); act.innerHTML = 'HOLD<br>PLAY'; }
   else if (t.type === 'xbrick') { pr.innerHTML = `<span>${key}PRESS</span>${bar}`; act.innerHTML = 'HOLD<br>PRESS'; }
   else pr.innerHTML = '<span>▼ DOWN</span>';
   pr.classList.toggle('locked', !usable); pr.hidden = false;
@@ -5961,7 +6543,7 @@ function knockedOut(final) {
 }
 function resetRun() {
   clearLoose(); satchel = []; potPending = []; strains = {}; seenTraits.clear(); reserve = null;
-  Object.assign(run, { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false, queenTip: false, cocTip: false, spikeTip: false });
+  Object.assign(run, { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, tickets: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false, queenTip: false, cocTip: false, spikeTip: false });
   player.maxHp = 8; $('#coinNum').textContent = '0';
   { const effs = shuffle(Object.keys(EXTRAS)); ['cyclops', 'drain', 'torch', 'high'].forEach((o, i) => { originEff[o] = effs[i]; }); }
   stockUp(); hasGun = false; tool = 'ladle'; score = 0; shownScore = 0; $('#scoreNum').textContent = '0';
@@ -6024,7 +6606,7 @@ function enterRoom(r, fromDir, instant) {
     else setTimeout(() => { if (room !== r) return; setDoors(false); spawn(false); }, 450);
   }
   if (r.type === 'stairs' && firstVisit) bossIntro(r);
-  else if (r.type === 'secret' && firstVisit) { const b = { shop: [r.shop && r.shop.name, 'SECRET STOCK'], den: [r.shop && r.shop.name, 'PLACE YOUR BETS'], gift: ['A GIFT', 'IT\'S FREE'], hoard: ['A HOARD', ''] }[r.secret]; banner(b[0], b[1]); SFX.fanfare(); if (r.shop && r.shopDir) SFX.gob(); }
+  else if (r.type === 'secret' && firstVisit) { const b = { shop: [r.shop && r.shop.name, 'SECRET STOCK'], den: ['GOBLIN ARCADE', (r.shop ? r.shop.name + ' · ' : '') + 'INSERT COIN'], gift: ['A GIFT', 'IT\'S FREE'], hoard: ['A HOARD', ''] }[r.secret]; banner(b[0], b[1]); SFX.fanfare(); if (r.shop && r.shopDir) SFX.gob(); }
   else if (firstVisit && fromDir) banner(th.name.toUpperCase(), r.trap ? { pits: 'PITFALLS', spikes: 'SPIKES', turrets: 'TURRETS' }[r.trap] : '');
   renderMap();
   if (r.type === 'stairs' && firstVisit && player.hp < 6) setTimeout(() => heal(6 - player.hp), 900); // a breather before the boss
@@ -6242,6 +6824,7 @@ const brewer = (() => {
       return g;
     },
     pouches() { const g = new THREE.Group(), leather = mat(0x6A4A2A); for (const a of [-0.9, 0.9]) { const p = at(mesh(new THREE.BoxGeometry(0.14, 0.16, 0.1), leather), Math.sin(a) * 0.42, -0.06, Math.cos(a) * 0.42); p.rotation.y = a; g.add(p); } return g; },
+    paperCrown() { const g = new THREE.Group(), paper = mat(0xF2E2A8, { roughness: 0.9, side: THREE.DoubleSide }); g.add(at(mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.09, 10, 1, true), paper), 0, 0.03, 0)); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, pt = at(mesh(new THREE.ConeGeometry(0.06, 0.13, 3), paper), Math.cos(a) * 0.21, 0.135, Math.sin(a) * 0.21); pt.rotation.y = -a; g.add(pt); } [0xFF3D9A, 0x5FF2D6, 0xFFE14D].forEach((c, i) => { const a = i * 2.1 + 0.4; g.add(at(mesh(new THREE.IcosahedronGeometry(0.026, 0), mat(c)), Math.cos(a) * 0.226, 0.03, Math.sin(a) * 0.226)); }); return g; },
     crown() { const g = new THREE.Group(), gd = gold(); g.add(at(mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.1, 12, 1, true), mat(0xFFD23A, { metalness: 0.6, roughness: 0.35, emissive: 0x3A2A04, side: THREE.DoubleSide })), 0, 0.03, 0)); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; g.add(at(mesh(new THREE.ConeGeometry(0.04, 0.12, 4), gd), Math.cos(a) * 0.21, 0.13, Math.sin(a) * 0.21)); } g.add(at(mesh(new THREE.OctahedronGeometry(0.04), mat(0xFF3B4E, { emissive: 0x6A0A14 })), 0, 0.05, 0.22)); return g; },
     cape(s) { // cut from the body's own outline so it drapes over the back, under the pot
       const { prof, bot } = s.userData, y0 = s.position.y, g = new THREE.Group(); g.userData.fit = true;
@@ -6253,7 +6836,7 @@ const brewer = (() => {
   };
   const BODIES = [['BEAN', buildBean, 0x8FD3FF], ['STOUT', buildStout, 0xB5562E], ['LANKY', buildLanky, 0x3E5A2A], ['SPROUT', buildSprout, 0xFF9AB8]];
   const COLOURS = [['CLASSIC', null], ['SKY', 0x8FD3FF], ['EMBER', 0xFF6A3A], ['MOSS', 0x6FBF4A], ['BUBBLEGUM', 0xFF8AB0], ['PLUM', 0x8A5AC8], ['GOLD', 0xFFC93A], ['TEAL', 0x2EC4B6], ['FROST', 0xE4F0FA], ['SOOT', 0x3A3644]];
-  const OUTFITS = [['NONE', {}], ['WIZARD', { head: 'wizardHat', neck: 'scarf', handR: 'ladle' }], ['TINKER', { head: 'topHat', face: 'goggles', handR: 'wrench', waist: 'pouches' }], ['ROYAL', { head: 'crown', neck: 'cape', handR: 'ladle' }]];
+  const OUTFITS = [['NONE', {}], ['WIZARD', { head: 'wizardHat', neck: 'scarf', handR: 'ladle' }], ['TINKER', { head: 'topHat', face: 'goggles', handR: 'wrench', waist: 'pouches' }], ['ROYAL', { head: 'crown', neck: 'cape', handR: 'ladle' }], ['ARCADE KING', { head: 'paperCrown', handR: 'ladle' }, 'crown']];
 
   /* ---------- dances: hand-keyed, written once against the shared joints so every body can do every one ----------
      pose keys: p* root (slide, hop, turn) · b* body (lean, twist, tilt, squash, drop) · h* head · aL/aR arms (forward, out, twist) · lL/lR legs (kick, splay, lift) */
@@ -6456,7 +7039,7 @@ const brewer = (() => {
   function set(what, d) {
     if (what === 'body') look.body = wrap(look.body + d, BODIES.length);
     else if (what === 'color') look.color = wrap(look.color + d, COLOURS.length);
-    else if (what === 'outfit') look.outfit = wrap(look.outfit + d, OUTFITS.length);
+    else if (what === 'outfit') { let n = look.outfit; for (let i = 0; i < OUTFITS.length; i++) { n = wrap(n + d, OUTFITS.length); if (!OUTFITS[n][2] || unlocked(OUTFITS[n][2])) break; } look.outfit = n; } // the paper crown only shows up once you've won it
     else if (what === 'dance') { look.dance = wrap(look.dance + 1 + d, DANCES.length + 1) - 1; setDance(look.dance >= 0 ? look.dance : nextDance()); }
     if (what !== 'dance' && R) build();
     store.set('slingcam.brewer', look);
@@ -7380,7 +7963,7 @@ function frame(now) {
   // projectile (sub-stepped so slow-mo and fast frames agree)
   if (blob) { let rem = sdt; while (rem > 0 && blob) { const st = Math.min(rem, 1 / 120); rem -= st; stepBlob(st); } }
   updateGun(paused ? 0 : rdt, sdt);
-  updatePickups(sdt); updateGoos(sdt); fieldTick(sdt); queenTick(sdt); updateCoins(sdt); updateShop(sdt); updateXBrick(); updateTraps(sdt); updateDen(sdt);
+  updatePickups(sdt); updateGoos(sdt); fieldTick(sdt); queenTick(sdt); updateCoins(sdt); updateShop(sdt); updateXBrick(); updateTraps(sdt); arcade.update(sdt, rdt);
   for (const e of enemies) if (e.slamRing) { e.slamRing.scale.setScalar(SLAM_R * (0.92 + 0.08 * Math.sin(T * 14))); e.slamRing.material.opacity = 0.5 + 0.4 * (1 - e.atk / 1.7); }
   if (!paused) updateInteract(rdt); else { $('#prompt').hidden = true; $('#actBtn').hidden = true; }
 
@@ -7433,7 +8016,7 @@ function frame(now) {
     const k = 1 - Math.exp(-9 * rdt); camera.position.lerp(want, k); camera.quaternion.slerp(camHelper.quaternion, k);
   } else if (camMode === 'return') {
     const k = 1 - Math.exp(-13 * rdt); camera.position.lerp(eye, k); camera.quaternion.slerp(fpQuat, k);
-  }
+  } else if (camMode === 'arcade') arcade.cameraStep(rdt);
   shake = Math.max(0, shake - rdt * 1.4);
   const sh = (settings.shake ? (reduceMotion ? 0.15 : 1) : 0) * shake * 0.25;
   if (sh) camera.position.add(new THREE.Vector3(rand(-sh, sh), rand(-sh, sh), rand(-sh, sh)));
@@ -7471,7 +8054,8 @@ function frame(now) {
   potLiquid.position.y = -0.05 + 0.11 * lvl;
   beltPot.position.y = -0.36 + Math.sin(player.bob + 1) * 0.008;
 
-  renderer.render(scene, camera);
+  if (!arcade.frozen()) renderer.render(scene, camera); // nose to a cabinet's glass, the room holds its last frame
+  arcade.afterRender();
   brewer.update(rdt, ui.screen);
   guide.update(rdt, ui.screen);
   netFrame(rdt); labTick(rdt);
@@ -7491,7 +8075,6 @@ function frame(now) {
     e.label.style.display = s.behind || menuOpen ? 'none' : '';
     e.label.style.transform = `translate(${s.x}px,${s.y}px) translate(-50%,-100%)`;
   }
-  if (den) for (const pt of den.pots) { const p = project(new THREE.Vector3(pt.x, 1.0, pt.z)), hide = menuOpen || p.behind; pt.tag.style.display = hide ? 'none' : ''; if (!hide) pt.tag.style.transform = `translate(${p.x}px,${p.y}px) translate(-50%,-100%) skewX(-8deg)`; }
   for (const sl of shopSlots) { // price tags under each pedestal
     const p = project(sl.pos.clone().setY(0.98 + sl.ped.position.y)), hide = sl.s.sold || menuOpen || p.behind || sl.ped.position.y < -0.3;
     sl.tag.style.display = hide ? 'none' : ''; if (hide) continue;

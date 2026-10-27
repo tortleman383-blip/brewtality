@@ -16,7 +16,7 @@ i = s.index('<script src="https://cdnjs')
 s = s[:i] + shim + open(os.path.join(HERE, "mockroom.html")).read() + s[i:]
 j = s.rindex("})();\n</script>")
 s = s[:j] + "window.__ev = src => eval(src);\n" + s[j:]
-s = s.replace("  renderer.render(scene, camera);", "  renderer.render(scene, camera); if (window.__snapReq) { const n = window.__snapReq; window.__snapReq = null; canvas.toBlob(b => fetch('/save?name=' + n, { method: 'POST', body: b }).then(() => { window.__snapDone = n; }), 'image/png'); }", 1)
+s = s.replace("renderer.render(scene, camera);", "renderer.render(scene, camera); if (window.__snapReq) { const n = window.__snapReq; window.__snapReq = null; canvas.toBlob(b => fetch('/save?name=' + n, { method: 'POST', body: b }).then(() => { window.__snapDone = n; }), 'image/png'); }", 1)
 a = "  return {\n    update, set, look,"
 if a in s:  # the title screen's brewer, for posing and dances
     s = s.replace(a, "  window.__bw = { DANCES, pose, apply, scn, cam, getR: () => R, build, look, P1, shadow, getCh: () => ch };\n" + a, 1)
