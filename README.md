@@ -26,7 +26,7 @@ A first-person dungeon crawler where you brew potions and fling them at things w
 
 **Rancid ingredients:** shrooms, glowcaps, frost and eyes sometimes come up rancid when you pick them up (about one in five). They still work, with a random nasty extra on top.
 
-**Goblin Arcade:** one of the secret rooms behind the X brick. A gnome in shades runs it. Machines take coins and pay tickets: Dragon Flap on the first cabinet, skee-ball, and cups on the counter (watch his medal: if it flashes, he's palmed the coin). Walk up and hold E to step up to a machine, and Esc to step back. Spend tickets at his counter on ingredients, coins, a mystery item, or a Paper Crown for your brewer that you can't get anywhere else.
+**Goblin Arcade:** one of the secret rooms behind the X brick. A gnome in shades runs it. Machines take coins and pay tickets: three cabinets (Dragon Flap, Brewkout and Slime Snake), skee-ball, and cups on the counter (watch his medal: if it flashes, he's palmed the coin). Walk up and hold E to step up to a machine, and Esc to step back. Spend tickets at his counter on ingredients, coins, a mystery item, or a Paper Crown for your brewer that you can't get anywhere else.
 
 **Guide:** click the red book in the bottom-right corner of the title screen. It covers the controls, brewing, every creature (pages fill in as you meet them) and co-op.
 
@@ -42,7 +42,7 @@ The **Veiled Queen** is the Gloom Moths' mother, from floor 2. She shrieks the t
 
 ## Test lab
 
-**TEST LAB** on the title screen opens a containment chamber for watching any creature's attacks. Esc opens the console: pick the subject, the floor it's from (bosses learn moves the deeper they are), hold its AI, toggle god mode, and run any attack. In the chamber, the number keys fire attacks and 0 brings in a fresh subject.
+**TEST LAB** on the title screen opens a containment chamber for watching any creature's attacks. Esc opens the console: pick the subject, the floor it's from (bosses learn moves the deeper they are), hold its AI, toggle god mode, and run any attack. In the chamber, the number keys fire attacks and 0 brings in a fresh subject. ROOM and SUMMON ROOM open a door in the chamber's back wall onto any kind of room (the arcade, the shops, a treasure room, the garden, a trap room, any boss), built fresh for testing, and +20 COINS · +20 TICKETS fills your purse.
 
 ## Co-op
 
