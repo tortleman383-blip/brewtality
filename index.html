@@ -2286,21 +2286,9 @@ function fuseStatic(roots, into, keep = new Set(), hide = new Set()) {
     for (const c of o.children) walk(c);
   };
   roots.forEach(walk);
-  const m4 = new THREE.Matrix4(), n3 = new THREE.Matrix3(), v = new THREE.Vector3(), c = new THREE.Color();
   for (const b of buckets.values()) {
-    const pos = [], nor = [], col = [];
-    for (const o of b.parts) {
-      m4.multiplyMatrices(inv, o.matrixWorld); n3.getNormalMatrix(m4); c.copy(o.material.color);
-      const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry, P = g.attributes.position, N = b.line ? null : g.attributes.normal;
-      for (let i = 0; i < P.count; i++) {
-        v.fromBufferAttribute(P, i).applyMatrix4(m4); pos.push(v.x, v.y, v.z); col.push(c.r, c.g, c.b);
-        if (N) { v.fromBufferAttribute(N, i).applyMatrix3(n3).normalize(); nor.push(v.x, v.y, v.z); }
-      }
-    }
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    if (nor.length === pos.length) geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
     const mat = b.mat.clone(); mat.color.set(0xFFFFFF); mat.vertexColors = true;
-    into.add(b.line ? new THREE.LineSegments(geo, mat) : new THREE.Mesh(geo, mat));
+    into.add(b.line ? new THREE.LineSegments(bakeGeo(b.parts, inv, b.line), mat) : new THREE.Mesh(bakeGeo(b.parts, inv), mat));
   }
   for (const o of drop.reverse()) { // deepest first; anything kept under a fused part moves up to its parent
     if (hide.has(o)) { o.visible = false; continue; }
@@ -2308,6 +2296,21 @@ function fuseStatic(roots, into, keep = new Set(), hide = new Set()) {
     for (const ch of [...o.children]) p.attach(ch);
     p.remove(o);
   }
+}
+// the parts' shapes in one geometry, relative to inv, each part's colour in its vertices
+function bakeGeo(parts, inv, line) {
+  const m4 = new THREE.Matrix4(), n3 = new THREE.Matrix3(), v = new THREE.Vector3(), c = new THREE.Color(), pos = [], nor = [], col = [];
+  for (const o of parts) {
+    m4.multiplyMatrices(inv, o.matrixWorld); n3.getNormalMatrix(m4); c.copy(o.material.color);
+    const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry, P = g.attributes.position, N = line ? null : g.attributes.normal;
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i).applyMatrix4(m4); pos.push(v.x, v.y, v.z); col.push(c.r, c.g, c.b);
+      if (N) { v.fromBufferAttribute(N, i).applyMatrix3(n3).normalize(); nor.push(v.x, v.y, v.z); }
+    }
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  if (nor.length === pos.length) geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  return geo;
 }
 function disposeTree(obj) {
   const cached = new Set(Object.values(MATS));
@@ -5146,7 +5149,7 @@ function updateTraps(sdt) {
 /* ================= the goblin arcade: a gnome's secret arcade. Coins go in, tickets come out, the prize counter turns them into things ================= */
 // It's laid out in the room's own frame, so it fits whichever way the secret room faces:
 // v runs from the counter wall (0) toward the door, u runs across the room, and negative v is behind the counter.
-const ARC_PLAYS = { flap: 3, brewkout: 3, snake: 3, skee: 3, cups: 3 }; // goes per machine per visit, then the gnome hangs a CLOSED sign on it
+const ARC_PLAYS = { flap: 3, brewkout: 3, snake: 3, invaders: 3, skee: 3, cups: 3, whack: 3, claw: 3 }; // goes per machine per visit, then the gnome hangs a CLOSED sign on it
 const ARC_PRIZES = [
   { id: 'ing', name: 'INGREDIENT', note: 'A RANDOM ONE OFF THE SHELF', cost: 10 },
   { id: 'coins', name: '5 COINS', note: 'TICKETS BACK INTO MONEY', cost: 25 },
@@ -5175,6 +5178,9 @@ const arcade = (() => {
     win() { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, null, 0.22, 0.08, i * 0.07)); },
     lose() { tone('sawtooth', 300, 110, 0.4, 0.06); },
     whoosh() { hiss('bandpass', 400, 1400, 0.35, 0.07); },
+    squeak() { tone('sine', 900, 1500, 0.07, 0.03); }, // a shroom pops up
+    clunk() { tone('square', 120, 60, 0.12, 0.06); hiss('lowpass', 500, 300, 0.05, 0.05); },
+    motor() { tone('sawtooth', 70, 74, 0.11, 0.012); hiss('lowpass', 260, 200, 0.1, 0.01); }, // one tick of the claw's gantry motor
   };
   // the cabinet tunes: 16 steps of melody and bass each, looped while you're playing that machine
   const NOTE = n => 440 * Math.pow(2, (n - 69) / 12);
@@ -5182,13 +5188,14 @@ const arcade = (() => {
     flap: { bpm: 150, mel: [76, 0, 79, 0, 81, 79, 76, 0, 74, 0, 76, 0, 72, 0, 0, 0], bass: [45, 0, 45, 0, 52, 0, 52, 0, 43, 0, 43, 0, 50, 0, 50, 0] },
     brewkout: { bpm: 132, mel: [72, 76, 79, 76, 72, 76, 79, 84, 71, 74, 77, 74, 71, 74, 79, 0], bass: [36, 0, 48, 0, 36, 0, 48, 0, 43, 0, 55, 0, 43, 0, 55, 0] },
     snake: { bpm: 120, mel: [69, 0, 72, 69, 0, 74, 72, 0, 69, 0, 67, 0, 64, 0, 0, 0], bass: [45, 45, 0, 45, 41, 41, 0, 41, 43, 43, 0, 43, 40, 0, 40, 0] },
+    invaders: { bpm: g => 100 + (18 - g.aliens.filter(a => a.alive).length) * 9, mel: Array(16).fill(0), bass: [40, 0, 0, 0, 38, 0, 0, 0, 36, 0, 0, 0, 35, 0, 0, 0] }, // the old four-step march, faster as they thin out
   };
   let tuneId = null, tuneStep = 0, tuneNext = 0;
   setInterval(() => {
     const g = play && play.frozen && play.S.game, id = live() && g && g.st === 'play' && !g.hold && !menuOpen ? g.id : null;
     if (id !== tuneId) { tuneId = id; tuneStep = 0; tuneNext = 0; }
     if (!id) return;
-    const tn = TUNES[id], len = 60 / tn.bpm / 2; if (!tuneNext) tuneNext = AC.currentTime + 0.05;
+    const tn = TUNES[id], len = 60 / (typeof tn.bpm === 'function' ? tn.bpm(g) : tn.bpm) / 2; if (!tuneNext) tuneNext = AC.currentTime + 0.05;
     while (tuneNext < AC.currentTime + 0.12) { const k = tuneStep % 16, t0 = tuneNext; if (tn.mel[k]) osc('square', NOTE(tn.mel[k]), null, t0, len * 0.9, 0.02); if (tn.bass[k]) osc('triangle', NOTE(tn.bass[k]), null, t0, len * 1.6, 0.05); tuneStep++; tuneNext += len; }
   }, 30);
 
@@ -5257,8 +5264,8 @@ const arcade = (() => {
     const mon = slab(wIn, 0.03, face, P_[6], P_[7]); g.add(mon);
     const tilt = mon.rotation.x, nrm = new THREE.Vector3(0, -Math.sin(tilt), Math.cos(tilt)), mid = new THREE.Vector3(0, (P_[6][1] + P_[7][1]) / 2, (P_[6][0] + P_[7][0]) / 2);
     const bez = meshOf(new THREE.BoxGeometry(0.5, 0.62, 0.012), dark); bez.position.copy(mid).addScaledVector(nrm, 0.02); bez.rotation.x = tilt; g.add(bez);
-    // every monitor stands on end, like the old vertical cabinets. Goblin Invaders isn't plugged in yet
-    const game = [flap, brewkout, snake][i] || null, cv = game ? game.cv : outOfOrder(name, accent), tex = new THREE.CanvasTexture(cv); tex.magFilter = tex.minFilter = THREE.NearestFilter;
+    // every monitor stands on end, like the old vertical cabinets
+    const game = [flap, brewkout, snake, invaders][i], tex = new THREE.CanvasTexture(game.cv); tex.magFilter = tex.minFilter = THREE.NearestFilter;
     const screen = meshOf(new THREE.PlaneGeometry(0.42, 0.56), new THREE.MeshBasicMaterial({ map: tex })); screen.position.copy(mid).addScaledVector(nrm, 0.03); screen.rotation.x = tilt; g.add(screen);
     g.add(slab(wIn, 0.02, dark, P_[7], P_[8]));
     g.add(slab(0.74, 0.012, glow(new THREE.Color(accent).getHex()), [P_[7][0] + 0.01, P_[7][1] - 0.012], [P_[8][0] - 0.005, P_[8][1] - 0.012])); // a light strip under the marquee
@@ -5268,15 +5275,7 @@ const arcade = (() => {
     colliders.push({ x: pos.x, z: pos.z, r: 0.55, h: 2.2 });
     g.updateMatrixWorld(true);
     const c = new THREE.Vector3(), n = nrm.clone().applyQuaternion(g.quaternion); screen.getWorldPosition(c);
-    return { id: 'cab' + i, kind: game ? 'cab' : 'broken', name, game, plays: game ? game.id : null, cost: 1, target: c.clone(), close: c.clone().addScaledVector(n, 0.82), look: c.clone(), screen, tex, fov: 50 };
-  }
-  function outOfOrder(name, accent) {
-    const c = document.createElement('canvas'); c.width = 192; c.height = 256; const x = c.getContext('2d');
-    x.fillStyle = '#07060A'; x.fillRect(0, 0, 192, 256);
-    for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(160,150,190,${(Math.random() * 0.25).toFixed(2)})`; x.fillRect(Math.random() * 192 | 0, Math.random() * 256 | 0, 2, 1); } // static
-    x.font = '24px VT323, monospace'; x.textAlign = 'center'; x.fillStyle = accent; x.fillText(name, 96, 90);
-    x.save(); x.translate(96, 150); x.rotate(-0.35); x.fillStyle = '#FFE14D'; x.fillRect(-120, -14, 240, 28); x.fillStyle = '#1A1206'; x.font = '22px VT323, monospace'; x.fillText('OUT OF ORDER', 0, 7); x.restore();
-    return c;
+    return { id: 'cab' + i, kind: 'cab', name, game, plays: game.id, cost: 1, target: c.clone(), close: c.clone().addScaledVector(n, 0.82), look: c.clone(), screen, tex, fov: 50 };
   }
 
   /* ---------- Dragon Flap: a baby dragon through the drain pipes ---------- */
@@ -5602,6 +5601,75 @@ const arcade = (() => {
       overlays(this, ['SLIME', 'SNAKE'], n => n === 1 ? 'SNACK' : 'SNACKS', coarse ? 'SWIPE TO STEER' : 'ARROWS OR WASD TO STEER');
     },
   });
+  /* ---------- Goblin Invaders: the dungeon marches down, you sling brews up from your pot ---------- */
+  const INV_SPR = {
+    moth: [['m......m', 'mm.bb.mm', 'mmmbbmmm', '.mmbbmm.', '..m..m..'], ['........', 'm..bb..m', 'mmmbbmmm', 'mmmbbmmm', 'm.m..m.m']],
+    eye: [['..ssss..', '.ssssss.', 'sswwwwss', 'sswppwss', '.ssssss.', 's.s..s.s'], ['..ssss..', '.ssssss.', 'sswwwwss', 'sswwwwss', '.ssssss.', '.s.ss.s.']],
+    slime: [['..gggg..', '.gghggg.', 'gggggggg', 'gkggggkg', 'gggggggg'], ['........', '..gggg..', '.gghgggg', 'gkggggkg', 'gggggggg']],
+    pot: [['..gggggg..', '.kkkkkkkk.', 'kkkkkkkkkk', 'kkkkkkkkkk', '.kkkkkkkk.', '..k....k..']],
+    bat: [['b...bb...b', 'bb.bbbb.bb', 'bbbbbbbbbb', '..b.bb.b..'], ['..........', 'b..bbbb..b', 'bbbbbbbbbb', 'b.b.bb.b.b']],
+  };
+  const INV_PAL = { m: '#B07AFF', b: '#5A3A8A', s: '#D9A27E', w: '#F2EEE4', p: '#1A1020', g: '#7AD86A', h: '#C8F25A', k: '#3A3046' };
+  const sprite = (x, rows, X, Y, sc, pal) => rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) { const ch = r[i]; if (ch === '.') continue; x.fillStyle = (pal && pal[ch]) || INV_PAL[ch]; x.fillRect(X + i * sc, Y + j * sc, sc, sc); } });
+  const invaders = makeCab({
+    id: 'invaders', color: '#5FF2D6', overWord: 'OVERRUN',
+    pay: [[0, 7, 1], [8, 19, 2], [20, 34, 4], [35, 59, 7], [60, Infinity, 10]], // by creatures
+    start() { Object.assign(this, { sx: 96, tx: null, lives: 3, wave: 1, shots: [], bombs: [], booms: [], cd: 0, fireHeld: false, big: 0, ufo: null, ufoT: 8, hurtT: 0, msg: null }); this.setup(); },
+    setup() { this.aliens = []; const types = ['moth', 'eye', 'slime']; for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) this.aliens.push({ c, r, type: types[r], alive: true }); this.ox = 22; this.oy = 36 + Math.min(4, this.wave - 1) * 8; this.dirX = 1; }, // each wave starts a row lower
+    pos(a) { return [this.ox + a.c * 26, this.oy + a.r * 20]; },
+    fire() { if (this.cd > 0 || this.shots.length >= 2) return; this.cd = 0.3; this.shots.push({ x: this.sx, y: 226, big: this.big > 0 }); if (this.big > 0) this.big--; ASFX.blip(620, 0.05, 'triangle'); },
+    onKey(k) { if (ACTION.includes(k)) this.fire(); },
+    onPointer(t, x) { if (t === 'up') { this.fireHeld = false; return; } this.tx = x; if (t === 'down') { this.fireHeld = true; this.fire(); } }, // hold a finger down and it keeps slinging
+    move(dt) {
+      const mv_ = (held(this, 'arrowright', 'd') ? 1 : 0) - (held(this, 'arrowleft', 'a') ? 1 : 0);
+      if (mv_) { this.sx += mv_ * 130 * dt; this.tx = null; } else if (this.tx != null) this.sx += (this.tx - this.sx) * Math.min(1, dt * 12);
+      this.sx = Math.max(12, Math.min(180, this.sx)); this.cd -= dt; this.hurtT -= dt;
+      if (this.fireHeld || held(this, ' ')) this.fire();
+      const alive = this.aliens.filter(a => a.alive), sp = (12 + this.wave * 4) * (1 + (18 - alive.length) / 18 * 2.2); // faster as they thin out
+      this.ox += this.dirX * sp * dt;
+      const xs = alive.map(a => this.pos(a)[0]);
+      if (xs.length && ((this.dirX > 0 && Math.max(...xs) > 174) || (this.dirX < 0 && Math.min(...xs) < 4))) { this.dirX *= -1; this.oy += 7; }
+      if (alive.length && Math.random() < dt * (0.7 + this.wave * 0.2)) { const a = pick(alive), low = alive.filter(b => b.c === a.c).sort((p, q) => q.r - p.r)[0], [bx, by] = this.pos(low); this.bombs.push({ x: bx + 8, y: by + 12 }); } // the lowest in a column drops one
+      for (const b of this.bombs) b.y += (60 + this.wave * 6) * dt;
+      for (const s_ of this.shots) s_.y -= 190 * dt;
+      for (const s_ of this.shots.slice()) {
+        if (s_.y < 18) { this.shots.splice(this.shots.indexOf(s_), 1); continue; }
+        if (this.ufo && Math.abs(s_.x - (this.ufo.x + 10)) < 11 && Math.abs(s_.y - 30) < 7) { this.shots.splice(this.shots.indexOf(s_), 1); this.big = 3; this.score += 3; this.booms.push({ x: this.ufo.x + 10, y: 30, t: 0, r: 14 }); this.ufo = null; this.msg = { s: 'BIG BREW ×3', t: 1.4 }; ASFX.blip(1200, 0.2, 'triangle'); continue; } // the bat: three big brews that splash
+        const hit = this.aliens.find(a => { if (!a.alive) return false; const [ax, ay] = this.pos(a); return s_.x > ax - 1 && s_.x < ax + 17 && s_.y > ay && s_.y < ay + 12; });
+        if (!hit) continue;
+        this.shots.splice(this.shots.indexOf(s_), 1); const [hx, hy] = this.pos(hit);
+        hit.alive = false; this.score++;
+        if (s_.big) for (const a of this.aliens) { if (!a.alive) continue; const [ax, ay] = this.pos(a); if (Math.hypot(ax - hx, ay - hy) < 30) { a.alive = false; this.score++; } }
+        this.booms.push({ x: hx + 8, y: hy + 6, t: 0, r: s_.big ? 26 : 8 }); ASFX.blip(s_.big ? 200 : 300, s_.big ? 0.25 : 0.08, s_.big ? 'sawtooth' : 'square');
+      }
+      for (const b of this.bombs.slice()) {
+        if (b.y > 262) { this.bombs.splice(this.bombs.indexOf(b), 1); continue; }
+        if (this.hurtT <= 0 && b.y > 222 && b.y < 238 && Math.abs(b.x - this.sx) < 10) { this.bombs = []; this.lives--; this.hurtT = 1.2; ASFX.blip(120, 0.4, 'sawtooth'); if (this.lives <= 0) { this.end(); return; } break; }
+      }
+      this.ufoT -= dt; if (!this.ufo && this.ufoT <= 0) { this.ufo = { x: -22 }; this.ufoT = 14; }
+      if (this.ufo) { this.ufo.x += 45 * dt; if (this.ufo.x > 200) this.ufo = null; }
+      this.booms = this.booms.filter(b => (b.t += dt) < 0.35);
+      if (this.msg) this.msg.t -= dt;
+      if (this.aliens.some(a => a.alive && this.pos(a)[1] > 206)) { this.end(); return; } // they reached the pot
+      if (!this.aliens.some(a => a.alive)) { this.wave++; this.setup(); this.bombs = []; this.msg = { s: 'WAVE ' + this.wave, t: 1.2 }; ASFX.blip(1300, 0.15); }
+    },
+    draw() {
+      const x = this.x, t = this.t, fr = Math.floor(t * 2.5) % 2;
+      x.fillStyle = '#0A0810'; x.fillRect(0, 0, 192, 256);
+      for (let i = 0; i < 30; i++) { x.fillStyle = i % 3 ? '#1E1826' : '#2A2236'; x.fillRect((i * 53) % 192, (i * 97 + Math.floor(t * 6)) % 256, 1, 1); }
+      for (const a of this.aliens) if (a.alive) { const [ax, ay] = this.pos(a); sprite(x, INV_SPR[a.type][fr], Math.round(ax), Math.round(ay), 2); }
+      if (this.ufo) sprite(x, INV_SPR.bat[fr], Math.round(this.ufo.x), 26, 2, { b: '#FF3D9A' });
+      for (const s_ of this.shots) { x.fillStyle = s_.big ? '#FF8A2A' : '#7AD86A'; x.fillRect(Math.round(s_.x) - (s_.big ? 2 : 1), Math.round(s_.y) - 3, s_.big ? 5 : 3, 6); x.fillStyle = '#FFFFFF'; x.fillRect(Math.round(s_.x), Math.round(s_.y) - 2, 1, 2); }
+      for (const b of this.bombs) { x.fillStyle = '#B07AFF'; x.fillRect(Math.round(b.x) - 1, Math.round(b.y) - 3, 3, 5); x.fillRect(Math.round(b.x), Math.round(b.y) + 2, 1, 2); }
+      for (const b of this.booms) { const k = b.t / 0.35; x.globalAlpha = 1 - k; x.fillStyle = k < 0.5 ? '#FFE14D' : '#FF8A2A'; x.beginPath(); x.arc(b.x, b.y, b.r * (0.4 + k * 0.6), 0, 6.3); x.fill(); x.globalAlpha = 1; }
+      if (!(this.hurtT > 0 && Math.sin(t * 30) > 0)) sprite(x, INV_SPR.pot[0], Math.round(this.sx) - 10, 226, 2, { g: this.big > 0 ? '#FF8A2A' : '#7AD86A' });
+      x.fillStyle = '#2A2232'; x.fillRect(0, 240, 192, 1);
+      T2(x, String(this.score), 6, 17, 18, '#FFFFFF', 'left'); T2(x, 'WAVE ' + this.wave, 96, 16, 14, '#A99CB6');
+      for (let i = 0; i < this.lives; i++) sprite(x, INV_SPR.pot[0], 172 - i * 12, 8, 1);
+      if (this.msg && this.msg.t > 0) T2(x, this.msg.s, 96, 150, 22, '#FF8A2A');
+      overlays(this, ['GOBLIN', 'INVADERS'], n => n === 1 ? 'CREATURE' : 'CREATURES', coarse ? 'DRAG TO MOVE · HOLD TO SLING' : 'A D OR MOUSE · SPACE SLINGS');
+    },
+  });
   addEventListener('blur', () => { const g = play && play.S.game; if (g && g.keys) g.keys.clear(); }); // a key let go of in another window never comes back up
 
   /* ---------- skee-ball: hold to wind up, let go to roll; nine balls a game ---------- */
@@ -5634,7 +5702,7 @@ const arcade = (() => {
     const ball = meshOf(new THREE.IcosahedronGeometry(0.075, 1), M(0xF2EEE4)); ball.visible = false; sk.add(ball);
     const rack = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.075, 1), M(0xD8D0C0), 9), im = new THREE.Matrix4(); // one draw for the rack; its count is the balls you've got left
     for (let i = 0; i < 9; i++) rack.setMatrixAt(i, im.makeTranslation(-0.32 + (i % 5) * 0.16 + (i >= 5 ? 0.08 : 0), 0.54 + (i >= 5 ? 0.05 : 0), 1.95 - (i >= 5 ? 0.09 : 0)));
-    sk.add(rack);
+    rack.frustumCulled = false; sk.add(rack); // its own bounds sit at the lane's origin, not round the balls
     const aimDot = meshOf(new THREE.ConeGeometry(0.035, 0.1, 4), glow(0xFFE14D)); aimDot.rotation.x = -Math.PI / 2; aimDot.visible = false; sk.add(aimDot);
     const pos = F.V3(F.half - 0.75, 0, 5.2); sk.position.copy(pos); sk.rotation.y = F.yIn; roomGroup.add(sk);
     for (let z = -1.8; z <= 2.0; z += 0.6) { const w = sk.localToWorld(new THREE.Vector3(0, 0, z)); colliders.push({ x: w.x, z: w.z, r: 0.5, h: 0.9 }); }
@@ -5753,16 +5821,306 @@ const arcade = (() => {
     if (CP.st !== 'shuffle') L.forEach(c => place(c, c.slot, 0, c.lift * 0.24));
   }
   function cupsHud() {
-    hudBtn.hidden = CP.st !== 'pick'; hudBtn.textContent = 'HE CHEATED!';
     const left = room.den ? room.den.cups : 0;
     if (CP.st === 'idle') hud('CUPS', left > 0 ? `FOLLOW THE COIN · 2 COINS · WIN 5, OR 10 FOR CATCHING HIM CHEAT · ${left} LEFT` : 'CLOSED FOR TODAY');
     else if (CP.st === 'show') hud('WATCH THE COIN', 'HE SHUFFLES FASTER EVERY ROUND');
     else if (CP.st === 'shuffle') hud('…', 'KEEP YOUR EYE ON IT');
-    else if (CP.st === 'pick') hud('WHICH CUP?', coarse ? 'TAP A CUP · OR CALL HIM OUT' : 'CLICK A CUP OR PRESS 1 2 3 · C IF HE CHEATED');
+    else if (CP.st === 'pick') hud('WHICH CUP?', coarse ? 'TAP A CUP · OR CALL HIM OUT' : 'CLICK A CUP OR PRESS 1 2 3 · C IF HE CHEATED', 'HE CHEATED!');
     else hud(CP.msg, (CP.won ? '+' + CP.won + ' TICKETS · ' : '') + (left > 0 ? 'TAP OR SPACE TO GO AGAIN' : 'THAT\'S ALL THE PLAYS FOR NOW'));
   }
 
   /* ---------- the prize counter ---------- */
+  /* ---------- Whack-a-Shroom: bonk what pops up. Gilded ones need a held bonk, thistlings bite ---------- */
+  const WK = { st: 'idle', t: 0, score: 0, round: 30, held: null, won: 0, msg: '', msgT: 0, lx: 0, lz: 0, swing: 0, keys: new Set(), best: store.get('slingcam.arcade.whack', 0) };
+  const WK_PAY = [[0, 9, 1], [10, 17, 2], [18, 25, 4], [26, 33, 7], [34, Infinity, 10]];
+  const SH_COL = { red: 0xE2483B, gilded: 0xFFD23A, thistling: 0x8A4AE0 }, WK_HEAVY = 0.35, WK_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.95);
+  function buildWhack(F) {
+    const wg = new THREE.Group(), shrooms = [];
+    wg.add(box(1.5, 0.85, 1.0, M(0x5A2A6A), 0, 0.42, 0)); wg.add(box(1.56, 0.06, 1.06, M(0x1A1420), 0, 0.87, 0));
+    wg.add(box(1.56, 0.02, 0.02, glow(0xC8F25A), 0, 0.91, 0.535)); // a strip of neon along the front edge
+    wg.add(box(1.4, 0.5, 0.05, M(0x1A1420), 0, 1.15, -0.5));
+    const sign = meshOf(new THREE.PlaneGeometry(1.3, 0.3), new THREE.MeshBasicMaterial({ map: textTex('WHACK-A-SHROOM', 256, 60, '#C8F25A', 38, '#0A0810') })); sign.position.set(0, 1.2, -0.47); wg.add(sign);
+    for (let i = 0; i < 6; i++) {
+      const hx = -0.48 + (i % 3) * 0.48, hz = i < 3 ? -0.22 : 0.22;
+      wg.add(at(meshOf(new THREE.CylinderGeometry(0.16, 0.16, 0.02, 10), M(0x050406)), hx, 0.905, hz));
+      const sh = new THREE.Group(), capM = new THREE.MeshStandardMaterial({ color: SH_COL.red, flatShading: true, roughness: 0.7 }); // its own, since it changes colour
+      const stem = at(meshOf(new THREE.CylinderGeometry(0.06, 0.08, 0.22, 6), M(0xEFE4D0)), 0, 0.11, 0); sh.add(stem);
+      const cap = at(meshOf(new THREE.SphereGeometry(0.15, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), capM), 0, 0.2, 0); sh.add(cap);
+      const spikes = new THREE.Group(); sh.add(spikes);
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2, sp = at(meshOf(new THREE.ConeGeometry(0.03, 0.12, 4), M(0xE6D2A8)), Math.cos(a) * 0.11, 0.27, Math.sin(a) * 0.11); sp.rotation.set(Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9); spikes.add(sp); }
+      spikes.add(at(meshOf(new THREE.IcosahedronGeometry(0.055, 0), M(0xD05AC8)), 0, 0.36, 0)); // a thistle's purple tuft
+      fuseStatic([spikes], spikes); spikes.visible = false;
+      cap.userData.hole = stem.userData.hole = i;
+      sh.position.set(hx, 0.48, hz); sh.visible = false; wg.add(sh);
+      shrooms.push({ g: sh, cap, stem, spikes, hx, hz, type: null, k: 0, life: 0, hit: false, cool: Math.random() });
+    }
+    const mallet = new THREE.Group(); // its origin is your hand
+    mallet.add(box(0.22, 0.13, 0.13, M(0xC8282E), 0, 0, -0.32)); mallet.add(box(0.035, 0.035, 0.42, M(0x6A4A2A), 0, 0, -0.1));
+    mallet.position.set(0.72, 0.95, 0.5); mallet.rotation.y = 0.5; wg.add(mallet);
+    wg.position.copy(F.V3(-2.2, 0, 9.9)); wg.rotation.y = F.yIn; roomGroup.add(wg); wg.updateMatrixWorld(true);
+    for (const x of [-0.45, 0.45]) { const w = wg.localToWorld(new THREE.Vector3(x, 0, 0)); colliders.push({ x: w.x, z: w.z, r: 0.6, h: 0.9 }); }
+    const L = (x, y, z) => wg.localToWorld(new THREE.Vector3(x, y, z));
+    return { mesh: { wg, shrooms, mallet }, spot: { id: 'whack', kind: 'whack', name: 'WHACK-A-SHROOM', plays: 'whack', cost: 1, target: L(0, 0.9, 0.3), close: L(0, 2.05, 1.1), look: L(0, 0.85, -0.1), fov: 58 } };
+  }
+  const flashMsg = m => { WK.msg = m; WK.msgT = 1.1; };
+  function whackStart() {
+    if (!room.den || !(room.den.whack > 0)) { flashMsg('CLOSED FOR TODAY'); ASFX.lose(); return; }
+    if (!payCoins(1)) { flashMsg('NEED A COIN'); ASFX.lose(); return; }
+    room.den.whack--; Object.assign(WK, { st: 'play', t: 0, score: 0, msgT: 0, held: null });
+    A.whack.shrooms.forEach(s => { s.type = null; s.k = 0; s.hit = false; s.cool = 0.3 + Math.random() * 0.6; });
+  }
+  function whackDown() { if (WK.st !== 'play') { whackStart(); return; } WK.held = 0; } // seconds held, counted in game time
+  function whackUp(under) {
+    if (WK.st !== 'play' || WK.held == null) return;
+    const heavy = WK.held >= WK_HEAVY; WK.held = null; WK.swing = 0.16;
+    // what's under the mallet: the one you pointed at, or failing that the nearest one up within reach
+    let s = under && under.type && under.k >= 0.4 && !under.hit ? under : null;
+    if (!s) { let bd = 0.22; for (const q of A.whack.shrooms) { if (!q.type || q.k < 0.4 || q.hit) continue; const d = Math.hypot(q.hx - WK.lx, q.hz - WK.lz); if (d < bd) { bd = d; s = q; } } }
+    if (!s) { ASFX.thunk(); return; } // the mallet hits the table
+    if (s.type === 'red') { WK.score += 1; s.hit = true; SFX.bonk(heavy); }
+    else if (s.type === 'gilded') { if (heavy) { WK.score += 3; s.hit = true; SFX.bonk(true); ASFX.ding(1.5); flashMsg('HEAVY BONK +3'); } else { ASFX.clunk(); flashMsg('TOO SOFT: HOLD IT'); } }
+    else { WK.score = Math.max(0, WK.score - 2); s.hit = true; SFX.bonk(heavy); ASFX.lose(); flashMsg('THISTLING! −2'); }
+  }
+  function whackPointer(type, e) {
+    const m = A.whack; aim(e);
+    const h = ray.intersectObjects(m.shrooms.filter(s => s.g.visible).flatMap(s => [s.cap, s.stem]), false)[0], under = h ? m.shrooms[h.object.userData.hole] : null, p = new THREE.Vector3();
+    if (under) { WK.lx = under.hx; WK.lz = under.hz; } else if (ray.ray.intersectPlane(WK_PLANE, p)) { m.wg.worldToLocal(p); WK.lx = clamp(p.x, -0.75, 0.75); WK.lz = clamp(p.z, -0.45, 0.45); }
+    if (type === 'down') whackDown(); else if (type === 'up') whackUp(under);
+  }
+  function popShroom(s, type, life) {
+    s.type = type; s.hit = false; s.life = life;
+    s.cap.material.color.setHex(SH_COL[type]); s.cap.material.emissive.setHex(type === 'gilded' ? 0x5A3A06 : 0x000000); s.spikes.visible = type === 'thistling';
+  }
+  function whackStep(dt) {
+    const m = A && A.whack; if (!m) return;
+    const here = play && play.S.kind === 'whack', live = here && ready();
+    const running = WK.st === 'play' && live, attract = WK.st !== 'play' && !here; // the clock only runs while you're stood at the table
+    if (running) WK.t += dt; WK.msgT -= dt; if (WK.held != null && live) WK.held += dt;
+    for (const s of m.shrooms) {
+      s.cool = Math.max(0, s.cool - dt);
+      if (s.type) {
+        if (running || attract) s.life -= dt;
+        const up = s.life > 0 && !s.hit && (WK.st === 'play' || attract);
+        s.k += ((up ? 1 : 0) - s.k) * Math.min(1, dt * (up ? 16 : s.hit ? 24 : 10));
+        if (!up && s.k < 0.03) { s.type = null; s.k = 0; s.hit = false; s.cool = 0.5 + Math.random() * 0.7; } // back down its hole, and a moment before anything else comes up there
+      } else if (s.cool <= 0 && (running || attract)) {
+        if (running && Math.random() < dt * (0.35 + WK.t / WK.round * 0.5)) {
+          const r = Math.random(), type = r < 0.68 ? 'red' : r < 0.84 ? 'gilded' : 'thistling';
+          popShroom(s, type, (type === 'gilded' ? 1.4 : 0.95) - WK.t / WK.round * 0.3); ASFX.squeak();
+        } else if (attract && Math.random() < dt * 0.2) popShroom(s, Math.random() < 0.8 ? 'red' : 'gilded', 1.1);
+      }
+      s.g.visible = s.k > 0.02; // an empty hole until something comes up
+      s.g.position.y = 0.48 + s.k * 0.4; s.g.scale.y = s.hit ? 0.55 + s.k * 0.45 : 1;
+    }
+    if (running && WK.t >= WK.round) {
+      WK.st = 'over'; WK.held = null; WK.won = WK_PAY.find(([a, b]) => WK.score >= a && WK.score <= b)[2]; award(WK.won); ASFX.win();
+      if (WK.score > WK.best) { WK.best = WK.score; store.set('slingcam.arcade.whack', WK.best); }
+    }
+    // the mallet hangs from your hand: it hovers where you point, winds back while you hold, and comes down when you let go
+    const ml = m.mallet;
+    if (live) {
+      const kx = (WK.keys.has('d') || WK.keys.has('arrowright') ? 1 : 0) - (WK.keys.has('a') || WK.keys.has('arrowleft') ? 1 : 0), kz = (WK.keys.has('s') || WK.keys.has('arrowdown') ? 1 : 0) - (WK.keys.has('w') || WK.keys.has('arrowup') ? 1 : 0);
+      if (kx || kz) { WK.lx = clamp(WK.lx + kx * 1.6 * dt, -0.75, 0.75); WK.lz = clamp(WK.lz + kz * 1.6 * dt, -0.45, 0.45); }
+      WK.swing = Math.max(0, WK.swing - dt);
+      const hk = WK.held != null ? Math.min(1, WK.held / WK_HEAVY) : 0;
+      ml.position.x += (WK.lx - ml.position.x) * Math.min(1, dt * 22); ml.position.z += (WK.lz + 0.32 - ml.position.z) * Math.min(1, dt * 22); ml.position.y = 1.0;
+      ml.rotation.set(WK.swing > 0 ? -0.05 : 0.7 + hk * 0.55 + (hk >= 1 ? Math.sin(T * 45) * 0.06 : 0), 0, 0); // it trembles once a bonk's heavy enough
+    } else { ml.position.set(0.72, 0.95, 0.5); ml.rotation.set(0, 0.5, 0); }
+  }
+  function whackHud() {
+    const left = room.den ? room.den.whack : 0, go = coarse ? 'TAP' : 'CLICK OR SPACE';
+    if (WK.st === 'play') hud(WK.score + ' · ' + Math.max(0, Math.ceil(WK.round - WK.t)) + 's', WK.msgT > 0 ? WK.msg : 'RED +1 · GILDED NEEDS A HELD BONK, +3 · THISTLING −2');
+    else if (WK.st === 'over') hud(WK.score + ' BONKS · +' + WK.won + (WK.won === 1 ? ' TICKET' : ' TICKETS'), left > 0 ? go + ' TO GO AGAIN · ' + left + ' LEFT' : 'THAT\'S ALL THE PLAYS FOR NOW');
+    else hud('WHACK-A-SHROOM', WK.msgT > 0 ? WK.msg : left > 0 ? `${go} TO START · 1 COIN · 30 SECONDS · POINT${coarse ? '' : ' OR WASD'}, HOLD, LET GO TO BONK · ${left} LEFT` : 'CLOSED FOR TODAY');
+  }
+
+  /* ---------- GRAB-A-GOB: the claw. 15 seconds to line it up, then it drops ---------- */
+  const CLAW_TIX = [4, 6, 8, 5, 12], CLAW_NAME = ['A SLIME', 'AN EYEBALL', 'A GOBLIN HEAD', 'A POTION', 'A DRAGON EGG'], CHUTE = [-0.32, 0.32], CLAW_UP = 1.92, OPEN = 0.55, SHUT = 0.08;
+  function buildClaw(F) {
+    const cm = new THREE.Group(), body = M(0x241A3A), edge = glow(0xFF3D9A), edge2 = glow(0x5FF2D6), metal = M(0xC8C0D2, { metalness: 0.7, roughness: 0.3 }), dark = M(0x0E0B12); // a pink-lit pit, cyan posts
+    cm.add(box(1.0, 0.95, 1.0, body, 0, 0.475, 0)); cm.add(box(1.04, 0.05, 1.04, edge, 0, 0.95, 0));
+    for (const [px_, pz] of [[-0.49, -0.49], [0.49, -0.49], [-0.49, 0.49], [0.49, 0.49]]) { cm.add(box(0.05, 1.2, 0.05, body, px_, 1.55, pz)); cm.add(box(0.015, 1.2, 0.015, edge2, px_ + Math.sign(px_) * 0.03, 1.55, pz + Math.sign(pz) * 0.03)); }
+    cm.add(box(1.06, 0.28, 1.06, body, 0, 2.29, 0)); cm.add(box(1.08, 0.03, 1.08, edge, 0, 2.15, 0));
+    const sign = meshOf(new THREE.PlaneGeometry(0.98, 0.26), new THREE.MeshBasicMaterial({ map: textTex('GRAB-A-GOB', 256, 64, '#5FF2D6', 40, '#0A0810') })); sign.position.set(0, 2.29, 0.535); cm.add(sign);
+    const glassM = new THREE.MeshStandardMaterial({ color: 0xBFE8FF, transparent: true, opacity: 0.1, roughness: 0.05, metalness: 0.1, depthWrite: false });
+    cm.add(at(meshOf(new THREE.BoxGeometry(0.97, 1.18, 0.97), glassM), 0, 1.55, 0));
+    // the front: a shelf with the stick, the button and the coin slot; the chute's flap below
+    cm.add(box(1.0, 0.08, 0.3, body, 0, 0.9, 0.62)); cm.add(box(1.0, 0.04, 0.3, edge2, 0, 0.86, 0.62)); cm.add(box(0.02, 0.16, 0.02, dark, -0.15, 1.0, 0.64));
+    const knob = at(meshOf(new THREE.IcosahedronGeometry(0.05, 1), glow(0xFF3D3D)), -0.15, 1.1, 0.64); cm.add(knob);
+    const btn = at(meshOf(new THREE.CylinderGeometry(0.06, 0.06, 0.04, 10), glow(0xFFE14D)), 0.15, 0.96, 0.66); cm.add(btn);
+    cm.add(box(0.12, 0.16, 0.03, dark, 0.36, 0.6, 0.515)); cm.add(box(0.04, 0.07, 0.01, glow(0xFF8A2A), 0.36, 0.62, 0.532));
+    cm.add(box(0.36, 0.28, 0.03, M(0x0A0810), -0.25, 0.42, 0.515));
+    const flapP = box(0.32, 0.24, 0.01, new THREE.MeshStandardMaterial({ color: 0x8FD3FF, transparent: true, opacity: 0.35 }), -0.25, 0.42, 0.535); cm.add(flapP);
+    // the chute inside: a glass pen in the front-left corner
+    cm.add(box(0.3, 0.22, 0.01, glassM, -0.32, 1.06, 0.17)); cm.add(box(0.01, 0.22, 0.3, glassM, -0.17, 1.06, 0.32));
+    cm.add(box(0.3, 0.012, 0.012, edge, -0.32, 1.17, 0.17)); cm.add(box(0.012, 0.012, 0.3, edge, -0.17, 1.17, 0.32));
+    // the gantry: two rails, a bridge that runs along them, a trolley on the bridge, the cable and the claw
+    for (const sx_ of [-0.44, 0.44]) cm.add(box(0.03, 0.03, 0.9, metal, sx_, 2.1, 0));
+    const bridge = new THREE.Group(); bridge.add(box(0.9, 0.035, 0.05, metal, 0, 2.08, 0)); cm.add(bridge);
+    const trolley = box(0.1, 0.06, 0.1, metal, 0, 2.05, 0); bridge.add(trolley);
+    const cable = box(0.012, 1, 0.012, M(0x9A92A6), 0, 1.8, 0); cm.add(cable);
+    const claw = new THREE.Group(); claw.add(meshOf(new THREE.CylinderGeometry(0.05, 0.035, 0.07, 8), metal)); const prongs = [];
+    for (let k = 0; k < 3; k++) {
+      const arm = new THREE.Group(); arm.rotation.y = k * Math.PI * 2 / 3; claw.add(arm);
+      const piv = new THREE.Group(); piv.position.set(0, -0.03, 0.035); arm.add(piv);
+      piv.add(box(0.018, 0.13, 0.018, metal, 0, -0.065, 0)); const tip = box(0.018, 0.07, 0.018, metal, 0, -0.15, -0.025); tip.rotation.x = 0.7; piv.add(tip);
+      prongs.push(piv);
+    }
+    cm.add(claw);
+    // the pile: slimes, eyeballs, goblin heads, potions and dragon eggs. One instanced mesh per kind of toy, so 22 toys cost 5 draws
+    const toyMakers = [
+      () => { const t = meshOf(new THREE.IcosahedronGeometry(0.1, 1), M(0x7AD86A)); t.scale.y = 0.7; return t; },
+      () => { const t = new THREE.Group(); t.add(meshOf(new THREE.IcosahedronGeometry(0.09, 1), M(0xF2EEE4))); t.add(at(meshOf(new THREE.IcosahedronGeometry(0.045, 0), M(0x1A1418)), 0, 0, 0.07)); return t; },
+      () => { const t = new THREE.Group(), skin = M(0x7FB04A); t.add(meshOf(new THREE.IcosahedronGeometry(0.085, 0), skin)); for (const sd of [-1, 1]) { const ear = at(meshOf(new THREE.ConeGeometry(0.025, 0.12, 4), skin), sd * 0.1, 0, 0); ear.rotation.z = -sd * 1.2; t.add(ear); } return t; },
+      () => { const t = new THREE.Group(); t.add(meshOf(new THREE.CylinderGeometry(0.05, 0.07, 0.14, 6), M(0xFF6A8A))); t.add(at(meshOf(new THREE.CylinderGeometry(0.025, 0.025, 0.04, 5), M(0x8A6A3A)), 0, 0.09, 0)); return t; },
+      () => { const t = meshOf(new THREE.IcosahedronGeometry(0.08, 0), M(0xB07AFF)); t.scale.y = 1.35; return t; },
+    ];
+    const toyMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.88 }), I4 = new THREE.Matrix4(); toyMat.color.setScalar(1.7); // lit up like a display case, or the dim room turns them to mud
+    const ims = toyMakers.map((mk, k) => {
+      const t = mk(), parts = []; t.updateMatrixWorld(true); t.traverse(o => { if (o.isMesh) parts.push(o); });
+      const im = new THREE.InstancedMesh(bakeGeo(parts, I4), toyMat, k < 2 ? 5 : 4); im.frustumCulled = false; cm.add(im); return im; // its own bounds sit on the floor, not round the toys
+    });
+    let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const pile = [], dummy = new THREE.Object3D();
+    for (let i = 0; i < 22; i++) {
+      let x, z; do { x = rnd() * 0.8 - 0.4; z = rnd() * 0.8 - 0.4; } while (x < -0.14 && z > 0.14); // not in the chute's corner
+      const kind = i % 5, home = new THREE.Vector3(x, 1.02 + (i % 3) * 0.07 + rnd() * 0.04, z);
+      pile.push({ kind, slot: Math.floor(i / 5), home, rot: new THREE.Euler(rnd() * 2, rnd() * 6, rnd() * 2), m: { position: home.clone() } });
+    }
+    const put = p => { dummy.position.copy(p.m.position); dummy.rotation.copy(p.rot); dummy.updateMatrix(); ims[p.kind].setMatrixAt(p.slot, dummy.matrix); ims[p.kind].instanceMatrix.needsUpdate = true; };
+    pile.forEach(put);
+    const face = Math.atan2(-Math.sin(F.yRt) + 0.45 * Math.sin(F.yIn), -Math.cos(F.yRt) + 0.45 * Math.cos(F.yIn)); // out from the right-hand wall, turned a little toward the door
+    cm.position.copy(F.V3(F.half - 1.1, 0, 9.9)); cm.rotation.y = face; roomGroup.add(cm); cm.updateMatrixWorld(true);
+    colliders.push({ x: cm.position.x, z: cm.position.z, r: 0.75, h: 2.4 });
+    const L = (x, y, z) => cm.localToWorld(new THREE.Vector3(x, y, z));
+    const c = { cm, bridge, cable, claw, prongs, pile, ims, put, knob, btn, flap: flapP, keep: [bridge, cable, claw, knob, btn, flapP, ...ims],
+      t: 10, from: new THREE.Vector3(), to: new THREE.Vector3(), held: null, fall: null, prize: null, target: null, slip: false, x: CHUTE[0], z: CHUTE[1], tx: CHUTE[0], tz: CHUTE[1], mode: 'demo', keys: new Set(), flash: 0, aimT: 0, result: '', won: 0 };
+    return { c, spot: { id: 'claw', kind: 'claw', name: 'GRAB-A-GOB', plays: 'claw', cost: 1, target: L(0, 1.4, 0), close: L(0, 1.72, 1.35), look: L(0, 1.52, 0), fov: 58 } };
+  }
+  let motorT = 0;
+  const motor = (on, dt) => { if (on && (motorT -= dt) <= 0) { motorT = 0.1; ASFX.motor(); } };
+  function clawPose(c, cy, open) {
+    c.bridge.position.z = c.z; c.bridge.children[1].position.x = c.x; // the trolley rides the bridge
+    c.claw.position.set(c.x, cy, c.z);
+    c.cable.position.set(c.x, (2.05 + cy) / 2, c.z); c.cable.scale.y = Math.max(0.02, 2.05 - cy);
+    c.prongs.forEach(p => { p.rotation.x = -open; });
+    if (c.held) { c.held.m.position.set(c.x, cy - 0.17, c.z); c.put(c.held); }
+  }
+  // nobody's playing: it runs a demo, over and over, and sometimes even wins
+  function clawDemo(c, dt) {
+    c.t += dt; const t = c.t;
+    if (t > 10) { c.t = 0; c.from.set(c.x, 0, c.z); c.target = pick(c.pile); c.to.set(c.target.home.x, 0, c.target.home.z); c.slip = Math.random() < 0.45; }
+    if (!c.target) { c.t = 10; return [CLAW_UP, OPEN]; }
+    let drop = 0, open = OPEN;
+    if (t < 2.2) { const k = sm(Math.min(1, t / 2.2)); c.x = lerp(c.from.x, c.to.x, k); c.z = lerp(c.from.z, c.to.z, k); }
+    else if (t < 3.2) drop = sm((t - 2.2) / 1.0);
+    else if (t < 3.7) { drop = 1; open = lerp(OPEN, SHUT, (t - 3.2) / 0.5); if (!c.held && t > 3.5) c.held = c.target; }
+    else if (t < 4.7) { drop = 1 - sm((t - 3.7) / 1.0); open = SHUT; if (c.slip && t > 4.3 && c.held) { c.fall = c.held; c.held = null; } }
+    else if (t < 6.7) { open = SHUT; const k = sm((t - 4.7) / 2.0); c.x = lerp(c.to.x, CHUTE[0], k); c.z = lerp(c.to.z, CHUTE[1], k); }
+    else if (t < 7.2) { open = lerp(SHUT, OPEN, (t - 6.7) / 0.5); if (c.held) { c.prize = c.held; c.prize.mine = false; c.held = null; } }
+    return [lerp(CLAW_UP, c.target.home.y + 0.16, drop), open];
+  }
+  function clawStart(c) {
+    if (!room.den || !(room.den.claw > 0)) { c.mode = 'done'; c.result = 'CLOSED FOR TODAY'; c.won = 0; ASFX.lose(); return; }
+    if (!payCoins(1)) { c.mode = 'done'; c.result = 'NEED A COIN'; c.won = 0; ASFX.lose(); return; }
+    room.den.claw--; Object.assign(c, { mode: 'aim', aimT: 15, tx: c.x, tz: c.z, result: '', won: 0 });
+  }
+  function clawDrop(c) {
+    if (c.mode !== 'aim') return;
+    c.mode = 'drop'; c.dt2 = 0; c.ax = c.x; c.az = c.z; c.tried = false; c.slipChecked = false; c.grabbed = false; ASFX.clunk();
+    let best = null, bd = 0.11; // the toy nearest under the claw, preferring the top of the pile
+    for (const q of c.pile) { if (q === c.fall || q === c.prize) continue; const d = Math.hypot(q.home.x - c.x, q.home.z - c.z); if (d < bd || (best && d < 0.11 && q.home.y > best.home.y)) { bd = Math.min(bd, d); best = q; } }
+    c.cand = best; c.cdist = best ? Math.hypot(best.home.x - c.x, best.home.z - c.z) : 1; c.grabY = best ? best.home.y + 0.16 : 1.15;
+  }
+  // your go: steer it, then down, shut, up (sometimes it slips), over to the chute, open
+  function clawPlay(c, dt) {
+    let cy = CLAW_UP, open = OPEN;
+    if (c.mode === 'aim') {
+      if (ready()) c.aimT -= dt;
+      const kx = (c.keys.has('d') || c.keys.has('arrowright') ? 1 : 0) - (c.keys.has('a') || c.keys.has('arrowleft') ? 1 : 0), kz = (c.keys.has('s') || c.keys.has('arrowdown') ? 1 : 0) - (c.keys.has('w') || c.keys.has('arrowup') ? 1 : 0);
+      if (kx || kz) { c.tx = clamp(c.x + kx * 0.2, -0.4, 0.4); c.tz = clamp(c.z + kz * 0.2, -0.4, 0.4); }
+      const dx = c.tx - c.x, dz = c.tz - c.z, d = Math.hypot(dx, dz), st = Math.min(d, 0.42 * dt);
+      if (d > 0.002) { c.x += dx / d * st; c.z += dz / d * st; }
+      motor(d > 0.01, dt);
+      if (c.aimT <= 0) clawDrop(c);
+    } else if (c.mode === 'drop') {
+      c.dt2 += dt; const t = c.dt2; let drop = 0;
+      if (t < 1.0) drop = sm(t);
+      else if (t < 1.5) { drop = 1; open = lerp(OPEN, SHUT, (t - 1) / 0.5); if (!c.tried && t > 1.3) { c.tried = true; if (c.cand && Math.random() < 1 - c.cdist / 0.11 * 0.5) { c.held = c.cand; c.grabbed = true; c.slipP = 0.18 + c.cdist / 0.11 * 0.4; ASFX.clunk(); } } } // dead centre grabs every time; at the edge, half the time
+      else if (t < 2.5) { drop = 1 - sm(t - 1.5); open = SHUT; if (c.held && !c.slipChecked && t > 2.1) { c.slipChecked = true; if (Math.random() < c.slipP) { c.fall = c.held; c.held = null; ASFX.thunk(); } } }
+      else if (t < 4.5) { open = SHUT; const k = sm((t - 2.5) / 2); c.x = lerp(c.ax, CHUTE[0], k); c.z = lerp(c.az, CHUTE[1], k); }
+      else if (t < 5.0) { open = lerp(SHUT, OPEN, (t - 4.5) / 0.5); if (c.held) { c.prize = c.held; c.prize.mine = true; c.held = null; } }
+      else if (!c.prize) { c.mode = 'done'; if (!c.won) { c.result = c.grabbed ? 'IT SLIPPED' : 'MISSED'; ASFX.lose(); } }
+      cy = lerp(CLAW_UP, c.grabY, drop);
+      motor(t < 1 || (t > 2.5 && t < 4.5), dt);
+    }
+    return [cy, open];
+  }
+  function clawStep(dt) {
+    const c = A && A.claw; if (!c) return;
+    const here = play && play.S.kind === 'claw';
+    // walk up to it and the demo stops: whatever it was holding drops back on the pile, and the claw goes home
+    if (here && c.mode === 'demo') { c.mode = 'idle'; if (c.held) { c.fall = c.held; c.held = null; } c.target = null; }
+    if (!here && (c.mode === 'idle' || c.mode === 'done')) { c.mode = 'demo'; c.t = 10; }
+    let pose;
+    if (c.mode === 'demo') pose = clawDemo(c, dt);
+    else if (c.mode === 'idle' || c.mode === 'done') { c.x += (CHUTE[0] - c.x) * Math.min(1, dt * 3); c.z += (CHUTE[1] - c.z) * Math.min(1, dt * 3); pose = [CLAW_UP, OPEN]; }
+    else pose = clawPlay(c, dt);
+    clawPose(c, pose[0], pose[1]);
+    if (c.fall) { const p = c.fall, hm = p.home, ps = p.m.position; ps.y = Math.max(hm.y, ps.y - dt * 3); ps.x = lerp(ps.x, hm.x, Math.min(1, dt * 6)); ps.z = lerp(ps.z, hm.z, Math.min(1, dt * 6)); c.put(p); if (ps.y <= hm.y) c.fall = null; } // back onto the pile
+    if (c.prize) {
+      const p = c.prize; p.m.position.y -= dt * 2.5; c.put(p);
+      if (p.m.position.y < 0.55) { // down the chute: yours if you won it, and the gnome restocks the pile
+        if (p.mine) { c.won = CLAW_TIX[p.kind]; award(c.won); c.result = 'YOU WON ' + CLAW_NAME[p.kind]; ASFX.win(); c.mode = 'done'; }
+        p.m.position.copy(p.home); p.m.position.y += 0.4; c.fall = p; c.prize = null; c.flash = 0.6;
+      }
+    }
+    if (c.flash > 0) { c.flash -= dt; c.flap.rotation.x = Math.sin(c.flash * 20) * 0.3; c.btn.material.color.setHex(c.flash % 0.2 < 0.1 ? 0xFFFFFF : 0xFFE14D); }
+    else c.btn.material.color.setHex(0xFFE14D);
+    const moving = c.mode === 'aim' || (c.mode === 'demo' && (c.t < 2.2 || (c.t > 4.7 && c.t < 6.7)));
+    c.knob.position.x = -0.15 + (moving ? Math.sin(T * 9) * 0.015 : 0); // the stick waggles while it moves
+  }
+  function clawPointer(type, e) {
+    const c = A.claw;
+    if (type === 'down' && c.mode !== 'aim' && c.mode !== 'drop') { clawStart(c); return; }
+    if (c.mode !== 'aim' || type === 'up') return;
+    aim(e); const p = new THREE.Vector3();
+    if (ray.ray.intersectPlane(CLAW_PLANE, p)) { c.cm.worldToLocal(p); c.tx = clamp(p.x, -0.4, 0.4); c.tz = clamp(p.z, -0.4, 0.4); }
+  }
+  const CLAW_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.6);
+  function clawHud(c) {
+    const left = room.den ? room.den.claw : 0, go = coarse ? 'TAP' : 'CLICK OR SPACE';
+    if (c.mode === 'aim') hud(Math.max(0, Math.ceil(c.aimT)) + 's', coarse ? 'DRAG TO STEER · DROP WHEN YOU\'RE OVER A PRIZE' : 'STEER WITH THE MOUSE OR WASD · SPACE DROPS', 'DROP!');
+    else if (c.mode === 'drop') hud('…', 'COME ON, COME ON');
+    else if (c.mode === 'done') hud(c.result, (c.won ? '+' + c.won + ' TICKETS · ' : '') + (left > 0 ? go + ' TO GO AGAIN · ' + left + ' LEFT' : 'THAT\'S ALL THE PLAYS FOR NOW'));
+    else hud('GRAB-A-GOB', left > 0 ? `${go} TO START · 1 COIN · 15 SECONDS TO LINE IT UP · A DRAGON EGG PAYS 12 · ${left} LEFT` : 'CLOSED FOR TODAY');
+  }
+
+  // the room's too deep for what's in it, so a brick wall goes across with an arch in it: the far end becomes a little entrance hall
+  const ARC_WALL = 12.4, ARCH_W = 1.5, ARCH_H = 3.1;
+  function partition(F) {
+    const th = THEMES.den; let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let row = 0; row * 0.5 < H; row++) {
+      const y = row * 0.5 + 0.25, off = row % 2 ? 0.5 : 0;
+      for (let u = -F.half - off; u < F.half; u += 1.0) {
+        const a = Math.max(-F.half, u), b = Math.min(F.half, u + 0.98);
+        const pieces = y < ARCH_H ? [[a, Math.min(b, -ARCH_W)], [Math.max(a, ARCH_W), b]] : [[a, b]]; // leave the arch open
+        for (const [p0, p1] of pieces) { if (p1 - p0 < 0.05) continue; const br = box(p1 - p0, 0.47, 0.34 + rnd() * 0.04, M(th.stone[Math.floor(rnd() * 4)]), 0, 0, 0); br.position.copy(F.V3((p0 + p1) / 2, y, ARC_WALL)); br.rotation.y = F.yIn; roomGroup.add(br); }
+      }
+    }
+    // a dark core behind the bricks, so the gaps between them read as mortar rather than windows onto the room
+    const coreM = M(0x120E18), core = (w, h, u, y) => { const c = box(w, h, 0.2, coreM, 0, 0, 0); c.position.copy(F.V3(u, y, ARC_WALL)); c.rotation.y = F.yIn; roomGroup.add(c); };
+    for (const sd of [-1, 1]) core(F.half - ARCH_W, H, sd * (F.half + ARCH_W) / 2, H / 2);
+    core(ARCH_W * 2, H - ARCH_H, 0, (H + ARCH_H) / 2);
+    // pink neon round the arch, both faces, and a sign over it on the way in
+    for (const sd of [-1, 1]) for (const fz of [-0.2, 0.2]) {
+      const post = box(0.06, ARCH_H, 0.04, glow(0xFF3D9A), 0, 0, 0); post.position.copy(F.V3(sd * (ARCH_W + 0.03), ARCH_H / 2, ARC_WALL + fz)); post.rotation.y = F.yIn; roomGroup.add(post);
+      if (sd < 0) { const top = box(ARCH_W * 2 + 0.12, 0.06, 0.04, glow(0xFF3D9A), 0, 0, 0); top.position.copy(F.V3(0, ARCH_H + 0.03, ARC_WALL + fz)); top.rotation.y = F.yIn; roomGroup.add(top); }
+    }
+    const sign = meshOf(new THREE.PlaneGeometry(3.4, 0.74), new THREE.MeshBasicMaterial({ map: textTex('INSERT COIN', 512, 110, '#5FF2D6', 86, null), transparent: true }));
+    sign.position.copy(F.V3(0, 3.95, ARC_WALL + 0.21)); sign.rotation.y = F.yIn; roomGroup.add(sign);
+    for (const sd of [-1, 1]) for (let u = ARCH_W + 0.3; u < F.half; u += 0.45) { const w = F.V3(sd * u, 0, ARC_WALL); colliders.push({ x: w.x, z: w.z, r: 0.3, h: H }); }
+  }
   function prizeSpot(F) {
     const disp = box(0.3, 0.4, 0.25, M(0x2A2232), 0, 0, 0); disp.position.copy(F.V3(1.0, 1.04, -0.88)); disp.rotation.y = F.yIn; roomGroup.add(disp);
     for (let i = 0; i < 5; i++) { const tk = box(0.12, 0.012, 0.18, glow(0xFF8A2A), 0, 0, 0); tk.position.copy(F.V3(1.0, 0.86 - i * 0.008, -0.62 + i * 0.15)); tk.rotation.y = F.yIn; tk.rotation.x = -0.3 + (i % 2) * 0.6; roomGroup.add(tk); } // a curl of tickets off the end of the counter
@@ -5828,11 +6186,14 @@ const arcade = (() => {
     [3.0, 4.6, 6.2, 7.8].forEach((v, i) => A.spots.push(cabinet(i, F, v)));
     const skee = buildSkee(F); A.skee = skee.mesh; A.spots.push(skee.spot);
     const cups = buildCups(F); A.cups = cups.mesh; A.spots.push(cups.spot);
+    const wk = buildWhack(F); A.whack = wk.mesh; A.spots.push(wk.spot);
+    const cl = buildClaw(F); A.claw = cl.c; A.spots.push(cl.spot);
+    partition(F);
     A.spots.push(prizeSpot(F)); A.prizes = prizeShelves(F);
     const sm_ = A.skee; // the cabinets, skee-ball, the dispenser and the shelves go down to a handful of draws. Cups move; the prizes stay hidden as templates for prizeFly
-    fuseStatic(roomGroup.children.filter(c => !before.has(c)), roomGroup, new Set([...A.cups.list.map(c => c.g), A.cups.coin, sm_.ball, sm_.aimDot, sm_.rack].filter(Boolean)), new Set(A.prizes));
+    fuseStatic(roomGroup.children.filter(c => !before.has(c)), roomGroup, new Set([...A.cups.list.map(c => c.g), A.cups.coin, sm_.ball, sm_.aimDot, sm_.rack, ...A.whack.shrooms.map(s => s.g), A.whack.mallet, ...A.claw.keep].filter(Boolean)), new Set(A.prizes));
     tixEl.hidden = false; showTix();
-    flap.reset(); if (SK.st !== 'play') SK.st = 'idle'; if (!['idle', 'done'].includes(CP.st)) CP.st = 'idle';
+    flap.reset(); if (SK.st !== 'play') SK.st = 'idle'; if (!['idle', 'done'].includes(CP.st)) CP.st = 'idle'; if (WK.st !== 'play') WK.st = 'idle';
   }
   function teardown() {
     if (play) endNow();
@@ -5851,12 +6212,15 @@ const arcade = (() => {
     if (S.kind === 'prizes') ASFX.mutter();
     if (S.kind === 'cups' && CP.st === 'done') CP.st = 'idle';
     if (S.kind === 'skee' && SK.st === 'over') SK.st = 'idle';
+    if (S.kind === 'whack' && WK.st === 'over') WK.st = 'idle';
     if (S.kind === 'cab') S.game.reset();
   }
   function leave() {
     if (!play || play.back) return;
     if (play.S.kind === 'cab') play.S.game.leave();
     if (play.S.kind === 'skee') { SK.hold = null; SK.keys.clear(); }
+    if (play.S.kind === 'whack') { WK.held = null; WK.keys.clear(); }
+    if (play.S.kind === 'claw') A.claw.keys.clear();
     play.back = true; play.frozen = false; screenEl.hidden = true; hudEl.hidden = true; prizeEl.hidden = true; backEl.hidden = true;
   }
   function endNow() { // out at once: the room's changing under you
@@ -5889,7 +6253,7 @@ const arcade = (() => {
     screenEl.style.transform = `matrix3d(${[t[0], t[3], 0, t[6], t[1], t[4], 0, t[7], 0, 0, 1, 0, t[2], t[5], 0, t[8]].join(',')})`;
     sx.drawImage(play.S.game.cv, 0, 0); screenEl.hidden = false; play.frozen = true;
   }
-  function hud(main, sub) { hudEl.hidden = false; if (hudMain.textContent !== main) hudMain.textContent = main; if (hudSub.textContent !== (sub || '')) hudSub.textContent = sub || ''; }
+  function hud(main, sub, btn) { hudEl.hidden = false; if (hudMain.textContent !== main) hudMain.textContent = main; if (hudSub.textContent !== (sub || '')) hudSub.textContent = sub || ''; hudBtn.hidden = !btn; if (btn && hudBtn.textContent !== btn) hudBtn.textContent = btn; } // the button only when that machine wants one
 
   /* ---------- the frame ---------- */
   let texT = 0;
@@ -5899,11 +6263,11 @@ const arcade = (() => {
     for (const S of A.spots) if (S.game) S.game.step(sdt, S === at_ && ready()); // a run only moves while you're stood at its cabinet
     if (at_ && play.frozen) { at_.game.draw(); sx.drawImage(at_.game.cv, 0, 0); }
     else if ((texT += rdt) > 1 / 15) { texT = 0; for (const S of A.spots) if (S.game) { S.game.draw(); S.tex.needsUpdate = true; } } // the attract screens, 15 times a second
-    skeeStep(sdt); cupsStep(sdt); flyStep(rdt);
+    skeeStep(sdt); cupsStep(sdt); whackStep(sdt); clawStep(sdt); flyStep(rdt);
     A.sign.material.opacity = 0.92 + Math.sin(T * 30) * 0.04;
     if (ready()) {
       const k = play.S.kind;
-      if (k === 'skee') skeeHud(); else if (k === 'cups') cupsHud(); else if (k === 'prizes') { if (prizeEl.hidden) { prizeEl.hidden = false; } renderPrizes(); hudEl.hidden = true; } else hudEl.hidden = true;
+      if (k === 'skee') skeeHud(); else if (k === 'cups') cupsHud(); else if (k === 'whack') whackHud(); else if (k === 'claw') clawHud(A.claw); else if (k === 'prizes') { if (prizeEl.hidden) { prizeEl.hidden = false; } renderPrizes(); hudEl.hidden = true; } else hudEl.hidden = true;
     }
   }
 
@@ -5919,7 +6283,9 @@ const arcade = (() => {
     else if (S.kind === 'cups' && down && !rep) {
       if (CP.st === 'idle' || CP.st === 'done') { if (k === ' ' || k === 'enter') cupsStart(); }
       else if (CP.st === 'pick') { const n = { 1: 0, 2: 1, 3: 2 }[k]; if (n != null) cupsPick(A.cups.list.find(c => c.slot === n)); else if (k === 'c') cupsCall(); }
-    } else if (S.kind === 'prizes' && down && !rep) { const n = { 1: 0, 2: 1, 3: 2, 4: 3 }[k]; if (n != null) buy(ARC_PRIZES[n].id); }
+    } else if (S.kind === 'whack') { if (down) WK.keys.add(k); else WK.keys.delete(k); if (!rep && (k === ' ' || k === 'enter')) { if (down) whackDown(); else whackUp(null); } }
+    else if (S.kind === 'claw') { const c = A.claw; if (down) c.keys.add(k); else c.keys.delete(k); if (down && !rep && (k === ' ' || k === 'enter')) { if (c.mode === 'aim') clawDrop(c); else if (c.mode !== 'drop') clawStart(c); } }
+    else if (S.kind === 'prizes' && down && !rep) { const n = { 1: 0, 2: 1, 3: 2, 4: 3 }[k]; if (n != null) buy(ARC_PRIZES[n].id); }
   }
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   function aim(e) { const r_ = stage.getBoundingClientRect(); ndc.set((e.clientX - r_.left) / r_.width * 2 - 1, -((e.clientY - r_.top) / r_.height) * 2 + 1); ray.setFromCamera(ndc, camera); }
@@ -5928,6 +6294,8 @@ const arcade = (() => {
     const S = play.S;
     if (S.kind === 'cab') { if (play.inv) { const r_ = stage.getBoundingClientRect(), v = mv(play.inv, [e.clientX - r_.left, e.clientY - r_.top, 1]); S.game.pointer(type, v[0] / v[2], v[1] / v[2]); } } // into the screen's own pixels
     else if (S.kind === 'skee') { const r_ = stage.getBoundingClientRect(); if (type !== 'up') SK.aim = clamp(((e.clientX - r_.left) / r_.width - 0.5) * 1.3, -0.34, 0.34); if (type === 'down') skeeDown(); else if (type === 'up') skeeUp(); }
+    else if (S.kind === 'whack') whackPointer(type, e);
+    else if (S.kind === 'claw') clawPointer(type, e);
     else if (S.kind === 'cups' && type === 'down') {
       if (CP.st === 'idle' || CP.st === 'done') { cupsStart(); return; }
       if (CP.st !== 'pick') return;
@@ -5938,13 +6306,12 @@ const arcade = (() => {
   screenEl.addEventListener('pointermove', e => pointer('move', e));
   for (const ev of ['pointerup', 'pointercancel']) screenEl.addEventListener(ev, e => pointer('up', e));
   backEl.addEventListener('click', () => leave());
-  hudBtn.addEventListener('click', () => { if (ready() && play.S.kind === 'cups') cupsCall(); });
+  hudBtn.addEventListener('click', () => { if (!ready()) return; if (play.S.kind === 'cups') cupsCall(); else if (play.S.kind === 'claw') clawDrop(A.claw); });
 
   /* ---------- the prompt you see when you walk up ---------- */
   function interacts(consider) { if (A && !play) for (const S of A.spots) consider(S.target, 2.4, 0.82, { type: 'arcade', S, key: 'arc-' + S.id }); }
-  const usable = S => S.kind !== 'broken';
+  const usable = () => true; // a closed machine still lets you walk up and read CLOSED
   function promptHtml(S, ok, keyHtml, bar) {
-    if (S.kind === 'broken') return '<span>OUT OF ORDER</span>';
     if (S.kind === 'prizes') return `<span>${keyHtml}PRIZES</span><small>${run.tickets} TICKETS TO SPEND</small>${bar}`;
     const left = A.r.den[S.plays];
     return `<span>${keyHtml}${S.name}<i class="coin"></i>${S.cost}</span><small>${left > 0 ? left + (left === 1 ? ' PLAY LEFT' : ' PLAYS LEFT') : 'CLOSED FOR TODAY'}</small>${bar}`;
@@ -5953,7 +6320,7 @@ const arcade = (() => {
   return {
     spawn, teardown, update, enter, interacts, usable, promptHtml, key, pointer, afterRender, cameraStep,
     active: () => !!play, frozen: () => !!(play && play.frozen),
-    get here() { return !!A; }, award, flap, brewkout, snake, SK, CP, get A() { return A; }, get play() { return play; },
+    get here() { return !!A; }, award, flap, brewkout, snake, invaders, SK, CP, WK, get A() { return A; }, get play() { return play; },
   };
 })();
 
