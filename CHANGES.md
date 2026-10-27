@@ -19,6 +19,11 @@ Brewtality also has a Roblox version that copies this game exactly, and it reads
 
 ---
 
+### 2026-10-27 · The Cast-Iron Rim in the goblin shop
+- **From floor 3, every goblin shop sells the Cast-Iron Rim** (the pot holds one more) on a fourth pedestal of its own, until you've bought it. It used to turn up only in secret shops behind the X brick, so most runs never reached a 4-slot pot. Secret shops still sell it early, and it still never comes out of a chest or the arcade's mystery prize. Beating bosses still takes the pot to 3 slots; the Rim is the only way to a 4th.
+- Numbers: Rim 20 coins (endless floors add their usual +1 per floor past 5); offered by goblin shops on floor 3 and deeper. Goblin shops on floors 1–2 are unchanged.
+- Code: ITEMS.rim gains shopFrom: 3; makeShop adds the Rim as an extra goblin slot after the random picks (it draws no randoms, so co-op partners' seeded shops still match).
+
 ### 2026-10-27 · Fix: walking straight back out skipped the boss; arcade fixes
 - **Fix: you could skip any fight, bosses included.** Step into a room and straight back out inside half a second, and its creatures still spawned behind you during the fade. That left the room marked as mid-fight with nobody in it, so on your next visit the game counted it as won at once: doors open, the stairs open and the goblin shop out, with the boss still standing there. A visit after that, the room was empty. Now a room's fight only starts once its creatures are in, and nothing spawns if you're already on your way back out; the room just waits for you.
 - **Cups**: the gnome now plays honest on your first round in every arcade (the round count never reset, so in a new run he could cheat on your very first game). With too few coins, it just says NEED 2 COINS; it no longer lifts a cup and shows a coin as if you'd played.

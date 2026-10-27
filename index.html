@@ -720,7 +720,7 @@ const ITEMS = {
   bell:     { name: 'ECHO BELL',       tag: 'LAST INGREDIENT GOES OFF TWICE', color: '#FFE14D', price: 14 },
   lucky:    { name: 'LUCKY COIN',      tag: 'MORE COINS DROP',                color: '#FFD23A', price: 10 },
   heart:    { name: 'SPARE HEART',     tag: '+2 MAX HEALTH',                  color: '#FF3B4E', price: 12 },
-  rim:      { name: 'CAST-IRON RIM',   tag: 'THE POT HOLDS ONE MORE',         color: '#9A9AA8', price: 20, secret: true },
+  rim:      { name: 'CAST-IRON RIM',   tag: 'THE POT HOLDS ONE MORE',         color: '#9A9AA8', price: 20, secret: true, shopFrom: 3 }, // never from a chest; secret shops sell it early, every goblin shop from floor 3
   bandolier:{ name: 'BANDOLIER',       tag: 'CARRY A SECOND BREW · R SWAPS',  color: '#C8A26A', price: 12 },
   gun:      { name: 'POTION WATER GUN', tag: coarse ? 'SPRAYS YOUR BREW · TAP SWAP' : 'SPRAYS YOUR BREW · Q SWAPS', color: '#2A9DF4', price: 16 },
 };
@@ -6439,6 +6439,7 @@ function makeShop(kind = 'goblin') {
   else if (kind === 'den') slots = []; // the bookie sells nothing; he takes bets
   else if (kind === 'gift') slots = [Object.assign(item(), { price: 0 })];
   else slots = [item(), ing(), Math.random() < 0.5 ? { kind: 'heart', id: 'heart', price: 5 } : ing()];
+  if (kind === 'goblin' && floorNum >= ITEMS.rim.shopFrom && !run.items.has('rim')) slots.push({ kind: 'item', id: 'rim', price: ITEMS.rim.price }); // a pedestal of its own, so it never pushes out his other stock (and draws no randoms, so co-op shops still match)
   const up = Math.max(0, floorNum - FINAL_FLOOR); // endless gets pricier
   slots.forEach(sl => { if (sl.price) sl.price += up; sl.sold = false; });
   return { name: kind === 'den' ? gnomeName() : gobName(), kind, hat: Math.floor(Math.random() * 3), robe: pick([0x7A4A2A, 0x5A3A7A, 0x8A2A2A, 0x2A5A4A]), slots };
