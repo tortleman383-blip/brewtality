@@ -658,6 +658,7 @@ const ICON = {
   frost: '<path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7"/><path d="M9 4l3 2 3-2M9 20l3-2 3 2"/>',
   iron: '<path d="M5 4h4v8a3 3 0 0 0 6 0V4h4v8a7 7 0 0 1-14 0z"/><path d="M5 8h4M15 8h4"/>',
   rim: '<ellipse cx="12" cy="9" rx="9" ry="4"/><path d="M3 9v4c0 2.2 4 4 9 4s9-1.8 9-4V9"/>',
+  beads: '<circle cx="12" cy="4.5" r="2.2"/><circle cx="17.6" cy="7.6" r="2.2"/><circle cx="17.6" cy="13.4" r="2.2"/><circle cx="6.4" cy="13.4" r="2.2"/><circle cx="6.4" cy="7.6" r="2.2"/><path d="M12 16.5V22M9.5 22h5"/>',
   bandolier: '<path d="M3 5l18 13"/><path d="M8 8.5v4a2 2 0 0 0 4 0v-1.5"/><path d="M14 12.5v4a2 2 0 0 0 4 0V15"/>',
 };
 const svg = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
@@ -672,8 +673,10 @@ const ING = {
   eye:     { name: 'Cyclops Eye',        short: 'Cyc. Eye',    color: 0xF2EEE4, css: '#F2EEE4', desc: 'It stares. Whatever it hits stands there dazed.', perishable: true },
   frost:   { name: 'Frost Lichen',       short: 'Frost',       color: 0xBFE8FF, css: '#BFE8FF', desc: 'Chills them. Freezes anything wet solid.', perishable: true },
   iron:    { name: 'Iron Filings',       short: 'Iron',        color: 0x9A9AA8, css: '#B0B0C0', desc: 'Drags everything nearby into the splash.' },
+  beads:   { name: 'Rattle Beads',       short: 'Beads',       color: 0xFF9AC8, css: '#FFA6CF', desc: 'Shakes the ceiling: a rock comes down where it splashes. Only drops on the Big Baby\'s floors.', boss: 'chief' },
 };
-const KINDS = ['feather', 'bog', 'horn', 'doom', 'glowcap', 'frost', 'eye', 'iron'];
+const KINDS = ['feather', 'bog', 'horn', 'doom', 'glowcap', 'frost', 'eye', 'iron', 'beads'];
+const SHOP_KINDS = KINDS.filter(k => !ING[k].boss); // a boss floor's ingredient never turns up for sale
 const ORIGINS = {
   stock:   { label: 'from your supplies' },
   torch:   { label: 'scraped by the torch',    smell: 'Smells of smoke and bad decisions.' },
@@ -705,6 +708,7 @@ const COMBOS = {
   shatter:  { name: 'SHATTERED',     chain: ['bog', 'frost', 'doom'] },
   shocking: { name: 'SHOCKING',      chain: ['bog', 'horn'] },
   skeet:    { name: 'SKEET',         chain: ['feather', 'doom'] },
+  batter:   { name: 'BATTER UP',     chain: ['beads', 'feather'] },
   steam:    { name: 'STEAM CLEAN',   chain: ['bog', 'doom'] },
   frozen:   { name: 'FROZEN SOLID',  chain: ['bog', 'frost'] },
   rod:      { name: 'LIGHTNING ROD', chain: ['iron', 'horn'] },
@@ -1897,7 +1901,7 @@ function teardownRoom() {
   drops.forEach(d => scene.remove(d.m)); drops.length = 0; clearGoos();
   if (coins.length) { coins.forEach(c => scene.remove(c.g)); gainCoins(coins.length, true); coins.length = 0; }
   shopSlots.forEach(sl => sl.tag.remove()); shopSlots = []; goblin = null; plug = null;
-  darts.forEach(d => scene.remove(d.m)); darts.length = 0; arcade.teardown();
+  darts.forEach(d => scene.remove(d.m)); darts.length = 0; arcade.teardown(); clearRocks();
   disposeTree(roomGroup);
   scene.remove(roomGroup); roomGroup = null; fxLight.intensity = 0;
   renderSatchel();
@@ -2431,6 +2435,7 @@ function addSupplies() {
 // something picked up in the dungeon (scraped, or pulled out of a creature): a perishable might be rancid already
 function gather(kind, origin) {
   const it = newItem(kind, origin); satchel.push(it);
+  if (kind === 'beads' && !run.beadsTip) { run.beadsTip = true; setTimeout(() => notice('RATTLE BEADS<em>A ROCK COMES DOWN WHERE IT SPLASHES</em>'), 700); }
   if (ING[kind].perishable && origin !== 'stock' && Math.random() < rancidChance()) { spoil(it); loot(kind, 'RANCID', 'rot'); } else loot(kind);
   return it;
 }
@@ -2446,6 +2451,7 @@ stockUp();
 function renderSatchel() {
   $('#satchel').innerHTML = KINDS.map(k => {
     const n = satchel.filter(it => it.kind === k).length, off = satchel.filter(it => it.kind === k && it.spoiled).length;
+    if (!n && ING[k].boss) return ''; // a boss floor's ingredient only takes a spot once you've got some
     return `<div class="sk ${n ? '' : 'none'}" style="--c:${ING[k].css}" title="${ING[k].name}">${svg(k)}<b>${n}</b>${off ? `<span class="off">${off} rancid</span>` : ''}</div>`;
   }).join('');
 }
@@ -2481,12 +2487,12 @@ function resetCards() { cardItems = null; renderCards(); }
 // The cinematic, the instant path and the water gun all play this same plan.
 const imm = (e, k) => !!(e.T.immune && e.T.immune.includes(k));
 const hurt = (e, n, how, from, el, launch) => damage(e, n + (el && e.T.weak === el ? 1 : 0), how, from, launch); // wood burns, metal conducts
-function planBrew(items, targets, point) {
+function planBrew(items, targets, point, opts = {}) {
   if (has('bell') && items.length) items = [...items, items[items.length - 1]]; // echo bell: the last one goes off again
   targets = targets.slice();
   const st = new Map(), S = e => { if (!st.has(e)) st.set(e, { lev: e.lev > 0 || !!e.T.flying, wet: e.wet > 0, glow: e.glow > 0, frozen: e.frozen > 0, mag: false }); return st.get(e); };
   targets.forEach(S);
-  const seen = {}; let lastLev, lastWet, lastFrost, lastMag;
+  const seen = {}; let lastLev, lastWet, lastFrost, lastMag, lastBeads = null;
   return items.map((it, i) => {
     const ing = it.kind, b = { ing, item: it, i, tier: 1, word: '', combo: null, contrib: [i], out: [], extra: null };
     // doubling up on an ingredient waters it down: full, then 60%, then 35%
@@ -2496,7 +2502,9 @@ function planBrew(items, targets, point) {
     b.targets = targets.slice();
     b.resisted = targets.filter(e => imm(e, ing));
     const open = targets.filter(e => !b.resisted.includes(e));
-    if (ing === 'feather') { open.forEach(e => { if (!e.T.heavy && !e.T.boss) S(e).lev = true; }); b.word = open.length ? 'whoosh' : 'resisted'; lastLev = i; }
+    if (ing === 'beads') { if (opts.gun) { b.pebble = true; b.word = open.length ? 'pelted' : 'resisted'; } else { b.word = 'rattle'; lastBeads = b; } } // the gun sprays them as pebbles; the ladle shakes the ceiling
+    else if (ing === 'feather' && lastBeads) { lastBeads.batter = true; b.tier = 2; b.word = 'BATTER UP'; b.combo = 'batter'; b.contrib = [lastBeads.i, i]; lastBeads = null; } // the feather catches the rock instead: it floats, and it's yours to bat
+    else if (ing === 'feather') { open.forEach(e => { if (!e.T.heavy && !e.T.boss) S(e).lev = true; }); b.word = open.length ? 'whoosh' : 'resisted'; lastLev = i; }
     else if (ing === 'bog') { open.forEach(e => { S(e).wet = true; }); b.word = open.length ? 'yuck' : 'resisted'; lastWet = i; }
     else if (ing === 'glowcap') { open.forEach(e => { S(e).glow = true; }); b.word = 'shiny'; }
     else if (ing === 'eye') { b.word = 'stare'; }
@@ -2562,6 +2570,7 @@ function kill(e, how, from, launch = 1) {
   if (e.glass) { burst(centerOf(e), 0xE8FBFF, 26, 6, 1, 0.12); e.deadT = 0.05; how = how === 'TOASTED' ? how : 'SHATTERED'; }
   else if (e.T.dropsEye && !e.clone && (e.T.boss || Math.random() < 0.25)) spawnPickup('eye', 'cyclops', centerOf(e).add(new THREE.Vector3(0, e.h * 0.3, 0)));
   else if (e.T.dropsIron && !e.clone && Math.random() < 0.5) spawnPickup('iron', 'stock', centerOf(e).add(new THREE.Vector3(0, e.h * 0.3, 0)));
+  if (!e.clone && (e.T.baby || (floorBossId() === 'chief' && Math.random() < 0.25))) { const n = e.T.baby ? 2 + (Math.random() < 0.5 ? 1 : 0) : 1; for (let k = 0; k < n; k++) spawnPickup('beads', 'stock', centerOf(e).add(new THREE.Vector3(0, e.h * 0.3, 0))); } // rattle beads: the Big Baby's floors only
   if (e.T.boss && !e.clone && potSlots < (has('rim') ? 4 : 3)) { potSlots++; setTimeout(() => stamp('BIGGER POT'), 1800); }
   if (!e.clone && e.T.boss) { const n = e.T.king ? 8 : Math.random() < (has('lucky') ? 0.7 : 0.35) ? 3 : 0; if (n) dropCoins(centerOf(e), n); } // coins are a chest thing; a boss only sometimes has a few
   run.kills++; slingKills.push(e); xp(100, how); feed(e.T.name, how, dmgSrc);
@@ -2572,7 +2581,13 @@ function kill(e, how, from, launch = 1) {
 function applyBeat(b, point, targets) {
   const tg = (b.targets || targets).filter(e => !e.dead), open = tg.filter(e => !(b.resisted || []).includes(e)), c = groupCenter(tg.length ? tg : targets);
   setTimeout(() => showResisted(b), 250);
-  if (b.ing === 'feather') {
+  if (b.ing === 'beads') {
+    SFX.rattle();
+    if (b.pebble) open.forEach(e => { burst(centerOf(e), 0xFFA6CF, 6, 2.5, 0.5, 0.05); hurt(e, 1, 'PELTED', point, 'beads'); });
+    else { burst(point.clone().setY(Math.max(0.3, point.y)), 0xFFA6CF, 14, 4, 0.7, 0.07); brewRock(point.x, point.z, !!b.batter, { str: b.str }); }
+  } else if (b.combo === 'batter') { // the feather's busy holding the rock up, so nothing gets blown about
+    burst(new THREE.Vector3(point.x, ROCK.floatY + 0.6, point.z), 0xF4F0E0, 16, 3, 0.8, 0.06, 1); SFX.flutter();
+  } else if (b.ing === 'feather') {
     burst(point.clone().setY(Math.max(0.4, point.y)), 0xF4F0E0, 18, 7, 0.6, 0.06, 1); floorRing(point, 0xF4F0E0, 2.6, 0.5);
     open.forEach(e => gust(e, point, b.str)); SFX.flutter();
   } else if (b.ing === 'bog') {
@@ -2711,6 +2726,7 @@ function bonkTick(rdt) { // the wind-up: a click at heavy, a ring at full
 }
 function bonkLand(tier) {
   if (menuOpen && !net.on) return;
+  if (batRock(tier)) return; // a rock floating in reach takes the swing
   const fx_ = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), hits = [];
   for (const e of alive()) {
     if (e.hidden) continue;
@@ -3046,6 +3062,7 @@ function renderTool() {
 /* ================= the brewing station: shelves on the right, the pot on the left ================= */
 const ART = {
   frost: '<svg viewBox="0 0 64 64"><path d="M32 6l8 22-8 30-8-30z" fill="#BFE8FF" stroke="#3A6A8A" stroke-width="2"/><path d="M14 22l12 12-4 22-10-20z" fill="#9FD4F2" stroke="#3A6A8A" stroke-width="2"/><path d="M50 20l2 18-10 18-2-22z" fill="#DFF4FF" stroke="#3A6A8A" stroke-width="2"/><path d="M32 12l3 14" stroke="#fff" stroke-width="2"/></svg>',
+  beads: '<svg viewBox="0 0 64 64"><circle cx="32" cy="30" r="19" fill="none" stroke="#8a6a5a" stroke-width="1.6"/><circle cx="32.0" cy="11.0" r="7" fill="#FF9AC8" stroke="#6a4a5a" stroke-width="2"/><circle cx="29.8" cy="8.8" r="1.6" fill="#fff" opacity=".7"/><circle cx="46.9" cy="18.2" r="7" fill="#8FD3FF" stroke="#6a4a5a" stroke-width="2"/><circle cx="44.7" cy="16.0" r="1.6" fill="#fff" opacity=".7"/><circle cx="50.5" cy="34.2" r="7" fill="#FFE14D" stroke="#6a4a5a" stroke-width="2"/><circle cx="48.3" cy="32.0" r="1.6" fill="#fff" opacity=".7"/><circle cx="40.2" cy="47.1" r="7" fill="#9AE8B0" stroke="#6a4a5a" stroke-width="2"/><circle cx="38.0" cy="44.9" r="1.6" fill="#fff" opacity=".7"/><circle cx="23.8" cy="47.1" r="7" fill="#FFB070" stroke="#6a4a5a" stroke-width="2"/><circle cx="21.6" cy="44.9" r="1.6" fill="#fff" opacity=".7"/><circle cx="13.5" cy="34.2" r="7" fill="#C8A0FF" stroke="#6a4a5a" stroke-width="2"/><circle cx="11.3" cy="32.0" r="1.6" fill="#fff" opacity=".7"/><circle cx="17.1" cy="18.2" r="7" fill="#FF9AC8" stroke="#6a4a5a" stroke-width="2"/><circle cx="14.9" cy="16.0" r="1.6" fill="#fff" opacity=".7"/><path d="M32 49c-2 4-5 7-9 9M32 49c2 4 5 7 9 9" stroke="#8a6a5a" stroke-width="1.6" fill="none"/></svg>',
   iron: '<svg viewBox="0 0 64 64"><path d="M8 56c6-14 16-20 24-20s18 6 24 20z" fill="#7A7A86" stroke="#3A3A44" stroke-width="2"/><path d="M16 52l4-6M26 50l2-7M36 51l1-8M46 52l-3-6M22 46l3-4M40 45l-2-4" stroke="#C8C8D4" stroke-width="2"/><path d="M22 8h8v14a4 4 0 0 0 8 0V8h8v14a12 12 0 0 1-24 0z" fill="#C8282E" stroke="#5A1010" stroke-width="2"/><path d="M22 8h8v6h-8zM38 8h8v6h-8z" fill="#E8E0D4"/></svg>',
   feather: '<svg viewBox="0 0 64 64"><path d="M50 6C30 8 16 24 14 44l-4 14 4-2c2-6 4-10 6-12 18-2 30-16 30-38z" fill="#F4D35E" stroke="#8a6a1a" stroke-width="2"/><path d="M48 8L12 56" stroke="#8a6a1a" stroke-width="2"/><path d="M22 34l10-2M26 26l12-2M30 18l10-2" stroke="#c9a23a" stroke-width="2"/></svg>',
   bog: '<svg viewBox="0 0 64 64"><rect x="24" y="2" width="16" height="7" rx="2" fill="#8a5a34"/><path d="M26 8h12v13l12 21c3 6-1 14-8 14H22c-7 0-11-8-8-14l12-21z" fill="#cfe8ee" fill-opacity=".22" stroke="#bfe0e6" stroke-width="2"/><path d="M17 40h30l3 5c2 5-1 9-6 9H20c-5 0-8-4-6-9z" fill="#5d7f4c"/><circle cx="28" cy="46" r="2.2" fill="#a8c890"/><circle cx="37" cy="50" r="1.6" fill="#a8c890"/></svg>',
@@ -3088,6 +3105,7 @@ function renderInv() {
   $('#shelves').innerHTML = shelf('SUPPLIES', fresh.filter(it => ['feather', 'bog', 'horn'].includes(it.kind)))
     + shelf('MUSHROOMS', fresh.filter(it => ['doom', 'glowcap', 'frost'].includes(it.kind)))
     + shelf('PARTS', fresh.filter(it => it.kind === 'eye' || it.kind === 'iron'))
+    + (fresh.some(it => ING[it.kind].boss) ? shelf('RARE', fresh.filter(it => ING[it.kind].boss)) : '') // boss-floor finds, once you've got one
     + shelf('RANCID', off, 'rot');
   $('#invSlots').innerHTML = Array.from({ length: has('rim') ? 4 : 3 }, (_, i) => i).map(i => {
     if (i >= potSlots) return `<div class="pslot locked" title="Beat a boss for a bigger pot"><span class="n">${i + 1}</span><span class="lk">${CROWN}</span></div>`;
@@ -3274,7 +3292,7 @@ function targetsAt(point, hitE) {
 }
 function noteUse(items) {
   if (!items.length) { run.use.boil++; return; }
-  new Set(items.map(i => i.kind)).forEach(k => { run.use[k]++; });
+  new Set(items.map(i => i.kind)).forEach(k => { run.use[k] = (run.use[k] || 0) + 1; }); // frost and iron weren't in the tally, and undefined + 1 switched adapting off for the run
 }
 function sling(power) {
   const { origin, v } = launchParams(power);
@@ -3311,6 +3329,7 @@ async function onImpact(point, hitE, items, color, hitS) {
   const swatted = targets.filter(e => e.T.swats && e.ph === 'live' && !(e.stun > 0) && !(e.frozen > 0) && mkFacing(e)); // a mantis bats away what you throw at its front
   if (swatted.length) { targets = targets.filter(e => !swatted.includes(e)); swatted.forEach(e => { e.swatT = 0.35; SFX.clang(); const sp = project(centerOf(e)); if (!sp.behind) callout('SWATTED', 1, { at: true, x: sp.x, y: sp.y }); }); }
   if (hitE && hitE.T.hover && !hitE.dead && !swatted.includes(hitE)) { hitE.stun = Math.max(hitE.stun, 2.6); const sp = project(centerOf(hitE)); if (!sp.behind) callout('KNOCKED DOWN', 2, { at: true, x: sp.x, y: sp.y }); } // a direct hit puts a lampcap on the floor
+  if (!targets.length && items.some(it => it.kind === 'beads')) { await quickBeats(point, [], planBrew(items, [], point).filter(b => b.ing === 'beads' || b.combo === 'batter')); return endSling(); } // nobody in the splash, but the ceiling still comes down
   if (!targets.length) { if (!hitS && !swatted.length) callout('whiff', 1); return endSling(); }
   if (!items.length) { // boiling water: scalds whatever it lands on, and just soaks the rest of the splash
     puff(point.clone().setY(0.6), 0xF2F2F2, 8, 1.2, 0.8, 1.6, 0.25, 0.6);
@@ -3484,7 +3503,7 @@ function arcTick() {
 function dose(e) {
   const items = brewItems();
   if (!items.length) { if (imm(e, 'boil')) { showResisted({ resisted: [e] }); return; } damage(e, 1, 'SCALDED', centerOf(e)); return; }
-  const plan = planBrew(items, [e], centerOf(e)); let t = 0;
+  const plan = planBrew(items, [e], centerOf(e), { gun: true }); let t = 0;
   for (const b of plan) {
     b.str *= 0.6; // the gun doses gently; it's the ladle that hits hard
     setTimeout(() => {
@@ -3907,6 +3926,105 @@ function babyPose(e, sdt) {
   if (tan && !e.tanRing) { const r = meshOf(GEO.ring, slamMat); r.rotation.x = -Math.PI / 2; r.scale.setScalar(TANTRUM_R); const fill = meshOf(GEO.disc, slamFillMat); fill.position.z = -0.002; r.add(fill); scene.add(r); e.tanRing = r; }
   else if (!tan && e.tanRing) { scene.remove(e.tanRing); e.tanRing = null; }
   if (e.tanRing) e.tanRing.position.set(e.pos.x, 0.05, e.pos.z);
+}
+
+/* ================= rattle beads: the ceiling comes down where they splash, and with a feather after them you get to bat it ================= */
+const ROCK = { warn: 0.5, r: 1.1, dmg: 3, floatY: 1.25, floatFor: 6.5, reach: BONK_REACH + 0.9, speed: [16, 19, 23], hit: [3, 4, 6], name: ['BUNT', 'LINE DRIVE', 'HOME RUN'] };
+const brewRocks = []; let rockSeq = 0;
+const floorBossId = () => { for (const r of floorMap.values()) if (r.type === 'stairs') return r.king ? 'king' : r.boss; return null; };
+const featherRingMat = new THREE.MeshBasicMaterial({ color: 0xF4D35E, transparent: true, opacity: 0.75, depthWrite: false }); featherRingMat.userData.shared = true;
+const rockMark = (x, z) => { const m = meshOf(GEO.ring, crockMat); m.rotation.x = -Math.PI / 2; m.position.set(x, room && room.type === 'lab' && Math.hypot(x, z + 3.2) < 1.7 ? 0.1 : 0.045, z); /* up on the lab's pad, or the pad hides it */ m.scale.setScalar(ROCK.r); scene.add(m); return m; };
+// a red ring where it splashed, half a second, then the rock. fake: a partner's, so it looks the same but its fall hurts nothing here
+function brewRock(x, z, float, o = {}) {
+  x = Math.max(-W + 0.7, Math.min(W - 0.7, x)); z = Math.max(-D + 0.7, Math.min(D - 0.7, z));
+  const g = new THREE.Group(), rock = meshOf(GEO.ico0, rockMat); rock.scale.setScalar(0.36); g.add(rock); g.visible = false; scene.add(g);
+  const R = { id: o.id || (net.on ? net.me : 'me') + ':' + (++rockSeq), fake: !!o.fake, str: o.str || 1, mode: 'warn', t: 0, life: 0, x, z, y: H - 0.2, vy: 0, float, g, mark: rockMark(x, z), ring: null };
+  brewRocks.push(R);
+  if (!R.fake && net.on) netEmit('throw', { k: 'rock', rk: rkOf(room), id: R.id, p: [+x.toFixed(2), +z.toFixed(2)], f: float ? 1 : 0 });
+  return R;
+}
+function clearRocks() { for (const R of brewRocks) { scene.remove(R.g); if (R.mark) scene.remove(R.mark); } brewRocks.length = 0; }
+function rockLands(R) { // a plain rock hitting the floor: creatures under it take it, you never do
+  const p = new THREE.Vector3(R.x, 0.2, R.z);
+  burst(p, 0x8A6A4A, 14, 4, 0.6, 0.09); floorRing(p, 0xB0A090, ROCK.r, 0.35); SFX.thud(); shake = Math.max(shake, 0.2);
+  if (R.mark) { scene.remove(R.mark); R.mark = null; }
+  if (!R.fake) for (const e of alive()) { if (e.hidden || e.pos.y > 2.8 || Math.hypot(e.pos.x - R.x, e.pos.z - R.z) > ROCK.r + e.r * e.scale * 0.5) continue; e.tiltV -= 12; hurt(e, Math.max(1, Math.round(ROCK.dmg * R.str)), 'ROCKFALL', p, 'beads'); }
+  R.mode = 'rubble'; R.t = 0; R.y = 0.22;
+}
+function rockShatters(R) {
+  const p = new THREE.Vector3(R.x, R.y, R.z); burst(p, 0x8A7A6A, 18, 5, 0.6, 0.09); puff(p, 0x6E6276, 5, 0.9, 0.4, 1, 0.2, 0.6); SFX.thud();
+  scene.remove(R.g); brewRocks.splice(brewRocks.indexOf(R), 1);
+}
+function updateRocks(sdt) {
+  for (const R of brewRocks.slice()) {
+    R.t += sdt;
+    if (R.mode === 'warn') {
+      R.mark.scale.setScalar(ROCK.r * (1 + Math.sin(R.t * 22) * 0.06));
+      if (R.t >= ROCK.warn) { R.mode = 'fall'; R.t = 0; R.y = H - 0.2; R.vy = -3; R.g.visible = true; burst(new THREE.Vector3(R.x, H - 0.2, R.z), 0x8A7A6A, 6, 0.8, 0.7, 0.05); }
+    } else if (R.mode === 'fall') {
+      R.vy -= 30 * sdt; R.y += R.vy * sdt; R.g.rotation.x += sdt * 6; R.g.rotation.z += sdt * 4;
+      if (R.float && R.y <= ROCK.floatY) { // the feather catches it at chest height
+        R.mode = 'float'; R.y = ROCK.floatY; R.t = 0; R.life = 0; if (R.mark) { scene.remove(R.mark); R.mark = null; }
+        R.ring = meshOf(new THREE.TorusGeometry(0.46, 0.025, 4, 18), featherRingMat); R.ring.rotation.x = Math.PI / 2; R.g.add(R.ring);
+        burst(new THREE.Vector3(R.x, R.y, R.z), 0xF4F0E0, 14, 2.5, 0.7, 0.06, 1); SFX.flutter();
+        if (!R.fake && !run.batTip) { run.batTip = true; setTimeout(() => notice(`BATTER UP<em>${coarse ? 'BONK' : 'V TO BONK'} THE ROCK · HOLD IT FOR A HOME RUN</em>`), 900); }
+      } else if (!R.float && R.y <= 0.3) rockLands(R);
+    } else if (R.mode === 'float') {
+      if (cine.state === 'idle') R.life += sdt; // its clock starts once the slow-mo's over
+      R.y = ROCK.floatY + Math.sin(R.t * 2.2) * 0.07; R.g.rotation.y += sdt * 1.2; R.g.rotation.x *= 0.9; R.g.rotation.z *= 0.9;
+      R.ring.rotation.z += sdt * 3; R.ring.visible = R.life < ROCK.floatFor - 1.2 || Math.sin(R.t * 30) > 0; // it flickers for its last second
+      if (R.life >= ROCK.floatFor) { R.float = false; R.mode = 'fall'; R.vy = 0; R.g.remove(R.ring); R.ring = null; R.mark = rockMark(R.x, R.z); } // nobody batted it: it drops where it is
+    } else if (R.mode === 'fly') {
+      for (let k = 0; k < 3 && R.mode === 'fly'; k++) {
+        R.x += R.vel.x * sdt / 3; R.y += R.vel.y * sdt / 3; R.z += R.vel.z * sdt / 3;
+        for (const e of alive()) {
+          if (e.hidden || R.hits.has(e) || Math.hypot(e.pos.x - R.x, e.pos.z - R.z) > 0.38 + e.r * e.scale || R.y < e.pos.y - 0.35 || R.y > e.pos.y + e.h * e.scale + 0.35) continue;
+          R.hits.add(e); const p = new THREE.Vector3(R.x, R.y, R.z);
+          burst(p, 0xFFF4C0, R.pierce ? 16 : 10, 4, 0.4, 0.07, 4, true); SFX.bonk(R.pierce); shake = Math.max(shake, R.pierce ? 0.3 : 0.15);
+          if (!R.fake) {
+            const heavy = e.T.boss ? 0.3 : e.T.heavy ? 0.6 : 1; e.kbv = R.vel.clone().setY(0).normalize().multiplyScalar((R.pierce ? 8 : 5) * heavy); e.slamOK = true; e.tiltV -= 16;
+            if (R.pierce) { e.stun = Math.max(e.stun, e.T.boss ? 0.6 : 1.1); e.atk = 0; }
+            dmgSrc = 'ladle'; damage(e, R.dmg, R.pierce ? 'HOME RUN' : 'BATTED', player.pos, R.pierce ? 1.6 : 1.2);
+          }
+          if (!R.pierce) { rockShatters(R); break; } // a big one goes straight through and keeps going
+        }
+        if (R.mode !== 'fly' || !brewRocks.includes(R)) break;
+        if (Math.abs(R.x) > W - 0.3 || Math.abs(R.z) > D - 0.3 || R.y < 0.12 || R.y > H - 0.15 || R.t > 2.5 || colliders.some(c => R.y < c.h && Math.hypot(R.x - c.x, R.z - c.z) < c.r + 0.2)) { rockShatters(R); break; }
+      }
+      R.g.rotation.x += sdt * 14; R.g.rotation.y += sdt * 9;
+    } else if (R.mode === 'rubble') {
+      if (R.t > 1.1) R.g.scale.multiplyScalar(1 - Math.min(1, sdt * 6)); // crumbles away
+      if (R.t > 1.6) { scene.remove(R.g); brewRocks.splice(brewRocks.indexOf(R), 1); continue; }
+    }
+    R.g.position.set(R.x, R.y, R.z);
+  }
+}
+// your bonk, if there's a floating rock in reach: it goes where you're looking, bent a little toward whatever's nearest your aim
+function batRock(tier) {
+  const { dir, eye } = aimBasis(); let best = null, bd = 1e9;
+  for (const R of brewRocks) {
+    if (R.mode !== 'float') continue;
+    const to = new THREE.Vector3(R.x, R.y, R.z).sub(eye), d = to.length();
+    if (d > ROCK.reach || d >= bd || (to.normalize().dot(dir) < 0.3 && d > 1.1)) continue; // a generous swing: anywhere in front, or right beside you
+    best = R; bd = d;
+  }
+  if (!best) return false;
+  const from = new THREE.Vector3(best.x, best.y, best.z); let aimDir = dir.clone(), bestCos = 0.96;
+  for (const e of alive()) {
+    if (e.hidden) continue; const to = centerOf(e).sub(from), d = to.length(); if (d < 0.6 || d > 30) continue;
+    const cs = to.normalize().dot(dir); if (cs > bestCos) { bestCos = cs; aimDir = to; } // within about 16° of where you're looking
+  }
+  launchRock(best, aimDir, tier, false);
+  if (net.on) netEmit('throw', { k: 'bat', rk: rkOf(room), id: best.id, t: tier, d: aimDir.toArray().map(v => +v.toFixed(3)), o: [best.x, best.y, best.z].map(v => +v.toFixed(2)) });
+  return true;
+}
+function launchRock(R, dir, tier, fake) {
+  R.mode = 'fly'; R.t = 0; R.fake = fake; R.pierce = tier === 3; R.dmg = ROCK.hit[tier - 1]; R.hits = new Set();
+  R.vel = dir.clone().normalize().multiplyScalar(ROCK.speed[tier - 1]);
+  if (R.ring) { R.g.remove(R.ring); R.ring = null; }
+  const p = new THREE.Vector3(R.x, R.y, R.z); burst(p, 0xFFF4C0, tier === 3 ? 18 : 10, 4, 0.4, 0.06, 4, true);
+  SFX.bonk(tier === 3); if (tier === 3) SFX.clang(); shake = Math.max(shake, tier === 3 ? 0.3 : 0.12);
+  if (!fake) { vmState.bonk = 1; callout(ROCK.name[tier - 1], tier === 3 ? 2 : 1); }
 }
 
 /* ================= the Mimicshroom fight: a field of mushrooms, one of them the Lurker's lure, and a bug in every wrong one ================= */
@@ -6156,7 +6274,7 @@ const arcade = (() => {
     const p = ARC_PRIZES.find(q => q.id === id); if (!p || run.tickets < p.cost || (id === 'crown' && unlocked('crown'))) { ASFX.lose(); return; }
     if (id === 'item' && !chestItemPeek()) { notice('NOTHING LEFT<em>YOU\'VE GOT EVERYTHING HE STOCKS</em>'); ASFX.lose(); return; }
     run.tickets -= p.cost; showTix(); ASFX.ding(); ASFX.mutter(); if (goblin) goblin.hop = 0.5; prizeFly();
-    if (id === 'ing') { const k = pick(KINDS); satchel.push(newItem(k, SHOP_ORIGIN[k])); loot(k); renderSatchel(); renderInv(); }
+    if (id === 'ing') { const k = pick(SHOP_KINDS); satchel.push(newItem(k, SHOP_ORIGIN[k])); loot(k); renderSatchel(); renderInv(); }
     else if (id === 'coins') gainCoins(5);
     else if (id === 'item') { const it = chestItem(); if (it) setTimeout(() => giveItem(it), 500); }
     else { const u = store.get('slingcam.unlocks', {}) || {}; u.crown = true; store.set('slingcam.unlocks', u); notice('PAPER CROWN<em>WEAR IT FROM THE BREWER MENU</em>', 'good'); SFX.fanfare(); }
@@ -6431,7 +6549,7 @@ function makeShop(kind = 'goblin') {
   const all = Object.keys(ITEMS).filter(k => !run.items.has(k) && (kind !== 'goblin' || !ITEMS[k].secret)); // secret stock only turns up in secret rooms
   const fresh = all.filter(k => !run.offered.has(k));
   const take = () => { const src = fresh.length ? fresh : all; if (!src.length) return null; const k = pick(src); run.offered.add(k); for (const a of [fresh, all]) { const i = a.indexOf(k); if (i >= 0) a.splice(i, 1); } return k; };
-  const pool = shuffle(KINDS), ing = (qty = 1) => { const k = pool.pop(); return { kind: 'ing', id: k, qty, price: (['feather', 'bog', 'horn'].includes(k) ? 3 : 4) * qty - (qty > 1 ? 1 : 0) }; }; // no doubles in one shop
+  const pool = shuffle(SHOP_KINDS), ing = (qty = 1) => { const k = pool.pop(); return { kind: 'ing', id: k, qty, price: (['feather', 'bog', 'horn'].includes(k) ? 3 : 4) * qty - (qty > 1 ? 1 : 0) }; }; // no doubles in one shop
   const item = (mult = 1) => { const k = take(); return k ? { kind: 'item', id: k, price: Math.round(ITEMS[k].price * mult) } : ing(); };
   let slots;
   if (kind === 'secret') { const rim = !run.items.has('rim') && fresh.includes('rim'); if (rim) { run.offered.add('rim'); fresh.splice(fresh.indexOf('rim'), 1); all.splice(all.indexOf('rim'), 1); }
@@ -6673,6 +6791,10 @@ function goodsModel(s) {
     });
     const twinkles = [0, 1, 2, 3].map(i => { const m = add(new THREE.OctahedronGeometry(1, 0), glow(0xFFFFFF, { opacity: 1 }), rand(-0.15, 0.15), rand(0, 0.25), rand(-0.1, 0.1)); return { m, ph: i * 0.37 }; });
     tick = t => { for (const tw of twinkles) { const u = (t * 0.7 + tw.ph) % 1, s_ = Math.max(0, Math.sin(u * Math.PI * 3)) * (u < 0.33 ? 1 : 0); tw.m.scale.set(0.008 + s_ * 0.008, 0.01 + s_ * 0.04, 0.008); tw.m.visible = s_ > 0.02; if (u < 0.01) tw.m.position.set(rand(-0.15, 0.15), rand(-0.02, 0.26), rand(-0.1, 0.1)); } };
+  } else if (k === 'beads') { // rattle beads: painted wooden beads on a loop of string, and every so often a shake
+    add(new THREE.TorusGeometry(0.135, 0.007, 4, 16), M(0x8A6A5A), 0, 0.02, 0);
+    [0xFF9AC8, 0x8FD3FF, 0xFFE14D, 0x9AE8B0, 0xFFB070, 0xC8A0FF, 0xFF9AC8].forEach((c, i) => { const a_ = i / 7 * Math.PI * 2; add(new THREE.IcosahedronGeometry(0.052, 1), M(c, { roughness: 0.5 }), Math.sin(a_) * 0.135, 0.02 + Math.cos(a_) * 0.135, 0); });
+    tick = t => { const u = t % 1.8; g.rotation.z = u < 0.4 ? Math.sin(u * 40) * 0.18 * (1 - u / 0.4) : 0; };
   } else if (k === 'iron') { // a horseshoe magnet, and filings creeping up to its poles
     const mag = add(new THREE.TorusGeometry(0.12, 0.045, 6, 12, Math.PI), M(0xC8282E, { emissive: 0x3A0808 }), 0, 0.04, 0); mag.rotation.z = Math.PI;
     for (const sd of [-1, 1]) add(new THREE.CylinderGeometry(0.045, 0.045, 0.08, 8), M(0xE8E0D4, { metalness: 0.5, roughness: 0.3 }), sd * 0.12, 0.08, 0);
@@ -7241,7 +7363,7 @@ function knockedOut(final) {
 }
 function resetRun() {
   clearLoose(); satchel = []; potPending = []; strains = {}; seenTraits.clear(); reserve = null;
-  Object.assign(run, { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, tickets: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false, queenTip: false, cocTip: false, spikeTip: false });
+  Object.assign(run, { kills: 0, time: 0, won: false, endless: false, best: null, coins: 0, tickets: 0, items: new Set(), offered: new Set(), use: newUse(), adapted: new Set(), bossLog: [], bossMet: new Set(), lurkTip: false, queenTip: false, cocTip: false, spikeTip: false, beadsTip: false, batTip: false });
   player.maxHp = 8; $('#coinNum').textContent = '0';
   { const effs = shuffle(Object.keys(EXTRAS)); ['cyclops', 'drain', 'torch', 'high'].forEach((o, i) => { originEff[o] = effs[i]; }); }
   stockUp(); hasGun = false; tool = 'ladle'; score = 0; shownScore = 0; $('#scoreNum').textContent = '0';
@@ -8315,7 +8437,10 @@ const NET_ON = {
   floor(d) { if (net.on && d.run === net.run && d.fl === floorNum + 1) nextFloor(true); },
   cleared(d) { if (netGuest() && d.run === net.run && d.fl === floorNum && d.rk === rkOf(room) && room.fightActive) { room.fightActive = false; roomCleared(); } },
   throw(d, m) {
-    if (!net.on || d.run !== net.run || d.rk !== rkOf(room) || !Array.isArray(d.o) || !Array.isArray(d.v)) return;
+    if (!net.on || d.run !== net.run || d.rk !== rkOf(room)) return;
+    if (d.k === 'rock') { if (Array.isArray(d.p) && !brewRocks.some(R => R.id === d.id)) brewRock(+d.p[0] || 0, +d.p[1] || 0, !!d.f, { id: String(d.id), fake: true }); return; } // a partner's beads: you see the rock, and can bat it, but its fall's theirs
+    if (d.k === 'bat') { const R = brewRocks.find(q => q.id === d.id && q.mode === 'float'); if (R && Array.isArray(d.d)) { if (Array.isArray(d.o)) { R.x = +d.o[0] || R.x; R.y = +d.o[1] || R.y; R.z = +d.o[2] || R.z; } launchRock(R, new THREE.Vector3(+d.d[0] || 0, +d.d[1] || 0, +d.d[2] || 0), Math.min(3, Math.max(1, d.t | 0)), true); } return; }
+    if (!Array.isArray(d.o) || !Array.isArray(d.v)) return;
     fakeThrow(d.o.map(Number), d.v.map(Number), +d.c || 0xCFE8F0); const R = net.remotes.get(m.peer); if (R) R.throwT = 0.35;
   },
   goo(d) {
@@ -8664,7 +8789,7 @@ function frame(now) {
   // projectile (sub-stepped so slow-mo and fast frames agree)
   if (blob) { let rem = sdt; while (rem > 0 && blob) { const st = Math.min(rem, 1 / 120); rem -= st; stepBlob(st); } }
   updateGun(paused ? 0 : rdt, sdt);
-  updatePickups(sdt); updateGoos(sdt); fieldTick(sdt); queenTick(sdt); updateCoins(sdt); updateShop(sdt); updateXBrick(); updateTraps(sdt); arcade.update(sdt, rdt);
+  updatePickups(sdt); updateRocks(sdt); updateGoos(sdt); fieldTick(sdt); queenTick(sdt); updateCoins(sdt); updateShop(sdt); updateXBrick(); updateTraps(sdt); arcade.update(sdt, rdt);
   for (const e of enemies) if (e.slamRing) { e.slamRing.scale.setScalar(SLAM_R * (0.92 + 0.08 * Math.sin(T * 14))); e.slamRing.material.opacity = 0.5 + 0.4 * (1 - e.atk / 1.7); }
   if (!paused) updateInteract(rdt); else { $('#prompt').hidden = true; $('#actBtn').hidden = true; }
 

@@ -34,7 +34,7 @@ A first-person dungeon crawler where you brew potions and fling them at things w
 
 Each floor's stairs are guarded by a boss picked at random, and bosses learn new moves the deeper you find them. The whole floor dresses for whoever's waiting at the bottom: the Lurker's floors are overgrown cells and dripping grottos, and you fight it in a cave.
 
-The **Big Baby** guards the stairs from floor 1. When a red lane lights up it's about to charge: step aside and it runs into the wall, sits down hard and bawls, and that's your chance to hit it. Its tantrums bring rocks down from the ceiling, so get out from under the red rings on the floor.
+The **Big Baby** guards the stairs from floor 1. When a red lane lights up it's about to charge: step aside and it runs into the wall, sits down hard and bawls, and that's your chance to hit it. Its tantrums bring rocks down from the ceiling, so get out from under the red rings on the floor. Its floors drop **Rattle Beads**: brew them and a rock comes down wherever the brew splashes (it only hurts creatures). Put a feather in after them and the rock floats instead: walk up and bonk it at something. Hold the bonk for a home run that goes straight through.
 
 The **Lurker** hides as one mushroom in a room full of them, on the floor, the walls and the ceiling. Hit the real one and it bursts out of the floor and chases you for a few seconds before burrowing and reshuffling the lot. Hit a wrong one and a bug comes out instead: Rootskitters from floor 1, Capbeetles from floor 2, Mantishrooms from floor 3 and Lampcaps from floor 4. The real one's tell is two spots that blink like clockwork on a doom shroom, or a ring of teeth clenching in the dirt round a glowcap.
 
