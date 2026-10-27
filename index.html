@@ -80,6 +80,7 @@
   .arcPrize kbd{font:600 11px/1 var(--body);border:1px solid #3A3046;border-radius:3px;padding:2px 5px;color:#A99CB6}
   .coarse .arcPrize kbd{display:none}
   .arcPrize[disabled]{opacity:.4;cursor:not-allowed} .arcPrize.owned em{visibility:hidden}
+  .arcPrize:not([disabled]):hover,.arcPrize.sel{border-color:#FFB070;background:#2A2232}
   .arcading #cross,.arcading #cards,.arcading #satchel,.arcading #tool,.arcading #prompt,.arcading .touch,.arcading #joy,.arcading #map,.arcading #menuBtn,.arcading #invBtn,.arcading #hearts,.arcading #score,.arcading #feed,.arcading #labHud{display:none!important}
   .coin{display:inline-block;width:.78em;height:.78em;border-radius:50%;background:radial-gradient(circle at 38% 34%,#FFF4B0,#FFD23A 45%,#A87A0A);box-shadow:0 0 0 2px #000;flex:none}
   .ptag{position:absolute;left:0;top:0;display:flex;align-items:center;gap:6px;background:#000;padding:4px 9px 3px;font:400 17px/1 var(--display);letter-spacing:.04em;color:#FFE38A;white-space:nowrap;will-change:transform;transform:skewX(-8deg)}
@@ -2993,6 +2994,7 @@ function pollPad(rdt) {
     const fake = { preventDefault() {}, repeat: false };
     if (hit(1) || hit(9)) arcade.key('escape', true, fake);
     else if (hit(0)) arcade.key(' ', true, fake); else if (!on(0) && padPrev[0]) arcade.key(' ', false, fake);
+    if (hit(3)) arcade.key('c', true, fake); // Y: HE CHEATED!
     if (dir !== padDir && arcade.active()) { if (padDir) arcade.key('arrow' + padDir, false, fake); if (dir) arcade.key('arrow' + dir, true, fake); } // the stick or d-pad is the arrow keys
   } else if (hit(9)) openMenu();
   padDir = dir; padPrev = p.buttons.map(b => b.pressed);
@@ -5773,11 +5775,11 @@ const arcade = (() => {
     return { mesh: { list, coin, at: at_ }, spot: { id: 'cups', kind: 'cups', name: 'CUPS', plays: 'cups', cost: 2, target: F.V3(-0.65, 1.0, -0.88), close: F.V3(-0.55, 1.95, 1.3), look: F.V3(-0.45, 1.25, -1.4), fov: 58 } };
   }
   function cupsStart() {
-    if (!room.den || room.den.cups <= 0) { CP.st = 'done'; CP.msg = 'CLOSED FOR TODAY'; CP.won = 0; ASFX.lose(); return; }
-    if (!payCoins(2)) { CP.st = 'done'; CP.msg = 'NEED 2 COINS'; CP.won = 0; ASFX.lose(); return; }
-    room.den.cups--; CP.rounds++; ASFX.mutter();
+    if (!room.den || room.den.cups <= 0) { Object.assign(CP, { st: 'done', msg: 'CLOSED FOR TODAY', won: 0, dry: true }); ASFX.lose(); return; }
+    if (!payCoins(2)) { Object.assign(CP, { st: 'done', msg: 'NEED 2 COINS', won: 0, dry: true }); ASFX.lose(); return; }
+    room.den.cups--; CP.rounds = ARC_PLAYS.cups - room.den.cups; ASFX.mutter(); // this visit's round: honest the first time, every visit
     const n = 7 + Math.min(6, CP.rounds + floorNum);
-    Object.assign(CP, { st: 'show', t: 0, i: 0, coinCup: Math.floor(Math.random() * 3), cheat: CP.rounds > 1 && Math.random() < 0.3, picked: -1, called: false, won: 0, palmT: -1, swapT: Math.max(0.2, 0.32 - (CP.rounds + floorNum) * 0.012) });
+    Object.assign(CP, { st: 'show', t: 0, i: 0, coinCup: Math.floor(Math.random() * 3), cheat: CP.rounds > 1 && Math.random() < 0.3, picked: -1, called: false, won: 0, palmT: -1, dry: false, sel: null, swapT: Math.max(0.2, 0.32 - (CP.rounds + floorNum) * 0.012) });
     CP.swaps = Array.from({ length: n }, () => { const a = Math.floor(Math.random() * 3); let b = Math.floor(Math.random() * 2); if (b >= a) b++; return [a, b]; });
     CP.palmAt = CP.cheat ? 2 + Math.floor(Math.random() * (n - 4)) : -1;
     A.cups.list.forEach((c, i) => { c.slot = i; c.lift = 0; });
@@ -5812,20 +5814,21 @@ const arcade = (() => {
     if (CP.palmT >= 0) { CP.palmT += dt; if (goblin && goblin.medal) goblin.medal.material.emissive.setHex(CP.palmT < 0.3 ? 0xFFF0A0 : 0x3A2A04); if (goblin && CP.palmT < 0.5) goblin.head.rotation.y = 0.8; if (CP.palmT > 0.5) CP.palmT = -1; }
     const cc = L[CP.coinCup];
     if (CP.st === 'reveal' || CP.st === 'done') {
-      L.forEach((c, i) => { const want = i === CP.picked || (CP.t > 0.5 && i === CP.coinCup && !CP.cheat) ? 1 : 0; c.lift += (want - c.lift) * Math.min(1, dt * 10); });
-      if (CP.cheat && CP.msg !== 'CLOSED FOR TODAY' && CP.msg !== 'NEED 2 COINS') { C.coin.visible = CP.t > 0.4; C.coin.position.copy(C.at(1.54, -0.32)); C.coin.position.y += 0.55 + Math.min(1, CP.t) * 0.3; C.coin.rotation.set(Math.PI / 2, 0, CP.t * 6); } // out of his sleeve
+      L.forEach((c, i) => { const want = !CP.dry && (i === CP.picked || (CP.t > 0.5 && i === CP.coinCup && !CP.cheat)) ? 1 : 0; c.lift += (want - c.lift) * Math.min(1, dt * 10); }); // just a message, no game: the cups stay down
+      if (CP.dry) C.coin.visible = false;
+      else if (CP.cheat) { C.coin.visible = CP.t > 0.4; C.coin.position.copy(C.at(1.54, -0.32)); C.coin.position.y += 0.55 + Math.min(1, CP.t) * 0.3; C.coin.rotation.set(Math.PI / 2, 0, CP.t * 6); } // out of his sleeve
       else { C.coin.visible = true; C.coin.rotation.set(0, 0, 0); C.coin.position.set(cc.g.position.x, 0.86, cc.g.position.z); }
       if (CP.st === 'reveal' && CP.t > 1.4) CP.st = 'done';
     } else if (CP.st === 'show') { C.coin.visible = true; C.coin.rotation.set(0, 0, 0); C.coin.position.copy(C.at(cc.slot, 0)); C.coin.position.y = 0.86; }
     else C.coin.visible = false;
-    if (CP.st !== 'shuffle') L.forEach(c => place(c, c.slot, 0, c.lift * 0.24));
+    if (CP.st !== 'shuffle') L.forEach(c => place(c, c.slot, 0, c.lift * 0.24 + (CP.st === 'pick' && CP.sel === c.slot ? 0.03 + Math.abs(Math.sin(T * 6)) * 0.03 : 0))); // the cup a pad has picked out bobs
   }
   function cupsHud() {
     const left = room.den ? room.den.cups : 0;
     if (CP.st === 'idle') hud('CUPS', left > 0 ? `FOLLOW THE COIN · 2 COINS · WIN 5, OR 10 FOR CATCHING HIM CHEAT · ${left} LEFT` : 'CLOSED FOR TODAY');
     else if (CP.st === 'show') hud('WATCH THE COIN', 'HE SHUFFLES FASTER EVERY ROUND');
     else if (CP.st === 'shuffle') hud('…', 'KEEP YOUR EYE ON IT');
-    else if (CP.st === 'pick') hud('WHICH CUP?', coarse ? 'TAP A CUP · OR CALL HIM OUT' : 'CLICK A CUP OR PRESS 1 2 3 · C IF HE CHEATED', 'HE CHEATED!');
+    else if (CP.st === 'pick') hud('WHICH CUP?', padSeen ? 'PICK ONE WITH THE STICK, A TO LIFT IT · Y IF HE CHEATED' : coarse ? 'TAP A CUP · OR CALL HIM OUT' : 'CLICK A CUP OR PRESS 1 2 3 · C IF HE CHEATED', 'HE CHEATED!');
     else hud(CP.msg, (CP.won ? '+' + CP.won + ' TICKETS · ' : '') + (left > 0 ? 'TAP OR SPACE TO GO AGAIN' : 'THAT\'S ALL THE PLAYS FOR NOW'));
   }
 
@@ -6143,7 +6146,7 @@ const arcade = (() => {
   }
   prizeEl.innerHTML = '<b>THE PRIZE COUNTER</b><span id="arcWallet"></span><div id="arcPrizeList">' + ARC_PRIZES.map((p, i) => `<button type="button" class="arcPrize" data-prize="${p.id}"><kbd>${i + 1}</kbd><b>${p.name}<small>${p.note}</small></b><em>${p.cost}<i class="tkt"></i></em></button>`).join('') + '</div>';
   const walletEl = prizeEl.querySelector('#arcWallet');
-  let prizeKey = '';
+  let prizeKey = '', prizeSel = null;
   function renderPrizes() {
     const k_ = run.coins + '|' + run.tickets + '|' + unlocked('crown'); if (k_ === prizeKey) return; prizeKey = k_; // only when something's changed, not every frame
     walletEl.innerHTML = `<i class="coin"></i>${run.coins} · <i class="tkt"></i>${run.tickets}`;
@@ -6197,7 +6200,7 @@ const arcade = (() => {
   }
   function teardown() {
     if (play) endNow();
-    A = null; flying.length = 0; tixEl.hidden = true; SK.ball = null; SK.st = 'idle';
+    A = null; flying.length = 0; tixEl.hidden = true; SK.ball = null; if (SK.st !== 'play') SK.st = 'idle'; // a paused game waits for you, like the cabinets' do
   }
 
   /* ---------- walking up, pushing in, stepping back ---------- */
@@ -6215,16 +6218,19 @@ const arcade = (() => {
     if (S.kind === 'whack' && WK.st === 'over') WK.st = 'idle';
     if (S.kind === 'cab') S.game.reset();
   }
+  function release(S) { // let go of whatever you were holding at that machine
+    if (S.kind === 'cab') S.game.leave();
+    if (S.kind === 'skee') { SK.hold = null; SK.keys.clear(); }
+    if (S.kind === 'whack') { WK.held = null; WK.keys.clear(); }
+    if (S.kind === 'claw' && A) A.claw.keys.clear();
+  }
   function leave() {
     if (!play || play.back) return;
-    if (play.S.kind === 'cab') play.S.game.leave();
-    if (play.S.kind === 'skee') { SK.hold = null; SK.keys.clear(); }
-    if (play.S.kind === 'whack') { WK.held = null; WK.keys.clear(); }
-    if (play.S.kind === 'claw') A.claw.keys.clear();
+    release(play.S);
     play.back = true; play.frozen = false; screenEl.hidden = true; hudEl.hidden = true; prizeEl.hidden = true; backEl.hidden = true;
   }
   function endNow() { // out at once: the room's changing under you
-    if (!play) return; if (play.S.kind === 'cab') play.S.game.leave();
+    if (!play) return; release(play.S);
     play = null; camMode = 'fp'; fovTarget = 72; stage.classList.remove('arcading'); screenEl.hidden = hudEl.hidden = prizeEl.hidden = backEl.hidden = true;
   }
   function cameraStep(rdt) {
@@ -6282,10 +6288,20 @@ const arcade = (() => {
     else if (S.kind === 'skee') { if (down) SK.keys.add(k); else SK.keys.delete(k); if (!rep && [' ', 'enter', 'w', 'arrowup'].includes(k)) { if (down) skeeDown(); else skeeUp(); } }
     else if (S.kind === 'cups' && down && !rep) {
       if (CP.st === 'idle' || CP.st === 'done') { if (k === ' ' || k === 'enter') cupsStart(); }
-      else if (CP.st === 'pick') { const n = { 1: 0, 2: 1, 3: 2 }[k]; if (n != null) cupsPick(A.cups.list.find(c => c.slot === n)); else if (k === 'c') cupsCall(); }
+      else if (CP.st === 'pick') {
+        const n = { 1: 0, 2: 1, 3: 2 }[k], d = { arrowleft: -1, a: -1, arrowright: 1, d: 1 }[k];
+        if (n != null) cupsPick(A.cups.list.find(c => c.slot === n)); else if (k === 'c') cupsCall();
+        else if (d) CP.sel = CP.sel == null ? 1 : clamp(CP.sel + d, 0, 2); // the stick or arrows pick one out
+        else if ((k === ' ' || k === 'enter') && CP.sel != null) cupsPick(A.cups.list.find(c => c.slot === CP.sel));
+      }
     } else if (S.kind === 'whack') { if (down) WK.keys.add(k); else WK.keys.delete(k); if (!rep && (k === ' ' || k === 'enter')) { if (down) whackDown(); else whackUp(null); } }
     else if (S.kind === 'claw') { const c = A.claw; if (down) c.keys.add(k); else c.keys.delete(k); if (down && !rep && (k === ' ' || k === 'enter')) { if (c.mode === 'aim') clawDrop(c); else if (c.mode !== 'drop') clawStart(c); } }
-    else if (S.kind === 'prizes' && down && !rep) { const n = { 1: 0, 2: 1, 3: 2, 4: 3 }[k]; if (n != null) buy(ARC_PRIZES[n].id); }
+    else if (S.kind === 'prizes' && down && !rep) {
+      const n = { 1: 0, 2: 1, 3: 2, 4: 3 }[k], d = { arrowup: -1, w: -1, arrowdown: 1, s: 1 }[k];
+      if (n != null) buy(ARC_PRIZES[n].id);
+      else if (d) { prizeSel = prizeSel == null ? 0 : clamp(prizeSel + d, 0, ARC_PRIZES.length - 1); prizeEl.querySelectorAll('.arcPrize').forEach((b, i) => b.classList.toggle('sel', i === prizeSel)); }
+      else if ((k === ' ' || k === 'enter') && prizeSel != null) buy(ARC_PRIZES[prizeSel].id);
+    }
   }
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   function aim(e) { const r_ = stage.getBoundingClientRect(); ndc.set((e.clientX - r_.left) / r_.width * 2 - 1, -((e.clientY - r_.top) / r_.height) * 2 + 1); ray.setFromCamera(ndc, camera); }
@@ -7280,11 +7296,12 @@ function enterRoom(r, fromDir, instant) {
   for (const e of enemies) if (e.pup) { scene.remove(e.root); scene.remove(e.shadow); e.label.remove(); e.gone = true; }
   enemies = enemies.filter(e => !e.gone); net.pups.clear(); net.deadIds.clear(); net.snapIn = null;
   const th = THEMES[r.theme], fight = needsFight(r);
+  r.fightActive = false; // a fight only starts once its creatures are in. Left set from a visit cut short, it read as a fight already won, and cleared the room with the boss still in it
   setDoors(true, true); doors.forEach(d => { d.y = 3.15; });
   if (fight) {
     const spawn = inst => { if (netGuest()) r.fightActive = true; else spawnRoomEnemies(r, fromDir, inst); }; // a partner's creatures come from the host
     if (instant) { setDoors(false, true); doors.forEach(d => { d.y = 0; }); spawn(true); }
-    else setTimeout(() => { if (room !== r) return; setDoors(false); spawn(false); }, 450);
+    else setTimeout(() => { if (room !== r || transit) return; setDoors(false); spawn(false); }, 450); // already on your way back out: nothing spawns, and the room waits for next time
   }
   if (r.type === 'stairs' && firstVisit) bossIntro(r);
   else if (r.type === 'secret' && firstVisit) { const b = { shop: [r.shop && r.shop.name, 'SECRET STOCK'], den: ['GOBLIN ARCADE', (r.shop ? r.shop.name + ' · ' : '') + 'INSERT COIN'], gift: ['A GIFT', 'IT\'S FREE'], hoard: ['A HOARD', ''] }[r.secret]; banner(b[0], b[1]); SFX.fanfare(); if (r.shop && r.shopDir) SFX.gob(); }
