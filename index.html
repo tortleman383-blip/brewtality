@@ -709,6 +709,8 @@ const COMBOS = {
   shocking: { name: 'SHOCKING',      chain: ['bog', 'horn'] },
   skeet:    { name: 'SKEET',         chain: ['feather', 'doom'] },
   batter:   { name: 'BATTER UP',     chain: ['beads', 'feather'] },
+  extinction: { name: 'EXTINCTION',  chain: ['doom', 'doom', 'beads'] },
+  mass:     { name: 'MASS EXTINCTION', chain: ['iron', 'doom', 'doom', 'beads'] }, // the first four-step one
   steam:    { name: 'STEAM CLEAN',   chain: ['bog', 'doom'] },
   frozen:   { name: 'FROZEN SOLID',  chain: ['bog', 'frost'] },
   rod:      { name: 'LIGHTNING ROD', chain: ['iron', 'horn'] },
@@ -2502,7 +2504,13 @@ function planBrew(items, targets, point, opts = {}) {
     b.targets = targets.slice();
     b.resisted = targets.filter(e => imm(e, ing));
     const open = targets.filter(e => !b.resisted.includes(e));
-    if (ing === 'beads') { if (opts.gun) { b.pebble = true; b.word = open.length ? 'pelted' : 'resisted'; } else { b.word = 'rattle'; lastBeads = b; } } // the gun sprays them as pebbles; the ladle shakes the ceiling
+    if (ing === 'beads') {
+      const k = j => (items[i - j] || {}).kind; // the steps just before this one, in a row
+      if (opts.gun) { b.pebble = true; b.word = open.length ? 'pelted' : 'resisted'; }
+      else if (k(1) === 'doom' && k(2) === 'doom') { // a meteor. Its own numbers, so the second doom's watering-down never reaches it
+        const mass = k(3) === 'iron'; Object.assign(b, { tier: 3, meteor: mass ? 2 : 1, ultimate: mass, word: mass ? 'MASS EXTINCTION' : 'EXTINCTION', combo: mass ? 'mass' : 'extinction', contrib: mass ? [i - 3, i - 2, i - 1, i] : [i - 2, i - 1, i] });
+      } else { b.word = 'rattle'; lastBeads = b; }
+    } // the gun sprays them as pebbles; the ladle shakes the ceiling
     else if (ing === 'feather' && lastBeads) { lastBeads.batter = true; b.tier = 2; b.word = 'BATTER UP'; b.combo = 'batter'; b.contrib = [lastBeads.i, i]; lastBeads = null; } // the feather catches the rock instead: it floats, and it's yours to bat
     else if (ing === 'feather') { open.forEach(e => { if (!e.T.heavy && !e.T.boss) S(e).lev = true; }); b.word = open.length ? 'whoosh' : 'resisted'; lastLev = i; }
     else if (ing === 'bog') { open.forEach(e => { S(e).wet = true; }); b.word = open.length ? 'yuck' : 'resisted'; lastWet = i; }
@@ -2584,6 +2592,7 @@ function applyBeat(b, point, targets) {
   if (b.ing === 'beads') {
     SFX.rattle();
     if (b.pebble) open.forEach(e => { burst(centerOf(e), 0xFFA6CF, 6, 2.5, 0.5, 0.05); hurt(e, 1, 'PELTED', point, 'beads'); });
+    else if (b.meteor) b.rockObj = meteor(point.x, point.z, b.meteor === 2);
     else { burst(point.clone().setY(Math.max(0.3, point.y)), 0xFFA6CF, 14, 4, 0.7, 0.07); brewRock(point.x, point.z, !!b.batter, { str: b.str }); }
   } else if (b.combo === 'batter') { // the feather's busy holding the rock up, so nothing gets blown about
     burst(new THREE.Vector3(point.x, ROCK.floatY + 0.6, point.z), 0xF4F0E0, 16, 3, 0.8, 0.06, 1); SFX.flutter();
@@ -3366,16 +3375,18 @@ async function cinematic(point, targets, plan) {
     if (b.tier === 3) {
       finale = true;
       fireCard(b); linkCards(b.contrib); setTS(0.03, 20);
-      stormCloud(c); SFX.charge(); orbit.spin = 0.12; await wait(480);
+      if (b.meteor) { SFX.rumble(); for (let k = 0; k < 6; k++) burst(new THREE.Vector3(point.x + rand(-2, 2), H - 0.2, point.z + rand(-2, 2)), 0x8A7A6A, 4, 0.6, 0.9, 0.05); } else stormCloud(c); // the ceiling starts to give
+      SFX.charge(); orbit.spin = 0.12; await wait(480);
       applyBeat(b, point, targets);
+      if (b.rockObj) { setTS(0.6, 12); for (let w = 0; w < 120 && !b.rockObj.landed; w++) await wait(30); } // let it come down, then freeze on the impact
       setTS(0, 100); flash(0.95, 450); shake = 0.6; fovTarget = 36; fovRate = 14; orbit.r = 3.8; orbit.spin = 0.55;
       stage.classList.add('freeze');
       const isNew = markFound(b);
-      callout(b.word, 3, { sub: multiName(slingKills.length) });
+      callout(b.word, 3, { sub: b.ultimate ? 'ULTIMATE' : multiName(slingKills.length) });
       if (isNew) setTimeout(() => stamp('NEW COMBO'), 350);
-      SFX.airhorn(); SFX.wub(); SFX.zap(true);
-      xp(500, 'COMBO');
-      await wait(1550);
+      SFX.airhorn(); SFX.wub(); if (!b.meteor) SFX.zap(true);
+      xp(b.ultimate ? 1000 : 500, 'COMBO');
+      await wait(b.ultimate ? 2100 : 1550);
       stage.classList.remove('freeze'); setTS(0.55, 3); fovTarget = 50; fovRate = 4;
       await wait(550);
     } else {
@@ -3401,7 +3412,7 @@ async function quickBeats(point, targets, plan) {
   cine.state = 'beats';
   for (const b of plan) {
     fireCard(b); applyBeat(b, point, targets);
-    if (b.tier >= 2) { linkCards(b.contrib); markFound(b); xp(b.tier === 3 ? 500 : 250, 'COMBO'); }
+    if (b.tier >= 2) { linkCards(b.contrib); markFound(b); xp(b.ultimate ? 1000 : b.tier === 3 ? 500 : 250, 'COMBO'); }
     callout(b.word, b.tier);
     if (b.extra) { await wait(140); const r = applyExtra(b); callout(r.any ? 'WAIT WHAT' : 'fizzled', r.any ? 2 : 1, { rot: true }); }
     await wait(170);
@@ -3943,7 +3954,7 @@ function brewRock(x, z, float, o = {}) {
   if (!R.fake && net.on) netEmit('throw', { k: 'rock', rk: rkOf(room), id: R.id, p: [+x.toFixed(2), +z.toFixed(2)], f: float ? 1 : 0 });
   return R;
 }
-function clearRocks() { for (const R of brewRocks) { scene.remove(R.g); if (R.mark) scene.remove(R.mark); } brewRocks.length = 0; }
+function clearRocks() { for (const R of brewRocks) { scene.remove(R.g); if (R.mark) scene.remove(R.mark); if (R.scorch) scene.remove(R.scorch); if (R.mats) R.mats.forEach(m => m.dispose()); if (R.tail) R.tail.geometry.dispose(); } brewRocks.length = 0; }
 function rockLands(R) { // a plain rock hitting the floor: creatures under it take it, you never do
   const p = new THREE.Vector3(R.x, 0.2, R.z);
   burst(p, 0x8A6A4A, 14, 4, 0.6, 0.09); floorRing(p, 0xB0A090, ROCK.r, 0.35); SFX.thud(); shake = Math.max(shake, 0.2);
@@ -3958,6 +3969,7 @@ function rockShatters(R) {
 function updateRocks(sdt) {
   for (const R of brewRocks.slice()) {
     R.t += sdt;
+    if (R.kind === 'meteor') { meteorStep(R, sdt); continue; }
     if (R.mode === 'warn') {
       R.mark.scale.setScalar(ROCK.r * (1 + Math.sin(R.t * 22) * 0.06));
       if (R.t >= ROCK.warn) { R.mode = 'fall'; R.t = 0; R.y = H - 0.2; R.vy = -3; R.g.visible = true; burst(new THREE.Vector3(R.x, H - 0.2, R.z), 0x8A7A6A, 6, 0.8, 0.7, 0.05); }
@@ -3998,6 +4010,67 @@ function updateRocks(sdt) {
     }
     R.g.position.set(R.x, R.y, R.z);
   }
+}
+// EXTINCTION: two dooms set the rock alight, and it comes in at an angle through the ceiling. MASS EXTINCTION: iron in front, and the room's dragged in along its trail
+const METEOR = { warn: 0.45, fall: 0.38, r: 3.2, rMass: 3.8, dmg: 6, dmgMass: 8, burn: 4, drag: 9 };
+function meteor(x, z, mass, o = {}) {
+  x = Math.max(-W + 1, Math.min(W - 1, x)); z = Math.max(-D + 1, Math.min(D - 1, z));
+  const a = rand(0, Math.PI * 2), from = new THREE.Vector3(Math.max(-W + 0.5, Math.min(W - 0.5, x + Math.cos(a) * 4.5)), H - 0.3, Math.max(-D + 0.5, Math.min(D - 0.5, z + Math.sin(a) * 4.5)));
+  const coreM = new THREE.MeshStandardMaterial({ color: 0x4A2A1E, emissive: 0xFF5A1F, emissiveIntensity: 0.9, flatShading: true }), haloM = new THREE.MeshBasicMaterial({ color: mass ? 0xFFB070 : 0xFF8A2A, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
+  const g = new THREE.Group(), core = meshOf(GEO.ico1, coreM), halo = meshOf(GEO.sphere, haloM); core.scale.setScalar(0.55); halo.scale.setScalar(0.95); g.add(core); g.add(halo); g.position.copy(from); g.visible = false; scene.add(g);
+  // a comet's tail, streaming back the way it came
+  const tailM = new THREE.MeshBasicMaterial({ color: mass ? 0xFFC890 : 0xFF7A2A, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const back = from.clone().sub(new THREE.Vector3(x, 0.45, z)).normalize(), tail = meshOf(new THREE.ConeGeometry(0.62, 3.2, 8, 1, true), tailM);
+  tail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), back); tail.position.copy(back).multiplyScalar(1.7); g.add(tail);
+  const rr = mass ? METEOR.rMass : METEOR.r, mark = rockMark(x, z); mark.scale.setScalar(rr);
+  const R = { kind: 'meteor', id: o.id || (net.on ? net.me : 'me') + ':' + (++rockSeq), fake: !!o.fake, mass, mode: 'mwarn', t: 0, x, z, rr, from, g, core, halo, tail, mark, mats: [coreM, haloM, tailM], landed: false, dragT: 0 };
+  brewRocks.push(R);
+  if (!R.fake && net.on) netEmit('throw', { k: 'rock', rk: rkOf(room), id: R.id, p: [+x.toFixed(2), +z.toFixed(2)], f: mass ? 3 : 2 });
+  SFX.rumble(); shake = Math.max(shake, 0.15);
+  return R;
+}
+function meteorDrag(R, sdt) { // pulled in toward where it's going to land, all the way down
+  const tick_ = (R.dragT -= sdt) <= 0; if (tick_) R.dragT = 0.12;
+  const to = new THREE.Vector3(R.x, 0, R.z);
+  for (const e of alive()) { if (e.hidden || Math.hypot(e.pos.x - R.x, e.pos.z - R.z) > METEOR.drag) continue; pull(e, to); if (tick_) burst(centerOf(e), 0xB8B8C4, 3, 2, 0.4, 0.04, 6); }
+  if (tick_) { floorRing(new THREE.Vector3(R.x, 0.05, R.z), 0xB8B8C4, R.rr * 0.8, 0.3); SFX.clink(); }
+}
+function meteorStep(R, sdt) {
+  if (R.mode === 'mwarn') {
+    R.mark.scale.setScalar(R.rr * (1 + Math.sin(R.t * 18) * 0.05));
+    if (R.mass && !R.fake) meteorDrag(R, sdt);
+    if (R.t >= METEOR.warn) { R.mode = 'mfall'; R.t = 0; R.g.visible = true; burst(R.from.clone(), 0x8A7A6A, 14, 2, 0.9, 0.08); SFX.rumble(); }
+  } else if (R.mode === 'mfall') {
+    const k = Math.min(1, R.t / METEOR.fall); R.g.position.lerpVectors(R.from, new THREE.Vector3(R.x, 0.45, R.z), k * k); // speeding up all the way
+    R.core.rotation.x += sdt * 9; R.core.rotation.z += sdt * 6; R.halo.scale.setScalar(0.95 + Math.sin(R.t * 40) * 0.08);
+    R.tail.material.opacity = 0.35 + Math.sin(R.t * 50) * 0.1;
+    burst(R.g.position.clone(), pick([0xFF8A2A, 0xFFD23A, 0xFF5A1F]), 8, 1.6, 0.6, 0.12, 0, true); puff(R.g.position.clone(), 0x3A3036, 2, 0.9, 0.3, 0.4, 0.26, 0.6); // sparks and smoke off it
+    if (R.mass) burst(R.g.position.clone(), 0xB8B8C4, 2, 1.8, 0.4, 0.04, 6);
+    if (R.mass && !R.fake) meteorDrag(R, sdt);
+    if (k >= 1) meteorLands(R);
+  } else if (R.mode === 'crater') { // it smoulders in its crater for a bit, then cools and goes
+    const f = Math.max(0, 1 - R.t / 4);
+    R.scorch.material.opacity = 0.75 * Math.min(1, f * 2); R.coreM.emissiveIntensity = 0.25 + 0.6 * f + Math.sin(R.t * 9) * 0.1 * f; R.halo.visible = R.tail.visible = false;
+    if (Math.random() < sdt * 10 * f) burst(new THREE.Vector3(R.x + rand(-1, 1) * R.rr * 0.4, 0.15, R.z + rand(-1, 1) * R.rr * 0.4), pick([0xFF8A2A, 0xFFD23A]), 2, 1.2, 0.5, 0.05, -2, true);
+    if (R.t > 3) R.g.scale.multiplyScalar(1 - Math.min(1, sdt * 3));
+    if (R.t > 4) { scene.remove(R.g); scene.remove(R.scorch); R.scorch.material.dispose(); R.mats.forEach(m => m.dispose()); R.tail.geometry.dispose(); brewRocks.splice(brewRocks.indexOf(R), 1); }
+  }
+}
+function meteorLands(R) {
+  R.landed = true; const p = new THREE.Vector3(R.x, 0.3, R.z), rr = R.rr;
+  blast(p, 0xFF7A3D, rr, 0.6); burst(p, 0xF2A23A, 40, 9, 1.1, 0.14); burst(p, 0x8A6A4A, 24, 6, 0.8, 0.1); puff(p, 0x3A3036, 14, 2.4, 1.2, 1.2, 0.4, 0.9); floorRing(p, 0xFF8A2A, rr, 0.6);
+  shake = Math.max(shake, R.mass ? 0.9 : 0.7); flash(0.45, 300); SFX.boom(); SFX.thud(); SFX.rumble();
+  for (let k = 0; k < 8; k++) burst(new THREE.Vector3(rand(-W + 1, W - 1), H - 0.2, rand(-D + 1, D - 1)), 0x8A7A6A, 4, 0.6, 0.9, 0.05); // the whole ceiling sheds dust
+  if (R.mark) { scene.remove(R.mark); R.mark = null; }
+  if (!R.fake) for (const e of alive()) {
+    if (e.hidden || e.pos.y > 3.5 || Math.hypot(e.pos.x - R.x, e.pos.z - R.z) > rr + e.r * e.scale * 0.5) continue;
+    if (!imm(e, 'doom')) { if (e.wet > 0) { e.wet = 0; puff(centerOf(e), 0xF2F2F2, 8, 1.4, 0.5, 2.2, 0.22, 0.75); } else e.fire = Math.max(e.fire || 0, METEOR.burn); } // it burns, unless it steams them dry first
+    const away = new THREE.Vector3(e.pos.x - R.x, 0, e.pos.z - R.z); if (away.lengthSq() < 0.01) away.set(rand(-1, 1), 0, rand(-1, 1)); away.normalize();
+    const heavy = e.T.boss ? 0.3 : e.T.heavy ? 0.6 : 1; e.kbv = away.multiplyScalar(8 * heavy); e.slamOK = true; e.tiltV -= 20;
+    dmgSrc = 'ladle'; hurt(e, R.mass ? METEOR.dmgMass : METEOR.dmg, R.mass ? 'MASS EXTINCTION' : 'EXTINCTION', p, 'doom', 1.7);
+  }
+  const scorch = meshOf(GEO.disc, new THREE.MeshBasicMaterial({ color: 0x1A0E08, transparent: true, opacity: 0.75, depthWrite: false })); scorch.rotation.x = -Math.PI / 2; scorch.position.set(R.x, 0.05, R.z); scorch.scale.setScalar(rr * 0.55); scene.add(scorch);
+  R.scorch = scorch; R.coreM = R.mats[0]; R.g.position.set(R.x, 0.3, R.z); R.mode = 'crater'; R.t = 0;
 }
 // your bonk, if there's a floating rock in reach: it goes where you're looking, bent a little toward whatever's nearest your aim
 function batRock(tier) {
@@ -8438,7 +8511,7 @@ const NET_ON = {
   cleared(d) { if (netGuest() && d.run === net.run && d.fl === floorNum && d.rk === rkOf(room) && room.fightActive) { room.fightActive = false; roomCleared(); } },
   throw(d, m) {
     if (!net.on || d.run !== net.run || d.rk !== rkOf(room)) return;
-    if (d.k === 'rock') { if (Array.isArray(d.p) && !brewRocks.some(R => R.id === d.id)) brewRock(+d.p[0] || 0, +d.p[1] || 0, !!d.f, { id: String(d.id), fake: true }); return; } // a partner's beads: you see the rock, and can bat it, but its fall's theirs
+    if (d.k === 'rock') { if (Array.isArray(d.p) && !brewRocks.some(R => R.id === d.id)) { if (d.f >= 2) meteor(+d.p[0] || 0, +d.p[1] || 0, d.f === 3, { id: String(d.id), fake: true }); else brewRock(+d.p[0] || 0, +d.p[1] || 0, !!d.f, { id: String(d.id), fake: true }); } return; } // a partner's beads: you see the rock, and can bat it, but its fall's theirs
     if (d.k === 'bat') { const R = brewRocks.find(q => q.id === d.id && q.mode === 'float'); if (R && Array.isArray(d.d)) { if (Array.isArray(d.o)) { R.x = +d.o[0] || R.x; R.y = +d.o[1] || R.y; R.z = +d.o[2] || R.z; } launchRock(R, new THREE.Vector3(+d.d[0] || 0, +d.d[1] || 0, +d.d[2] || 0), Math.min(3, Math.max(1, d.t | 0)), true); } return; }
     if (!Array.isArray(d.o) || !Array.isArray(d.v)) return;
     fakeThrow(d.o.map(Number), d.v.map(Number), +d.c || 0xCFE8F0); const R = net.remotes.get(m.peer); if (R) R.throwT = 0.35;
