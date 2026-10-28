@@ -19,6 +19,15 @@ Brewtality also has a Roblox version that copies this game exactly, and it reads
 
 ---
 
+### 2026-10-28 · BATTER UP: served, and it carries the brew
+- **BATTER UP no longer drops the rock where the brew lands** (it used to float in the middle of the crowd you'd thrown at). Slinging a brew with beads then a feather now doesn't throw it at all: the ladle pops the rock up in an arc to float about 1.6 m in front of you, and BATTER UP goes off there and then.
+- **The rock carries the rest of the brew**: everything except the beads and the feather that made it, in the same order. Bat it, and the first thing it hits gets the rock's hit and then the carried brew as a splash, combos, slow-mo and all: beads, feather, bog, horn makes a rock that soaks whatever you hit with it and then lands SHOCKING. If it hits nothing, it splashes where it breaks (a wall, the floor). Left alone, it drops in front of you after 6.5 s and splashes there. A HOME RUN still goes straight through, and splashes once, on the first thing it hits. Just beads and a feather makes a rock with nothing on it.
+- Plain beads and the meteors are unchanged: they still come down where the brew lands.
+- In co-op, a partner's served rock appears floating, with what it carries; whoever bats it gets the splash, on their screen.
+- The first-time tip now reads "BONK IT AT SOMETHING · THE REST OF THE BREW GOES WITH IT".
+- Numbers: the serve takes 0.35 s from your hand to 1.6 m in front, at 1.25 m up, with a 0.45 m arc; it uses one sling's worth of the brew, like a throw. The carried brew's echo bell has already gone off (it isn't echoed twice).
+- Code: sling (a plan with BATTER UP calls serveRock instead of throwing); new serveRock, startFloat, rockSplash; brewRock takes served, from and carried (no floor ring for a served rock; it animates in a new 'serve' mode); updateRocks splashes the cargo on the first creature hit, where it breaks, and rockLands splashes where it drops; planBrew takes noEcho; onImpact takes opts and passes them to its plans. Co-op: the rock message adds s (served) and c (the carried kinds).
+
 ### 2026-10-28 · EXTINCTION and MASS EXTINCTION
 - **EXTINCTION** (doom, doom, beads, in a row), a new 3-step combo: the two dooms go off as usual, then instead of a rock, a burning meteor. A wide red ring warns where; it comes in at an angle through the ceiling with a comet's tail, slams down, and everything within about 3 m takes 6, gets thrown back, and catches fire (or steams dry, if it was wet). Creatures that shrug off fire still take the hit but don't burn. It leaves a smouldering crater that cools over 4 seconds. Like the plain rock, it never hurts you or a partner, and it comes down even if the splash hits nobody.
 - **MASS EXTINCTION** (iron, doom, doom, beads), the game's first 4-step combo and first ULTIMATE: the same meteor, but from the moment the ring appears, everything within 9 m is dragged in toward it (grey iron streaks off each one), so the whole room is under it when it lands. A bigger blast (3.8 m), 8 damage, and fire. It needs four pot slots, so the Cast-Iron Rim.

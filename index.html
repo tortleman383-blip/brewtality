@@ -2490,7 +2490,7 @@ function resetCards() { cardItems = null; renderCards(); }
 const imm = (e, k) => !!(e.T.immune && e.T.immune.includes(k));
 const hurt = (e, n, how, from, el, launch) => damage(e, n + (el && e.T.weak === el ? 1 : 0), how, from, launch); // wood burns, metal conducts
 function planBrew(items, targets, point, opts = {}) {
-  if (has('bell') && items.length) items = [...items, items[items.length - 1]]; // echo bell: the last one goes off again
+  if (has('bell') && items.length && !opts.noEcho) items = [...items, items[items.length - 1]]; // echo bell: the last one goes off again (a rock's cargo already has)
   targets = targets.slice();
   const st = new Map(), S = e => { if (!st.has(e)) st.set(e, { lev: e.lev > 0 || !!e.T.flying, wet: e.wet > 0, glow: e.glow > 0, frozen: e.frozen > 0, mag: false }); return st.get(e); };
   targets.forEach(S);
@@ -3306,6 +3306,7 @@ function noteUse(items) {
 function sling(power) {
   const { origin, v } = launchParams(power);
   const items = useCharge(); noteUse(items); if (!items.length) scoopT = 0.65;
+  if (items.length) { const pl = planBrew(items, [], null), bb = pl.find(b => b.combo === 'batter'); if (bb) { serveRock(items, pl, bb); return; } } // BATTER UP: the ladle pops the rock up in front of you instead
   const pred = trace(origin, v), predTargets = targetsAt(pred.point, pred.hitE);
   const plan = predTargets.length ? planBrew(items, predTargets, pred.point) : [];
   const notable = plan.some(b => b.tier >= 2 || b.extra);
@@ -3331,14 +3332,14 @@ function stepBlob(dt) {
 }
 
 /* ================= the sling cinematic ================= */
-async function onImpact(point, hitE, items, color, hitS) {
+async function onImpact(point, hitE, items, color, hitS, opts = {}) {
   let targets = targetsAt(point, hitE);
   burst(point, color.getHex(), 18, 5, 0.8, 0.09); floorRing(point, color.getHex(), 1.6, 0.4); SFX.splash(false);
   if (hitS) shroomStruck(hitS);
   const swatted = targets.filter(e => e.T.swats && e.ph === 'live' && !(e.stun > 0) && !(e.frozen > 0) && mkFacing(e)); // a mantis bats away what you throw at its front
   if (swatted.length) { targets = targets.filter(e => !swatted.includes(e)); swatted.forEach(e => { e.swatT = 0.35; SFX.clang(); const sp = project(centerOf(e)); if (!sp.behind) callout('SWATTED', 1, { at: true, x: sp.x, y: sp.y }); }); }
   if (hitE && hitE.T.hover && !hitE.dead && !swatted.includes(hitE)) { hitE.stun = Math.max(hitE.stun, 2.6); const sp = project(centerOf(hitE)); if (!sp.behind) callout('KNOCKED DOWN', 2, { at: true, x: sp.x, y: sp.y }); } // a direct hit puts a lampcap on the floor
-  if (!targets.length && items.some(it => it.kind === 'beads')) { await quickBeats(point, [], planBrew(items, [], point).filter(b => b.ing === 'beads' || b.combo === 'batter')); return endSling(); } // nobody in the splash, but the ceiling still comes down
+  if (!targets.length && items.some(it => it.kind === 'beads')) { await quickBeats(point, [], planBrew(items, [], point, opts).filter(b => b.ing === 'beads' || b.combo === 'batter')); return endSling(); } // nobody in the splash, but the ceiling still comes down
   if (!targets.length) { if (!hitS && !swatted.length) callout('whiff', 1); return endSling(); }
   if (!items.length) { // boiling water: scalds whatever it lands on, and just soaks the rest of the splash
     puff(point.clone().setY(0.6), 0xF2F2F2, 8, 1.2, 0.8, 1.6, 0.25, 0.6);
@@ -3347,7 +3348,7 @@ async function onImpact(point, hitE, items, color, hitS) {
     if (imm(hit, 'boil')) { showResisted({ resisted: [hit] }); callout('scald', 1); } else { callout('scald', 1); damage(hit, 1, 'SCALDED', point); }
     return endSling();
   }
-  const plan = planBrew(items, targets, point);
+  const plan = planBrew(items, targets, point, opts);
   if (cine.use) await cinematic(point, targets, plan); else await quickBeats(point, targets, plan);
   endSling();
 }
@@ -3949,9 +3950,10 @@ const rockMark = (x, z) => { const m = meshOf(GEO.ring, crockMat); m.rotation.x 
 function brewRock(x, z, float, o = {}) {
   x = Math.max(-W + 0.7, Math.min(W - 0.7, x)); z = Math.max(-D + 0.7, Math.min(D - 0.7, z));
   const g = new THREE.Group(), rock = meshOf(GEO.ico0, rockMat); rock.scale.setScalar(0.36); g.add(rock); g.visible = false; scene.add(g);
-  const R = { id: o.id || (net.on ? net.me : 'me') + ':' + (++rockSeq), fake: !!o.fake, str: o.str || 1, mode: 'warn', t: 0, life: 0, x, z, y: H - 0.2, vy: 0, float, g, mark: rockMark(x, z), ring: null };
+  const R = { id: o.id || (net.on ? net.me : 'me') + ':' + (++rockSeq), fake: !!o.fake, str: o.str || 1, mode: o.served ? 'serve' : 'warn', t: 0, life: 0, x, z, tx: x, tz: z, y: H - 0.2, vy: 0, float, g, mark: o.served ? null : rockMark(x, z), ring: null, carried: o.carried || null, from: o.from || null };
   brewRocks.push(R);
-  if (!R.fake && net.on) netEmit('throw', { k: 'rock', rk: rkOf(room), id: R.id, p: [+x.toFixed(2), +z.toFixed(2)], f: float ? 1 : 0 });
+  if (o.served) { if (R.from) { R.x = R.from.x; R.y = R.from.y; R.z = R.from.z; g.visible = true; } else startFloat(R); } // a partner's served rock just appears where it's floating
+  if (!R.fake && net.on) netEmit('throw', { k: 'rock', rk: rkOf(room), id: R.id, p: [+x.toFixed(2), +z.toFixed(2)], f: float ? 1 : 0, s: o.served ? 1 : 0, c: (R.carried || []).map(it => it.kind) });
   return R;
 }
 function clearRocks() { for (const R of brewRocks) { scene.remove(R.g); if (R.mark) scene.remove(R.mark); if (R.scorch) scene.remove(R.scorch); if (R.mats) R.mats.forEach(m => m.dispose()); if (R.tail) R.tail.geometry.dispose(); } brewRocks.length = 0; }
@@ -3960,7 +3962,7 @@ function rockLands(R) { // a plain rock hitting the floor: creatures under it ta
   burst(p, 0x8A6A4A, 14, 4, 0.6, 0.09); floorRing(p, 0xB0A090, ROCK.r, 0.35); SFX.thud(); shake = Math.max(shake, 0.2);
   if (R.mark) { scene.remove(R.mark); R.mark = null; }
   if (!R.fake) for (const e of alive()) { if (e.hidden || e.pos.y > 2.8 || Math.hypot(e.pos.x - R.x, e.pos.z - R.z) > ROCK.r + e.r * e.scale * 0.5) continue; e.tiltV -= 12; hurt(e, Math.max(1, Math.round(ROCK.dmg * R.str)), 'ROCKFALL', p, 'beads'); }
-  R.mode = 'rubble'; R.t = 0; R.y = 0.22;
+  R.mode = 'rubble'; R.t = 0; R.y = 0.22; rockSplash(R, p, null); // never batted: it splashes where it lands
 }
 function rockShatters(R) {
   const p = new THREE.Vector3(R.x, R.y, R.z); burst(p, 0x8A7A6A, 18, 5, 0.6, 0.09); puff(p, 0x6E6276, 5, 0.9, 0.4, 1, 0.2, 0.6); SFX.thud();
@@ -3975,12 +3977,12 @@ function updateRocks(sdt) {
       if (R.t >= ROCK.warn) { R.mode = 'fall'; R.t = 0; R.y = H - 0.2; R.vy = -3; R.g.visible = true; burst(new THREE.Vector3(R.x, H - 0.2, R.z), 0x8A7A6A, 6, 0.8, 0.7, 0.05); }
     } else if (R.mode === 'fall') {
       R.vy -= 30 * sdt; R.y += R.vy * sdt; R.g.rotation.x += sdt * 6; R.g.rotation.z += sdt * 4;
-      if (R.float && R.y <= ROCK.floatY) { // the feather catches it at chest height
-        R.mode = 'float'; R.y = ROCK.floatY; R.t = 0; R.life = 0; if (R.mark) { scene.remove(R.mark); R.mark = null; }
-        R.ring = meshOf(new THREE.TorusGeometry(0.46, 0.025, 4, 18), featherRingMat); R.ring.rotation.x = Math.PI / 2; R.g.add(R.ring);
-        burst(new THREE.Vector3(R.x, R.y, R.z), 0xF4F0E0, 14, 2.5, 0.7, 0.06, 1); SFX.flutter();
-        if (!R.fake && !run.batTip) { run.batTip = true; setTimeout(() => notice(`BATTER UP<em>${coarse ? 'BONK' : 'V TO BONK'} THE ROCK · HOLD IT FOR A HOME RUN</em>`), 900); }
-      } else if (!R.float && R.y <= 0.3) rockLands(R);
+      if (R.float && R.y <= ROCK.floatY) startFloat(R); // the feather catches it at chest height
+      else if (!R.float && R.y <= 0.3) rockLands(R);
+    } else if (R.mode === 'serve') { // up off the ladle in a little arc, to just in front of you
+      const k = Math.min(1, R.t / 0.35), e_ = k * k * (3 - 2 * k);
+      R.x = R.from.x + (R.tx - R.from.x) * e_; R.z = R.from.z + (R.tz - R.from.z) * e_; R.y = R.from.y + (ROCK.floatY - R.from.y) * e_ + Math.sin(k * Math.PI) * 0.45;
+      R.g.rotation.x += sdt * 8; if (k >= 1) { R.x = R.tx; R.z = R.tz; startFloat(R); }
     } else if (R.mode === 'float') {
       if (cine.state === 'idle') R.life += sdt; // its clock starts once the slow-mo's over
       R.y = ROCK.floatY + Math.sin(R.t * 2.2) * 0.07; R.g.rotation.y += sdt * 1.2; R.g.rotation.x *= 0.9; R.g.rotation.z *= 0.9;
@@ -3998,10 +4000,11 @@ function updateRocks(sdt) {
             if (R.pierce) { e.stun = Math.max(e.stun, e.T.boss ? 0.6 : 1.1); e.atk = 0; }
             dmgSrc = 'ladle'; damage(e, R.dmg, R.pierce ? 'HOME RUN' : 'BATTED', player.pos, R.pierce ? 1.6 : 1.2);
           }
+          rockSplash(R, p, e); // the rest of the brew goes off on the first thing it hits
           if (!R.pierce) { rockShatters(R); break; } // a big one goes straight through and keeps going
         }
         if (R.mode !== 'fly' || !brewRocks.includes(R)) break;
-        if (Math.abs(R.x) > W - 0.3 || Math.abs(R.z) > D - 0.3 || R.y < 0.12 || R.y > H - 0.15 || R.t > 2.5 || colliders.some(c => R.y < c.h && Math.hypot(R.x - c.x, R.z - c.z) < c.r + 0.2)) { rockShatters(R); break; }
+        if (Math.abs(R.x) > W - 0.3 || Math.abs(R.z) > D - 0.3 || R.y < 0.12 || R.y > H - 0.15 || R.t > 2.5 || colliders.some(c => R.y < c.h && Math.hypot(R.x - c.x, R.z - c.z) < c.r + 0.2)) { rockSplash(R, new THREE.Vector3(Math.max(-W + 0.5, Math.min(W - 0.5, R.x)), Math.max(0.3, Math.min(H - 0.5, R.y)), Math.max(-D + 0.5, Math.min(D - 0.5, R.z))), null); rockShatters(R); break; } // hit nothing: it splashes where it breaks
       }
       R.g.rotation.x += sdt * 14; R.g.rotation.y += sdt * 9;
     } else if (R.mode === 'rubble') {
@@ -4071,6 +4074,38 @@ function meteorLands(R) {
   }
   const scorch = meshOf(GEO.disc, new THREE.MeshBasicMaterial({ color: 0x1A0E08, transparent: true, opacity: 0.75, depthWrite: false })); scorch.rotation.x = -Math.PI / 2; scorch.position.set(R.x, 0.05, R.z); scorch.scale.setScalar(rr * 0.55); scene.add(scorch);
   R.scorch = scorch; R.coreM = R.mats[0]; R.g.position.set(R.x, 0.3, R.z); R.mode = 'crater'; R.t = 0;
+}
+// BATTER UP's rock is served, not thrown: it pops up off the ladle in front of you, carrying everything else in the brew
+function serveRock(items, plan, bb) {
+  const carried = plan.filter((b, i) => !bb.contrib.includes(i)).map(b => b.item); // all but the beads and the feather that caught them, still in order
+  const { dir, eye, right } = aimBasis(), f = new THREE.Vector3(dir.x, 0, dir.z); if (f.lengthSq() < 0.01) f.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)); f.normalize();
+  const at_ = player.pos.clone().addScaledVector(f, 1.6), hand = eye.clone().addScaledVector(dir, 0.5).addScaledVector(right, 0.25).add(new THREE.Vector3(0, -0.35, 0));
+  brewRock(at_.x, at_.z, true, { served: true, from: hand, carried });
+  renderCards(items); fireCard(plan[bb.contrib[0]]); fireCard(bb); linkCards(bb.contrib);
+  setTimeout(() => { if (cine.state === 'idle') { resetCards(); refreshBrewColor(); } }, 1400);
+  const isNew = markFound(bb); callout('BATTER UP', 2, { sub: isNew ? 'NEW COMBO' : 'COMBO' }); if (isNew) setTimeout(() => stamp('NEW COMBO'), 350); xp(250, 'COMBO');
+  vmState.swing = 1; SFX.whoosh(); SFX.rattle(); renderSatchel();
+}
+function startFloat(R) {
+  R.mode = 'float'; R.y = ROCK.floatY; R.t = 0; R.life = 0; R.g.visible = true; if (R.mark) { scene.remove(R.mark); R.mark = null; }
+  R.ring = meshOf(new THREE.TorusGeometry(0.46, 0.025, 4, 18), featherRingMat); R.ring.rotation.x = Math.PI / 2; R.g.add(R.ring);
+  burst(new THREE.Vector3(R.x, R.y, R.z), 0xF4F0E0, 14, 2.5, 0.7, 0.06, 1); SFX.flutter();
+  if (!R.fake && !run.batTip) { run.batTip = true; setTimeout(() => notice(`BATTER UP<em>${coarse ? 'BONK' : 'V TO BONK'} IT AT SOMETHING · THE REST OF THE BREW GOES WITH IT</em>`), 700); }
+}
+// the cargo goes off where the rock hits, like a brew landing: combos, the slow-mo and all
+function rockSplash(R, point, hitE) {
+  if (R.fake || R.splashed || !R.carried || !R.carried.length) return; R.splashed = true;
+  const items = R.carried, color = mixColor(items), p = point.clone();
+  if (cine.state !== 'idle' || blob) { // something else has the camera: it just goes off, no slow-mo
+    const targets = targetsAt(p, hitE); burst(p, color.getHex(), 18, 5, 0.8, 0.09); SFX.splash(false); if (!targets.length) return;
+    planBrew(items, targets, p, { noEcho: true }).forEach((b, k) => setTimeout(() => { applyBeat(b, p, targets); callout(b.word, Math.min(2, b.tier)); if (b.tier >= 2) markFound(b); if (b.extra) applyExtra(b); }, k * 170));
+    return;
+  }
+  const targets = targetsAt(p, hitE), plan = targets.length ? planBrew(items, targets, p, { noEcho: true }) : [];
+  cine.use = targets.length > 0 && (settings.cine === 'always' || plan.some(b => b.tier >= 2 || b.extra));
+  cine.state = 'flight'; slingKills = []; dmgSrc = 'ladle'; renderCards(items);
+  if (cine.use) { stage.classList.add('cine'); startRec('ladle'); }
+  onImpact(p, hitE, items, color, null, { noEcho: true });
 }
 // your bonk, if there's a floating rock in reach: it goes where you're looking, bent a little toward whatever's nearest your aim
 function batRock(tier) {
@@ -8511,7 +8546,7 @@ const NET_ON = {
   cleared(d) { if (netGuest() && d.run === net.run && d.fl === floorNum && d.rk === rkOf(room) && room.fightActive) { room.fightActive = false; roomCleared(); } },
   throw(d, m) {
     if (!net.on || d.run !== net.run || d.rk !== rkOf(room)) return;
-    if (d.k === 'rock') { if (Array.isArray(d.p) && !brewRocks.some(R => R.id === d.id)) { if (d.f >= 2) meteor(+d.p[0] || 0, +d.p[1] || 0, d.f === 3, { id: String(d.id), fake: true }); else brewRock(+d.p[0] || 0, +d.p[1] || 0, !!d.f, { id: String(d.id), fake: true }); } return; } // a partner's beads: you see the rock, and can bat it, but its fall's theirs
+    if (d.k === 'rock') { if (Array.isArray(d.p) && !brewRocks.some(R => R.id === d.id)) { if (d.f >= 2) meteor(+d.p[0] || 0, +d.p[1] || 0, d.f === 3, { id: String(d.id), fake: true }); else brewRock(+d.p[0] || 0, +d.p[1] || 0, !!d.f, { id: String(d.id), fake: true, served: !!d.s, carried: Array.isArray(d.c) ? d.c.filter(k => ING[k]).slice(0, 6).map(k => newItem(k, 'stock')) : null }); } return; } // a partner's beads: you see the rock, and can bat it, but its fall's theirs
     if (d.k === 'bat') { const R = brewRocks.find(q => q.id === d.id && q.mode === 'float'); if (R && Array.isArray(d.d)) { if (Array.isArray(d.o)) { R.x = +d.o[0] || R.x; R.y = +d.o[1] || R.y; R.z = +d.o[2] || R.z; } launchRock(R, new THREE.Vector3(+d.d[0] || 0, +d.d[1] || 0, +d.d[2] || 0), Math.min(3, Math.max(1, d.t | 0)), true); } return; }
     if (!Array.isArray(d.o) || !Array.isArray(d.v)) return;
     fakeThrow(d.o.map(Number), d.v.map(Number), +d.c || 0xCFE8F0); const R = net.remotes.get(m.peer); if (R) R.throwT = 0.35;
