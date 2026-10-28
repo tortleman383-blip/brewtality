@@ -42,7 +42,7 @@ The **Veiled Queen** is the Gloom Moths' mother, from floor 2. She shrieks the t
 
 ## Test lab
 
-**TEST LAB** on the title screen opens a containment chamber for watching any creature's attacks. Esc opens the console: pick the subject, the floor it's from (bosses learn moves the deeper they are), hold its AI, toggle god mode, and run any attack. In the chamber, the number keys fire attacks and 0 brings in a fresh subject. ROOM and SUMMON ROOM open a door in the chamber's back wall onto any kind of room (the arcade, the shops, a treasure room, the garden, a trap room, any boss), built fresh for testing, and +20 COINS · +20 TICKETS fills your purse.
+**TEST LAB** on the title screen opens a containment chamber for watching any creature's attacks. Esc opens the console: pick the subject, the floor it's from (bosses learn moves the deeper they are), hold its AI, toggle god mode, and run any attack. In the chamber, the number keys fire attacks and 0 brings in a fresh subject. SUBJECT and ROOM open a grid of every creature or room: pick a room and a door opens in the chamber's back wall onto it (the arcade, the shops, a treasure room, the garden, a trap room, any boss), built fresh for testing. You start with five of every ingredient and three pot slots; ITEMS turns any shop item on or off, POT SLOTS goes up to four, REFILL INGREDIENTS tops you back up, and +20 COINS · +20 TICKETS fills your purse.
 
 ## Co-op
 
